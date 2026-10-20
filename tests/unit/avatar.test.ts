@@ -34,6 +34,15 @@ describe('Avatar', () => {
     expect(render(`${OWN}/storage/v1/object/public/avatarsx/${UID}/a.png`)).not.toContain('<img')
   })
 
+  it('shows initials for an address that climbs out of the avatars bucket', () => {
+    expect(render(`${OWN}/storage/v1/object/public/avatars/../../sign/avatars/${UID}/a.png`)).not.toContain('<img')
+  })
+
+  it('still shows own photos when the configured address differs only in case, port or slash', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://OwnProject.supabase.co:443/')
+    expect(render(`${OWN}/storage/v1/object/public/avatars/${UID}/avatar-1.png`)).toContain('<img')
+  })
+
   it('shows initials when the deployment has no Supabase address', () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '')
     expect(render(`${OWN}/storage/v1/object/public/avatars/${UID}/avatar-1.png`)).not.toContain('<img')
