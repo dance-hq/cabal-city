@@ -3,7 +3,11 @@ import { Resend } from 'resend'
 
 type Delivery = 'sent' | 'console' | 'unconfigured' | 'failed'
 
-const from = () => process.env.CABAL_EMAIL_FROM || 'Cabal <onboarding@resend.dev>'
+const from = () => {
+  const value = (process.env.CABAL_EMAIL_FROM ?? '').trim()
+  if (!value) return 'Cabal <onboarding@resend.dev>'
+  return value.includes('<') ? value : `Cabal <${value}>`
+}
 
 export async function sendSignInCode(email: string, code: string): Promise<Delivery> {
   const key = process.env.RESEND_API_KEY
