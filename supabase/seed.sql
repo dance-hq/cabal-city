@@ -4,7 +4,7 @@
 
 insert into public.communities (slug, name, description, join_policy)
 values (
-  'chicago-ai',
+  'chicago',
   'Chicago AI Cabal',
   'Founders, developers, designers and other people building with AI in Chicago.',
   'open'
@@ -18,5 +18,5 @@ cross join (values
   ('lobby', 'The main hangout. Say what you''re working on.', 0),
   ('introductions', 'New here? Tell people who you are and what you''re building.', 1)
 ) as r (slug, topic, position)
-where c.slug = 'chicago-ai'
+where c.slug = 'chicago'
 on conflict do nothing;

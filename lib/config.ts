@@ -20,7 +20,7 @@ export function normalizeGithubRepo(value: string | undefined): string {
 
 export const config = {
   appName: 'Cabal',
-  communitySlug: (process.env.NEXT_PUBLIC_CABAL_COMMUNITY ?? '').trim() || 'chicago-ai',
+  communitySlug: (process.env.NEXT_PUBLIC_CABAL_COMMUNITY ?? '').trim() || 'chicago',
   appUrl: normalizeAppUrl(process.env.NEXT_PUBLIC_CABAL_APP_URL),
   githubRepo: normalizeGithubRepo(process.env.NEXT_PUBLIC_CABAL_GITHUB_REPO),
 }
