@@ -58,7 +58,22 @@ export async function POST(request: NextRequest) {
     .eq('slug', config.communitySlug)
     .maybeSingle()
 
-  const created = await admin.auth.admin.createUser({ email, email_confirm: true })
+  let created = await admin.auth.admin.createUser({ email, email_confirm: true })
+  if (created.error?.code === 'email_exists') {
+    // Cabal confirms every account it creates (email_confirm above), so an account that exists but
+    // was never confirmed came from a direct Supabase sign-up, around this form. It may hold a
+    // password someone else chose: remove it, and this person gets a fresh account like anyone new.
+    const existing = await admin.auth.admin.generateLink({ type: 'magiclink', email })
+    const outside = existing.data?.user && !existing.data.user.email_confirmed_at ? existing.data.user : null
+    if (outside) {
+      const removed = await admin.auth.admin.deleteUser(outside.id)
+      if (removed.error) {
+        console.error('[cabal] removing an unconfirmed account failed', removed.error.message)
+        return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
+      }
+      created = await admin.auth.admin.createUser({ email, email_confirm: true })
+    }
+  }
   const isNew = !created.error
   if (created.error && created.error.code !== 'email_exists') {
     console.error('[cabal] createUser failed', created.error.message)
@@ -76,6 +91,11 @@ export async function POST(request: NextRequest) {
   const code = link.data?.properties?.email_otp
   if (link.error || !code) {
     console.error('[cabal] generateLink failed', link.error?.message)
+    return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
+  }
+  // Never email a code for an account Cabal didn't confirm (another direct sign-up got in first).
+  if (!link.data.user?.email_confirmed_at) {
+    console.error('[cabal] refused a code for an unconfirmed account')
     return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
   }
 
