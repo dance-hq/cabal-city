@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         console.error('[cabal] removing an unconfirmed account failed', outside.id, removed.error.message)
         return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
       }
-      console.warn('[cabal] replaced an unconfirmed account that Cabal did not create', outside.id)
+      console.warn('[cabal] replaced an unconfirmed account before sending a code', outside.id)
       created = await admin.auth.admin.createUser({ email, email_confirm: true })
     }
   }
