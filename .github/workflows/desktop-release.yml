@@ -57,7 +57,11 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          if [ -z "$CSC_LINK" ] && [ "$RUNNER_OS" = "macOS" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          # Unset secrets arrive as empty strings, which electron-builder reads as a path ("desktop not a file").
+          for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then unset "$v"; fi
+          done
+          if [ -z "${CSC_LINK:-}" ] && [ "$RUNNER_OS" = "macOS" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
           # The app lives in desktop/, so electron-builder can't find the repo on its own.
           node -e "const f='package.json',p=JSON.parse(require('fs').readFileSync(f));p.repository='https://github.com/'+process.env.GITHUB_REPOSITORY;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
           if [ -n "$GITHUB_REF_NAME" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
