@@ -115,7 +115,8 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       .is('banned_at', null)
     if (error) throw error
     return (data as unknown as MemberRow[]).filter((m) => m.profile?.username)
-  })
+  // Joins arrive live; leaves, bans and deleted accounts are picked up here.
+  }, { refreshInterval: 120_000 })
 
   const channelsQuery = useSWR(['channels', community.id], async () => {
     const { data, error } = await supabase.rpc('my_channels', { p_community: community.id })

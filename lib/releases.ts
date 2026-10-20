@@ -33,7 +33,7 @@ export async function latestRelease(): Promise<ReleaseInfo> {
       url: release.html_url,
       prerelease: release.prerelease,
       mac: [...pick(/arm64\.dmg$/i, 'Apple Silicon'), ...pick(/x64\.dmg$/i, 'Intel')],
-      windows: pick(/\.exe$/i, 'Windows x64'),
+      windows: pick(/\.exe$/i, 'Windows'),
     }
   } catch {
     return { state: 'none' }

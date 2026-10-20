@@ -1,12 +1,18 @@
 {
-  "name": "my-project",
+  "name": "cabal",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "node scripts/db.mjs migrate",
+    "db:seed": "node scripts/db.mjs seed",
+    "desktop": "cd desktop && npm start"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

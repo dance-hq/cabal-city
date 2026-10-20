@@ -165,6 +165,7 @@ export function TeamManageDialog({
                     <Button
                       size="sm"
                       variant="secondary"
+                      aria-label={`Invite ${m.profile.display_name} (@${m.profile.username})`}
                       disabled={busyId === m.user_id}
                       onClick={async () => {
                         const ok = await run(

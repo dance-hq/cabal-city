@@ -1,0 +1,49 @@
+{
+  "name": "cabal-desktop",
+  "productName": "Cabal",
+  "version": "0.1.0",
+  "description": "A buddy list and chat rooms for your local builder community.",
+  "license": "MIT",
+  "author": "Cabal contributors",
+  "main": "src/main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "CABAL_APP_URL=http://localhost:3000 electron .",
+    "check": "node --check src/main.cjs && node --check src/preload.cjs && node --test test/*.test.cjs",
+    "dist": "electron-builder --publish never",
+    "release": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "devDependencies": {
+    "electron": "44.9.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "community.cabal.desktop",
+    "productName": "Cabal",
+    "copyright": "MIT License",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["src/**/*", "build/tray*.png", "build/icon.png", "app.json", "package.json"],
+    "protocols": [{ "name": "Cabal", "schemes": ["cabal"] }],
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }, { "target": "zip", "arch": ["arm64", "x64"] }],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "artifactName": "Cabal-${version}-mac-${arch}.${ext}"
+    },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64", "arm64"] }] },
+    "nsis": { "oneClick": true, "perMachine": false, "artifactName": "Cabal-${version}-windows-setup.${ext}" },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Network;Chat",
+      "maintainer": "Cabal contributors",
+      "artifactName": "Cabal-${version}-linux-${arch}.${ext}"
+    },
+    "publish": [{ "provider": "github", "releaseType": "release" }]
+  }
+}

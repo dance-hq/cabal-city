@@ -8,12 +8,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY
-const slug = process.env.NEXT_PUBLIC_CABAL_COMMUNITY ?? 'chicago-ai'
 const run = Boolean(url && anon && service)
 
 type Person = { id: string; email: string; db: SupabaseClient; username: string }
 
 const tag = Math.random().toString(36).slice(2, 8)
+// A throwaway community, so test people never show up in a real one.
+const slug = `cabal-test-${tag}`
 const admin = run ? createClient(url!, service!, { auth: { persistSession: false } }) : (null as never)
 const people: Person[] = []
 let communityId = ''
@@ -50,6 +51,16 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
   let teamChannelId = ''
 
   beforeAll(async () => {
+    const { data: c, error } = await admin
+      .from('communities')
+      .insert({ slug, name: `Cabal test ${tag}`, join_policy: 'open' })
+      .select('id')
+      .single()
+    if (error) throw error
+    const { error: roomError } = await admin
+      .from('channels')
+      .insert({ community_id: c.id, kind: 'room', slug: 'lobby', name: 'lobby', position: 0 })
+    if (roomError) throw roomError
     ;[ada, grace, outsider] = await Promise.all([person('ada'), person('grace'), person('out')])
     await join(ada, 'Ada Test')
     await join(grace, 'Grace Test')
@@ -57,8 +68,8 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
   })
 
   afterAll(async () => {
-    if (teamId) await admin.from('teams').delete().eq('id', teamId)
-    if (dmId) await admin.from('channels').delete().eq('id', dmId)
+    // Rooms, teams, DMs, members and their messages all go with the community.
+    await admin.from('communities').delete().eq('slug', slug)
     for (const p of people) {
       await admin.from('messages').delete().eq('author_id', p.id)
       await admin.auth.admin.deleteUser(p.id)
@@ -207,9 +218,14 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
 
   it('blocks DMs between people who blocked each other', async () => {
     expect((await grace.db.from('blocks').insert({ blocker_id: grace.id, blocked_id: ada.id })).error).toBeNull()
-    expect((await ada.db.from('messages').select('id').eq('channel_id', dmId)).data).toEqual([])
-    expect((await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: 'hello?' })).error).not.toBeNull()
-    await grace.db.from('blocks').delete().eq('blocker_id', grace.id)
+    try {
+      // Existing history stays readable; only new messages are refused, in both directions.
+      expect((await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: 'hello?' })).error).not.toBeNull()
+      expect((await grace.db.from('messages').insert({ channel_id: dmId, author_id: grace.id, body: 'hi' })).error).not.toBeNull()
+    } finally {
+      await grace.db.from('blocks').delete().eq('blocker_id', grace.id)
+    }
+    expect((await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: 'unblocked' })).error).toBeNull()
   })
 
   it('rate-limits message floods', async () => {

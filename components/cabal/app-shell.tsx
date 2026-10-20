@@ -8,7 +8,6 @@ import { Conversation } from './conversation'
 import { ProfileDialog } from './profile-dialog'
 import { SettingsDialog } from './settings-dialog'
 import { useMedia } from '@/hooks/use-media'
-import { desktop } from '@/lib/desktop'
 import { CabalMark } from '@/components/brand/logo'
 
 export function AppShell({ boot }: { boot: Boot }) {
@@ -26,10 +25,6 @@ export function AppShell({ boot }: { boot: Boot }) {
 function Layout() {
   const { active, open } = useCabal()
   const compact = useMedia('(max-width: 719px)')
-
-  useEffect(() => {
-    desktop()?.setCompact(compact)
-  }, [compact])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -13,7 +13,6 @@ export type DesktopBridge = {
   platform: string
   show(): void
   setBadge(count: number): void
-  setCompact(compact: boolean): void
   getSettings(): Promise<DesktopSettings>
   setSettings(patch: Partial<DesktopSettings>): Promise<DesktopSettings>
   quit(): void
