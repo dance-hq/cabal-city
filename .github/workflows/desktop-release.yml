@@ -58,6 +58,8 @@ jobs:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
           if [ -z "$CSC_LINK" ] && [ "$RUNNER_OS" = "macOS" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          # The app lives in desktop/, so electron-builder can't find the repo on its own.
+          node -e "const f='package.json',p=JSON.parse(require('fs').readFileSync(f));p.repository='https://github.com/'+process.env.GITHUB_REPOSITORY;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
           if [ -n "$GITHUB_REF_NAME" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
             npx electron-builder --publish always
           else
