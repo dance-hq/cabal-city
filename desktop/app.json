@@ -1,4 +1,4 @@
 {
-  "appUrl": "https://cabal.example.com",
-  "allowedOrigins": []
+  "appUrl": "https://www.cabal.city",
+  "allowedOrigins": ["https://cabal.city"]
 }

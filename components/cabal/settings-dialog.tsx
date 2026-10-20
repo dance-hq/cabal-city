@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar } from './avatar'
 import { AdminPanel } from './admin-panel'
+import { DeleteAccount } from './delete-account'
 import { copyInviteLink } from './buddy-list'
 import { useCabal } from './store'
 import { createClient } from '@/lib/supabase/client'
@@ -370,6 +371,7 @@ function AppSettings() {
             Sign out
           </Button>
         </div>
+        <DeleteAccount />
       </div>
     </div>
   )

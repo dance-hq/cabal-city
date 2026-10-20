@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Too many codes requested. Wait a few minutes and try again.' }, { status: 429 })
   }
   await admin.from('auth_code_requests').insert({ email_hash: emailHash, ip_hash: ipHash })
+  // Rate limiting only looks back an hour; nothing older needs keeping.
+  await admin.from('auth_code_requests').delete().lt('created_at', since(24 * 60))
 
   // New accounts on an invite-only community need the current invite code.
   const { data: community } = await admin

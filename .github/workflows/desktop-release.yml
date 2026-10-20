@@ -34,14 +34,12 @@ jobs:
       - run: npm run check
 
       - name: Point the app at your hosted Cabal
+        # Forks: set the repository variable CABAL_APP_URL. Without it the
+        # address already in desktop/app.json is used.
+        if: ${{ vars.CABAL_APP_URL != '' }}
         env:
           CABAL_APP_URL: ${{ vars.CABAL_APP_URL }}
-        run: |
-          if [ -z "$CABAL_APP_URL" ]; then
-            echo "::error::Set the repository variable CABAL_APP_URL (Settings → Secrets and variables → Actions → Variables)."
-            exit 1
-          fi
-          node -e "const f='app.json',c=JSON.parse(require('fs').readFileSync(f));c.appUrl=process.env.CABAL_APP_URL;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+        run: node -e "const f='app.json',c=JSON.parse(require('fs').readFileSync(f));c.appUrl=process.env.CABAL_APP_URL;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
 
       - name: Match the version to the tag
         if: startsWith(github.ref, 'refs/tags/v')
