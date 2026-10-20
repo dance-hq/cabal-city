@@ -1,0 +1,59 @@
+import { cn } from '@/lib/utils'
+import type { ShownStatus } from '@/lib/types'
+import { StatusDot } from './status-dot'
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+export function Avatar({
+  name,
+  url,
+  size = 28,
+  status,
+  className,
+}: {
+  name: string
+  url?: string | null
+  size?: number
+  status?: ShownStatus
+  className?: string
+}) {
+  const dim = status === 'offline'
+  return (
+    <span className={cn('relative inline-flex shrink-0', className)} style={{ width: size, height: size }}>
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt=""
+          width={size}
+          height={size}
+          className={cn('size-full rounded-full object-cover', dim && 'opacity-55 grayscale')}
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className={cn(
+            'flex size-full items-center justify-center rounded-full bg-secondary font-medium text-secondary-foreground',
+            dim && 'opacity-60',
+          )}
+          style={{ fontSize: Math.max(10, Math.round(size * 0.38)) }}
+        >
+          {initials(name)}
+        </span>
+      )}
+      {status && (
+        <StatusDot
+          status={status}
+          className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
+          size={size >= 40 ? 12 : 9}
+        />
+      )}
+    </span>
+  )
+}
