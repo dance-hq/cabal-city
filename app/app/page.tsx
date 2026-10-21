@@ -20,7 +20,7 @@ export default async function AppPage() {
   const [{ data: profile }, { data: settings }, { data: membership }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url, company, bio, status_text, identity')
+      .select('id, username, display_name, avatar_url, company, bio, status_text, identity, links')
       .eq('id', user.id)
       .single(),
     supabase

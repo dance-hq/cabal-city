@@ -12,6 +12,7 @@ export type Profile = {
   bio: string | null
   status_text: string | null
   identity: Identity | null
+  links: string[] | null
 }
 
 export type Settings = {

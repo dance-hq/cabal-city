@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { MessageSquare } from 'lucide-react'
+import { ExternalLink, MessageSquare, Plus } from 'lucide-react'
+import { linkLabel } from '@/lib/username'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -92,6 +93,39 @@ export function ProfileDialog() {
                       </div>
                     )}
                   </dl>
+                )}
+                {self && !profile.company && !profile.bio && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close()
+                      setSettingsOpen(true)
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-md border border-dashed px-3 py-2.5 text-left transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Plus className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="flex flex-col">
+                      <span className="text-sm font-medium">Add what you&apos;re building</span>
+                      <span className="text-xs text-muted-foreground">Helps the right people find you.</span>
+                    </span>
+                  </button>
+                )}
+                {profile.links && profile.links.length > 0 && (
+                  <ul className="flex flex-col gap-1 text-sm">
+                    {profile.links.map((href) => (
+                      <li key={href} className="min-w-0">
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow ugc"
+                          className="inline-flex max-w-full items-center gap-1.5 rounded text-foreground/90 underline decoration-border underline-offset-2 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                          <span className="truncate">{linkLabel(href)}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
                 )}
                 <MemberPlaces personId={profile.id} self={self} onNavigate={close} />
                 {member && (

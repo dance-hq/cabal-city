@@ -18,6 +18,8 @@ import { IdentityPicker } from './identity-picker'
 import { DeleteAccount } from './delete-account'
 import { PinSetting } from './pin-prompt'
 import { copyInviteLink } from './buddy-list'
+import { CreateTeamDialog } from './team-dialogs'
+import { cleanLinks } from '@/lib/username'
 import { useCabal } from './store'
 import { createClient } from '@/lib/supabase/client'
 import { avatarProblem, uploadAvatar } from '@/lib/avatar'
@@ -87,12 +89,19 @@ function ProfileSettings() {
     bio: me.bio ?? '',
   })
   const [identity, setIdentity] = useState<Identity | null>(me.identity)
+  const [links, setLinks] = useState<string[]>(() => [...(me.links ?? []), '', '', ''].slice(0, Math.max(3, me.links?.length ?? 0)))
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [creatingTeam, setCreatingTeam] = useState(false)
   const file = useRef<HTMLInputElement>(null)
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
+    const cleaned = cleanLinks(links)
+    if (cleaned.length < links.filter((l) => l.trim()).length) {
+      toast.error("One of your links doesn't look like a web address.")
+      return
+    }
     setBusy(true)
     const { error } = await createClient()
       .from('profiles')
@@ -102,12 +111,14 @@ function ProfileSettings() {
         identity,
         company: fields.company.trim() || null,
         bio: fields.bio.trim() || null,
+        links: cleaned.length ? cleaned : null,
       })
       .eq('id', userId)
     setBusy(false)
     if (error) toast.error(error.code === '23505' ? 'That username is taken.' : friendlyError(error))
     else {
       toast.success('Profile saved')
+      setLinks([...cleaned, '', '', ''].slice(0, Math.max(3, cleaned.length)))
       refreshMembers()
     }
   }
@@ -130,6 +141,7 @@ function ProfileSettings() {
     setFields((f) => ({ ...f, [k]: e.target.value }))
 
   return (
+    <>
     <form onSubmit={save} className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <Avatar name={me.display_name ?? ''} url={me.avatar_url} size={52} />
@@ -174,19 +186,66 @@ function ProfileSettings() {
             maxLength={24}
             value={fields.username}
             onChange={set('username')}
+            aria-describedby="s-username-hint"
             className="font-mono"
           />
+          <p id="s-username-hint" className="text-xs text-muted-foreground">
+            People @mention you with it.
+          </p>
         </div>
       </div>
-      <IdentityPicker value={identity} onChange={setIdentity} />
+      <IdentityPicker value={identity} onChange={setIdentity} legend="Role" />
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="s-bio">What you&apos;re building</Label>
+        <Textarea
+          id="s-bio"
+          maxLength={280}
+          rows={3}
+          value={fields.bio}
+          onChange={set('bio')}
+          placeholder="An agent that files my receipts"
+        />
+      </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="s-company">Company or project</Label>
         <Input id="s-company" maxLength={80} value={fields.company} onChange={set('company')} />
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Want a place for it here?{' '}
+          <button
+            type="button"
+            onClick={() => setCreatingTeam(true)}
+            className="rounded text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Start a team
+          </button>{' '}
+          and it shows on your profile.
+        </p>
       </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="s-bio">What you&apos;re building</Label>
-        <Textarea id="s-bio" maxLength={280} rows={3} value={fields.bio} onChange={set('bio')} />
-      </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 text-sm leading-none font-medium">Links</legend>
+        {links.map((value, i) => (
+          <Input
+            key={i}
+            aria-label={`Link ${i + 1}`}
+            inputMode="url"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={200}
+            value={value}
+            onChange={(e) => setLinks((ls) => ls.map((l, j) => (j === i ? e.target.value : l)))}
+            placeholder={LINK_PLACEHOLDERS[i] ?? 'https://'}
+          />
+        ))}
+        {links.length < 4 && (
+          <button
+            type="button"
+            onClick={() => setLinks((ls) => [...ls, ''])}
+            className="self-start rounded text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Add another link
+          </button>
+        )}
+      </fieldset>
       <div>
         <Button type="submit" disabled={busy}>
           {busy && <Loader2 className="animate-spin" aria-hidden />}
@@ -194,8 +253,12 @@ function ProfileSettings() {
         </Button>
       </div>
     </form>
+    <CreateTeamDialog open={creatingTeam} onOpenChange={setCreatingTeam} />
+    </>
   )
 }
+
+const LINK_PLACEHOLDERS = ['yoursite.com', 'x.com/you', 'linkedin.com/in/you', 'github.com/you']
 
 function NotificationSettings() {
   const { settings, updateSettings } = useCabal()
