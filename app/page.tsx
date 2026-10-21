@@ -76,16 +76,22 @@ export default async function Home() {
                 </Link>
               )}
             </div>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Free and open source for Windows, Mac and Linux.
+            <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground">
+              <span>Free</span>
+              <span aria-hidden className="text-muted-foreground/50">
+                ·
+              </span>
+              <span>Mac, Windows &amp; Linux</span>
               {githubUrl && (
                 <>
-                  {' '}
+                  <span aria-hidden className="text-muted-foreground/50">
+                    ·
+                  </span>
                   <Link
                     href="/login"
                     className="group inline-flex items-center gap-0.5 rounded font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    Or open Cabal in your browser
+                    Open in browser
                     <ArrowUpRight
                       className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
                       aria-hidden
