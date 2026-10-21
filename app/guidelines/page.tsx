@@ -50,7 +50,7 @@ export default function GuidelinesPage() {
       <LegalSection title="What admins can do">
         <p>
           Admins can delete messages in community rooms that break these guidelines and remove people from the
-          community. They can&apos;t read your DMs or team rooms, so report anything there that needs attention. We start with a
+          community. They can&apos;t read your DMs or invite-only team rooms, so report anything there that needs attention. We start with a
           friendly word where we can, and act right away for threats, harassment, spam or anything illegal. If you
           think we got it wrong, email us and a different person will take a look.
         </p>

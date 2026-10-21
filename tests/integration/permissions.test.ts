@@ -131,7 +131,11 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
   })
 
   it('keeps private team messages away from non-members, including realtime', async () => {
-    const created = await ada.db.rpc('create_team', { p_community: communityId, p_name: `Test Team ${tag}` })
+    const created = await ada.db.rpc('create_team', {
+      p_community: communityId,
+      p_name: `Test Team ${tag}`,
+      p_visibility: 'private',
+    })
     expect(created.error).toBeNull()
     teamId = created.data as string
     const { data: ch } = await ada.db.from('channels').select('id').eq('team_id', teamId).single()
@@ -168,7 +172,53 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect((await outsider.db.rpc('invite_to_team', { p_team: teamId, p_user: outsider.id })).error).not.toBeNull()
     expect((await outsider.db.rpc('mark_read', { p_channel: teamChannelId })).error).not.toBeNull()
 
+    // Invite-only rooms don't show up in the directory and can't be joined.
+    const listed = await outsider.db.rpc('community_teams', { p_community: communityId })
+    expect((listed.data as { id: string }[]).map((t) => t.id)).not.toContain(teamId)
+    expect((await outsider.db.rpc('join_team', { p_team: teamId })).error?.message).toMatch(/not found/i)
+
     await outsider.db.removeAllChannels()
+  })
+
+  it('lets anyone in the community find and join an open team room', async () => {
+    const created = await ada.db.rpc('create_team', {
+      p_community: communityId,
+      p_name: `Open Team ${tag}`,
+      p_visibility: 'public',
+    })
+    expect(created.error).toBeNull()
+    const openTeam = created.data as string
+    const { data: ch } = await ada.db.from('channels').select('id').eq('team_id', openTeam).single()
+    const hello = `building in public ${tag}`
+    expect((await ada.db.from('messages').insert({ channel_id: ch!.id, author_id: ada.id, body: hello })).error).toBeNull()
+
+    // Listed for everyone, but you join before you read or post.
+    const listed = await outsider.db.rpc('community_teams', { p_community: communityId })
+    const entry = (listed.data as { id: string; joined: boolean; member_count: number }[]).find((t) => t.id === openTeam)
+    expect(entry).toMatchObject({ joined: false, member_count: 1 })
+    expect((await outsider.db.from('messages').select('id').eq('channel_id', ch!.id)).data).toEqual([])
+    expect((await outsider.db.from('messages').insert({ channel_id: ch!.id, author_id: outsider.id, body: 'x' })).error).not.toBeNull()
+
+    const joined = await outsider.db.rpc('join_team', { p_team: openTeam })
+    expect(joined.error).toBeNull()
+    expect(joined.data).toBe(ch!.id)
+    const history = await outsider.db.from('messages').select('body').eq('channel_id', ch!.id)
+    expect(history.data?.map((m) => m.body)).toContain(hello)
+    expect((await outsider.db.from('messages').insert({ channel_id: ch!.id, author_id: outsider.id, body: 'hi all' })).error).toBeNull()
+    // Joining twice is harmless and doesn't post a second notice.
+    expect((await outsider.db.rpc('join_team', { p_team: openTeam })).error).toBeNull()
+    const notices = await ada.db.from('messages').select('body').eq('channel_id', ch!.id).eq('kind', 'system').like('body', '%joined.')
+    expect(notices.data).toHaveLength(1)
+
+    // Only owners decide who can join. Going invite-only keeps current members.
+    expect((await outsider.db.rpc('set_team_visibility', { p_team: openTeam, p_visibility: 'private' })).error).not.toBeNull()
+    expect((await ada.db.rpc('set_team_visibility', { p_team: openTeam, p_visibility: 'private' })).error).toBeNull()
+    expect((await grace.db.rpc('join_team', { p_team: openTeam })).error).not.toBeNull()
+    expect((await outsider.db.from('messages').select('id').eq('channel_id', ch!.id)).data?.length).toBeGreaterThan(0)
+
+    // Leaving takes away access again.
+    expect((await outsider.db.rpc('remove_team_member', { p_team: openTeam, p_user: outsider.id })).error).toBeNull()
+    expect((await outsider.db.from('messages').select('id').eq('channel_id', ch!.id)).data).toEqual([])
   })
 
   it('lets an invited member join and talk, and owners remove them', async () => {

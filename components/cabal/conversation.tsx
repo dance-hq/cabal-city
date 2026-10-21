@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Bell, BellOff, Hash, Lock, MoreHorizontal, Users } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, Hash, MoreHorizontal, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
 import { Composer } from './composer'
 import { MessageList } from './message-list'
 import { STATUS_LABEL, StatusDot } from './status-dot'
-import { TeamManageDialog } from './team-dialogs'
+import { TeamIcon, TeamManageDialog } from './team-dialogs'
 import { useCabal } from './store'
 import { useMessages } from '@/hooks/use-messages'
 import { useTyping } from '@/hooks/use-typing'
@@ -137,8 +137,9 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
           {channel.kind === 'team' && (
             <div className="flex min-w-0 items-baseline gap-2 px-1">
               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold">
-                <Lock className="size-3.5 text-muted-foreground" aria-hidden />
+                <TeamIcon visibility={channel.team_visibility} className="size-3.5 text-muted-foreground" />
                 {channel.team_name}
+                {channel.team_visibility !== 'public' && <span className="sr-only">(invite-only)</span>}
               </span>
               <span className="truncate font-mono text-xs text-muted-foreground">#{channel.slug}</span>
             </div>
