@@ -60,7 +60,7 @@ export function TeamIcon({ visibility, className }: { visibility: TeamVisibility
   return <Icon className={className} aria-hidden />
 }
 
-async function openTeam(communityId: string, teamId: string, openChannel: (id: string) => void, refresh: () => void) {
+export async function openTeam(communityId: string, teamId: string, openChannel: (id: string) => void, refresh: () => void) {
   const { data } = await createClient().rpc('my_channels', { p_community: communityId })
   refresh()
   void refreshTeamRooms(communityId)

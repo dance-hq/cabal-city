@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Avatar } from './avatar'
+import { MemberPlaces } from './member-places'
 import { ReportDialog, setBlocked } from './moderation'
 import { STATUS_LABEL } from './status-dot'
 import { useCabal } from './store'
@@ -92,6 +93,7 @@ export function ProfileDialog() {
                     )}
                   </dl>
                 )}
+                <MemberPlaces personId={profile.id} self={self} onNavigate={close} />
                 {member && (
                   <p className="text-xs text-muted-foreground">
                     Joined {new Date(member.joined_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}

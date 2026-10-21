@@ -179,7 +179,7 @@ function PeopleList({ people }: { people: PanelPerson[] }) {
               aria-label={spoken}
               className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              <Avatar name={p.name} url={p.profile.avatar_url} size={28} status={p.status} lockedIn={p.lockedIn} />
+              <Avatar name={p.name} url={p.profile.avatar_url} size={32} status={p.status} lockedIn={p.lockedIn} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span
