@@ -1,3 +1,5 @@
+import type { Identity } from './identity'
+
 export type Availability = 'online' | 'away' | 'dnd' | 'invisible'
 export type ShownStatus = 'online' | 'away' | 'dnd' | 'offline'
 
@@ -9,6 +11,7 @@ export type Profile = {
   company: string | null
   bio: string | null
   status_text: string | null
+  identity: Identity | null
 }
 
 export type Settings = {

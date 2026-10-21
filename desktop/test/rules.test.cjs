@@ -169,3 +169,61 @@ test('badge counts are whole, positive and capped', () => {
   assert.equal(rules.badgeCount(2.5), 0)
   assert.equal(rules.badgeCount(5000), 999)
 })
+
+test('the window ID matches the one the installer stamps on shortcuts', () => {
+  assert.equal(rules.APP_ID, require('../package.json').build.appId)
+})
+
+test('Cabal asks to be pinned on first run, then at most twice more, days apart', () => {
+  const day = 24 * 60 * 60 * 1000
+  let s = rules.normalizePinState(null)
+  assert.equal(rules.pinAskDue(s, false, 0), true)
+  s = rules.pinAnswer(s, 'shown', 0)
+  assert.equal(rules.pinAskDue(s, false, day), false)
+  assert.equal(rules.pinAskDue(s, false, 3 * day), true)
+  s = rules.pinAnswer(rules.pinAnswer(s, 'shown', 3 * day), 'shown', 6 * day)
+  assert.equal(s.asks, 3)
+  assert.equal(rules.pinAskDue(s, false, 60 * day), false)
+})
+
+test('pinning, or saying stop, ends the asking', () => {
+  const fresh = rules.normalizePinState({})
+  assert.equal(rules.pinAskDue(fresh, true, 0), false)
+  assert.equal(rules.pinAskDue(rules.pinAnswer(fresh, 'never', 0), false, 0), false)
+  assert.equal(rules.pinAskDue(rules.pinAnswer(fresh, 'pinned', 0), null, 0), false)
+  assert.deepEqual(rules.pinAnswer(fresh, 'later', 5), fresh)
+  assert.deepEqual(rules.pinAnswer(fresh, 'whatever', 5), fresh)
+  assert.deepEqual(rules.normalizePinState({ asks: -1, lastAskedAt: 'x', done: 'yes' }), fresh)
+})
+
+test('a Windows taskbar pin is found by its ID or by the program it opens', () => {
+  const exe = 'C:\\Users\\Ana\\AppData\\Local\\Programs\\cabal-desktop\\Cabal.exe'
+  assert.equal(rules.taskbarHasApp([{ target: 'C:\\Windows\\explorer.exe' }, { appUserModelId: rules.APP_ID }], exe, rules.APP_ID), true)
+  assert.equal(rules.taskbarHasApp([{ target: exe.toUpperCase() }], exe, rules.APP_ID), true)
+  assert.equal(rules.taskbarHasApp([{ target: 'C:\\Other\\Cabal.exe' }, null], exe, rules.APP_ID), false)
+  assert.equal(rules.taskbarHasApp([{ target: '' }], '', rules.APP_ID), false)
+})
+
+test('a Dock entry is found by the app bundle it points at', () => {
+  const dock = `(
+        {
+        "tile-data" =         {
+            "file-data" =             {
+                "_CFURLString" = "file:///Applications/Cabal.app/";
+                "_CFURLStringType" = 15;
+            };
+        };
+    },
+        {
+        "tile-data" =         {
+            "file-data" =             {
+                "_CFURLString" = "file:///System/Applications/Mail.app/";
+                "_CFURLStringType" = 15;
+            };
+        };
+    }
+)`
+  assert.equal(rules.dockKeepsApp(dock, 'file:///Applications/Cabal.app'), true)
+  assert.equal(rules.dockKeepsApp(dock, 'file:///Volumes/Cabal/Cabal.app'), false)
+  assert.equal(rules.dockKeepsApp(null, 'file:///Applications/Cabal.app'), false)
+})

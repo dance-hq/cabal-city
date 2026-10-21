@@ -14,13 +14,16 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar } from './avatar'
 import { AdminPanel } from './admin-panel'
+import { IdentityPicker } from './identity-picker'
 import { DeleteAccount } from './delete-account'
+import { PinSetting } from './pin-prompt'
 import { copyInviteLink } from './buddy-list'
 import { useCabal } from './store'
 import { createClient } from '@/lib/supabase/client'
 import { avatarProblem, uploadAvatar } from '@/lib/avatar'
 import { desktop, type DesktopSettings } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
+import type { Identity } from '@/lib/identity'
 import { ensureNotificationPermission, notificationsSupported, playChime } from '@/lib/notify'
 
 type Tab = 'profile' | 'notifications' | 'app' | 'community'
@@ -83,6 +86,7 @@ function ProfileSettings() {
     company: me.company ?? '',
     bio: me.bio ?? '',
   })
+  const [identity, setIdentity] = useState<Identity | null>(me.identity)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
   const file = useRef<HTMLInputElement>(null)
@@ -95,6 +99,7 @@ function ProfileSettings() {
       .update({
         display_name: fields.display_name.trim(),
         username: fields.username.trim(),
+        identity,
         company: fields.company.trim() || null,
         bio: fields.bio.trim() || null,
       })
@@ -173,6 +178,7 @@ function ProfileSettings() {
           />
         </div>
       </div>
+      <IdentityPicker value={identity} onChange={setIdentity} />
       <div className="flex flex-col gap-2">
         <Label htmlFor="s-company">Company or project</Label>
         <Input id="s-company" maxLength={80} value={fields.company} onChange={set('company')} />
@@ -299,6 +305,7 @@ function AppSettings() {
       {bridge && desk ? (
         <div className="flex flex-col gap-4">
           <h3 className="text-sm font-medium">Desktop</h3>
+          <PinSetting />
           <Toggle
             id="d-login"
             label="Open Cabal when I log in"
@@ -322,11 +329,11 @@ function AppSettings() {
           {desk.sessionOverlay !== undefined && (
             <Toggle
               id="d-overlay"
-              label="Show the session timer when Cabal is in the background"
+              label="Show the session timer"
               hint={
                 desktop()?.setBuddies
-                  ? 'A small clock in the corner of your screen while a session runs. Click it for your buddy list; drag it wherever you like.'
-                  : 'A small clock in the corner of your screen while a session runs. Drag it wherever you like.'
+                  ? 'A small clock that stays in the corner of your screen while a session runs, even over Cabal. Click it for your buddy list; drag it wherever you like.'
+                  : 'A small clock that stays in the corner of your screen while a session runs, even over Cabal. Drag it wherever you like.'
               }
               checked={desk.sessionOverlay}
               onChange={(v) => patch({ sessionOverlay: v })}

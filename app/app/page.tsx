@@ -5,7 +5,7 @@ import { getCommunity } from '@/lib/community'
 import { createClient } from '@/lib/supabase/server'
 import type { Profile, Settings } from '@/lib/types'
 
-export const metadata: Metadata = { title: 'Cabal' }
+export const metadata: Metadata = { title: { absolute: 'Cabal' } }
 
 export default async function AppPage() {
   const supabase = await createClient()
@@ -20,7 +20,7 @@ export default async function AppPage() {
   const [{ data: profile }, { data: settings }, { data: membership }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url, company, bio, status_text')
+      .select('id, username, display_name, avatar_url, company, bio, status_text, identity')
       .eq('id', user.id)
       .single(),
     supabase

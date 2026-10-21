@@ -12,6 +12,7 @@ import { useLockIns } from '@/hooks/use-lock-ins'
 import type { Channel, Message, Profile, ShownStatus } from '@/lib/types'
 import { Avatar } from './avatar'
 import { copyInviteLink } from './buddy-list'
+import { LockInControl } from './session-bar'
 import { MESSAGE_COLUMNS, useCabal } from './store'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
 
@@ -51,10 +52,13 @@ export function Home() {
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="app-drag flex h-11 shrink-0 items-center justify-between gap-3 border-b px-5">
         <h1 className="truncate text-sm font-semibold">{community.name}</h1>
-        <p className="shrink-0 font-mono text-[11px] text-muted-foreground">
-          {here.length} here
-          {lockIns.size > 0 ? ` · ${lockIns.size} locked in` : ''}
-        </p>
+        <div className="flex shrink-0 items-center gap-3">
+          <p className="font-mono text-[11px] text-muted-foreground">
+            {here.length} here
+            {lockIns.size > 0 ? ` · ${lockIns.size} locked in` : ''}
+          </p>
+          <LockInControl />
+        </div>
       </header>
 
       <div className="quiet-scroll min-h-0 flex-1 overflow-y-auto">
@@ -97,7 +101,7 @@ function LockedIn({ lockIns, now }: { lockIns: ReturnType<typeof useLockIns>; no
     <Block label={`Locked in · ${rows.length}`}>
       {rows.length === 0 ? (
         <Quiet>
-          Nobody&apos;s locked in right now. When you want to focus, tap Lock in in the sidebar.
+          Nobody&apos;s locked in right now. When you want to focus, tap Lock in at the top right.
         </Quiet>
       ) : (
         <ul className="flex flex-col">
@@ -111,7 +115,7 @@ function LockedIn({ lockIns, now }: { lockIns: ReturnType<typeof useLockIns>; no
                   onClick={() => showProfile(r.id)}
                   className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Avatar name={name} url={r.profile!.avatar_url} size={32} />
+                  <Avatar name={name} url={r.profile!.avatar_url} size={32} lockedIn />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm leading-tight font-medium">
                       {name}
@@ -306,7 +310,7 @@ function HereNow({ people }: { people: Person[] }) {
 }
 
 function Channels() {
-  const { channels, presence, open, community } = useCabal()
+  const { channels, presence, open, community, userId } = useCabal()
   const teamRooms = useTeamRooms(community.id)
   const [browsing, setBrowsing] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -317,7 +321,7 @@ function Channels() {
     <Block label="Channels">
       <ul className="flex flex-col">
         {rooms.map((r) => {
-          const count = [...presence.values()].filter((p) => p.rooms.has(r.id)).length
+          const count = [...presence].filter(([id, p]) => id !== userId && p.rooms.has(r.id)).length
           return (
             <li key={r.id}>
               <button

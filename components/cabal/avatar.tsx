@@ -15,17 +15,24 @@ export function Avatar({
   url,
   size = 28,
   status,
+  lockedIn,
   className,
 }: {
   name: string
   url?: string | null
   size?: number
   status?: ShownStatus
+  // Draws the live current around the avatar (see .locked-in in globals.css).
+  lockedIn?: boolean
   className?: string
 }) {
   const dim = status === 'offline'
+  const ring = size >= 48 ? 2.5 : size >= 26 ? 2 : 1.5
   return (
-    <span className={cn('relative inline-flex shrink-0', className)} style={{ width: size, height: size }}>
+    <span
+      className={cn('relative inline-flex shrink-0', lockedIn && 'locked-in', className)}
+      style={{ width: size, height: size, ...(lockedIn ? { '--ring': `${ring}px` } : null) } as React.CSSProperties}
+    >
       {url && isOwnAvatarUrl(url) ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -51,7 +58,7 @@ export function Avatar({
       {status && (
         <StatusDot
           status={status}
-          className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
+          className="absolute -right-0.5 -bottom-0.5 z-[1] ring-2 ring-sidebar"
           size={size >= 40 ? 12 : 9}
         />
       )}

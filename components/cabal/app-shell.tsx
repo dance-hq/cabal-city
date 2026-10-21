@@ -11,6 +11,7 @@ import { UpdateBar } from './update-bar'
 import { WorkSessionProvider } from './work-session'
 import { Home } from './home'
 import { DesktopBuddies } from './desktop-buddies'
+import { PinPrompt } from './pin-prompt'
 import { useMedia } from '@/hooks/use-media'
 
 export function AppShell({ boot }: { boot: Boot }) {
@@ -22,6 +23,7 @@ export function AppShell({ boot }: { boot: Boot }) {
           <ProfileDialog />
           <SettingsDialog />
           <DesktopBuddies />
+          <PinPrompt />
         </WorkSessionProvider>
       </CabalProvider>
     </SWRConfig>
@@ -44,7 +46,7 @@ function Layout() {
     return (
       <div className="flex h-svh flex-col overflow-hidden bg-sidebar">
         <UpdateBar />
-        {active ? <Conversation compact /> : <BuddyList />}
+        {active ? <Conversation compact /> : <BuddyList compact />}
       </div>
     )
   }

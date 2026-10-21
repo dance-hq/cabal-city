@@ -51,7 +51,7 @@ export async function copyInviteLink(communityId: string) {
   }
 }
 
-export function BuddyList() {
+export function BuddyList({ compact }: { compact?: boolean }) {
   const {
     community,
     members,
@@ -198,7 +198,7 @@ export function BuddyList() {
       </header>
       <ConnectionBanner />
       <MeCard />
-      <SessionBar />
+      {compact && <SessionBar />}
       <div className="px-3 pb-2">
         <label className="relative block">
           <span className="sr-only">Search people and channels</span>
@@ -249,7 +249,9 @@ export function BuddyList() {
         {visibleRooms.length > 0 && (
           <Section label="Channels">
             {visibleRooms.map((r) => {
-              const here = [...presence.values()].filter((p) => p.rooms.has(r.id)).length
+              // Other people only: counting yourself made a bare "1" that read as unread.
+              const here = [...presence].filter(([id, p]) => id !== userId && p.rooms.has(r.id)).length
+              const hereLabel = `${here} ${here === 1 ? 'person' : 'people'} here now`
               return (
                 <Row key={r.id} selected={active === r.id} onClick={() => open(r.id)} unread={r.unread} quiet muted={r.muted}>
                   <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -257,7 +259,12 @@ export function BuddyList() {
                     {r.slug}
                   </span>
                   {here > 0 && (
-                    <span className="ml-auto font-mono text-[11px] text-muted-foreground" aria-label={`${here} here now`}>
+                    <span
+                      className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground"
+                      title={hereLabel}
+                      aria-label={hereLabel}
+                    >
+                      <span className="size-1.5 rounded-full bg-online" aria-hidden />
                       {here}
                     </span>
                   )}
@@ -570,7 +577,7 @@ function PersonRow({
         aria-label={`Message ${name}, ${STATUS_LABEL[status]}${sub && sub !== STATUS_LABEL[status] ? `, ${sub}` : ''}${unread ? `, ${unread} unread` : ''}`}
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
-        <Avatar name={name} url={avatarUrl} size={28} status={status} />
+        <Avatar name={name} url={avatarUrl} size={28} status={status} lockedIn={!!lockedIn} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span
             className={cn(

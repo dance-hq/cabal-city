@@ -33,9 +33,20 @@ export type DesktopBridge = {
   // Desktop apps released before the corner buddy list don't have these.
   setBuddies?(list: OverlayBuddies): void
   onBuddyAction?(cb: (action: BuddyAction) => void): () => void
+  // Desktop apps released before the pin prompt (0.1.2 and older) don't have these.
+  getPin?(): Promise<DesktopPin | null>
+  answerPin?(answer: PinAnswer): void
+  moveToApplications?(): Promise<boolean>
 }
 
 export type DesktopUpdate = { version: string }
+
+// `pinned` is null when the system won't say (then the person tells us).
+export type DesktopPin =
+  | { supported: false }
+  | { supported: true; pinned: boolean | null; needsMove: boolean; ask: boolean }
+
+export type PinAnswer = 'shown' | 'later' | 'never' | 'pinned'
 
 declare global {
   interface Window {
