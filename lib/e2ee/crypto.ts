@@ -20,6 +20,8 @@ const ECDH = { name: 'ECDH', namedCurve: 'P-256' } as const
 
 type Bytes = Uint8Array<ArrayBuffer>
 
+const encode = (s: string): Bytes => new Uint8Array(utf8.encode(s))
+
 export function toBase64(data: ArrayBuffer | Uint8Array): string {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
   let s = ''
@@ -125,7 +127,7 @@ export function messageKey(conversation: CryptoKey, ctx: MessageContext): Promis
 }
 
 function messageAad(ctx: MessageContext) {
-  return utf8.encode(['cabal-dm-v1', ctx.channelId, ctx.messageId, ctx.authorId, ctx.sk, ctx.rk].join('|'))
+  return encode(['cabal-dm-v1', ctx.channelId, ctx.messageId, ctx.authorId, ctx.sk, ctx.rk].join('|'))
 }
 
 // [4-byte length][text][zeros] in 64-byte steps, so "ok" and "see you at six" look the same.
@@ -178,7 +180,7 @@ export type KeyringEntry = { id: string; privateKey: CryptoKey; publicKey: strin
 
 export async function packKeyring(keys: KeyringEntry[]): Promise<Bytes> {
   const packed = await Promise.all(keys.map(async (k) => ({ id: k.id, key: await exportPrivateKey(k.privateKey) })))
-  return utf8.encode(JSON.stringify({ v: 1, keys: packed }))
+  return encode(JSON.stringify({ v: 1, keys: packed }))
 }
 
 export async function unpackKeyring(bytes: Bytes): Promise<KeyringEntry[]> {
@@ -249,7 +251,7 @@ async function recoveryLock(recoveryKey: string, userId: string): Promise<Bytes>
   return hkdf(base, 'cabal-recovery-v1', userId)
 }
 
-const backupAad = (userId: string) => utf8.encode(`cabal-backup-v1|${userId}`)
+const backupAad = (userId: string) => encode(`cabal-backup-v1|${userId}`)
 
 export async function lockWithRecoveryKey(keyring: Bytes, recoveryKey: string, userId: string) {
   const { iv, ct } = await encrypt(await recoveryLock(recoveryKey, userId), keyring, backupAad(userId))
@@ -288,7 +290,7 @@ async function transferKey(mine: CryptoKey, theirs: string, x: DeviceExchange) {
   return hkdf(shared, 'cabal-device-v1', [x.requestKey, x.approverKey, x.requestNonce, x.approverNonce].join('|'))
 }
 
-const deviceAad = utf8.encode('cabal-device-v1')
+const deviceAad = encode('cabal-device-v1')
 
 export async function sealForDevice(keyring: Bytes, approverKey: CryptoKey, x: DeviceExchange) {
   const { iv, ct } = await encrypt(await transferKey(approverKey, x.requestKey, x), keyring, deviceAad)

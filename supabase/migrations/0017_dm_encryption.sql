@@ -102,9 +102,10 @@ alter publication supabase_realtime add table public.e2ee_device_requests;
 -- ---------------------------------------------------------------------------
 
 -- Publishes your key and its backup. Refuses when you already have a key,
--- unless you're resetting (p_replace), which retires the old one.
+-- unless you're resetting (p_replace), which retires the old one. The device
+-- picks the id, because the backup it locks up already names the key.
 create function public.e2ee_publish_key(
-  p_public_key text, p_backup_iv text, p_backup text, p_replace boolean default false
+  p_id uuid, p_public_key text, p_backup_iv text, p_backup text, p_replace boolean default false
 ) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -124,7 +125,7 @@ begin
     end if;
     update public.e2ee_keys set retired_at = now() where user_id = auth.uid() and retired_at is null;
   end if;
-  insert into public.e2ee_keys (user_id, public_key) values (auth.uid(), p_public_key) returning id into kid;
+  insert into public.e2ee_keys (id, user_id, public_key) values (p_id, auth.uid(), p_public_key) returning id into kid;
   insert into public.e2ee_backups (user_id, key_id, iv, keyring)
     values (auth.uid(), kid, p_backup_iv, p_backup)
     on conflict (user_id) do update
@@ -359,7 +360,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 revoke all on function public.e2ee_can_see_key(uuid) from public, anon;
-revoke all on function public.e2ee_publish_key(text, text, text, boolean) from public, anon;
+revoke all on function public.e2ee_publish_key(uuid, text, text, text, boolean) from public, anon;
 revoke all on function public.e2ee_save_backup(uuid, text, text) from public, anon;
 revoke all on function public.e2ee_request_device(text, text, text) from public, anon;
 revoke all on function public.e2ee_claim_device(uuid, text, text) from public, anon;
@@ -367,7 +368,7 @@ revoke all on function public.e2ee_reveal_device(uuid, text) from public, anon;
 revoke all on function public.e2ee_approve_device(uuid, text, text) from public, anon;
 revoke all on function public.e2ee_decline_device(uuid) from public, anon;
 grant execute on function public.e2ee_can_see_key(uuid) to authenticated;
-grant execute on function public.e2ee_publish_key(text, text, text, boolean) to authenticated;
+grant execute on function public.e2ee_publish_key(uuid, text, text, text, boolean) to authenticated;
 grant execute on function public.e2ee_save_backup(uuid, text, text) to authenticated;
 grant execute on function public.e2ee_request_device(text, text, text) to authenticated;
 grant execute on function public.e2ee_claim_device(uuid, text, text) to authenticated;

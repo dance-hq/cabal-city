@@ -13,6 +13,7 @@ import { playChime, showNotification } from '@/lib/notify'
 import { foldPresence, type UserPresence } from '@/lib/presence'
 import { mentions, plainText } from '@/lib/text'
 import { linkLabel } from '@/lib/channel-links'
+import { useE2ee } from './e2ee-provider'
 import type {
   Availability,
   Channel,
@@ -96,13 +97,22 @@ export function isView(id: string | null | undefined): id is View {
 }
 
 export const messagesKey = (channelId: string) => ['messages', channelId] as const
-export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, created_at, deleted_at'
+export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, created_at, deleted_at'
+
+// Keeps a conversation in time order when an incoming message took a moment to open.
+function insertInOrder(list: Message[], m: Message): Message[] {
+  if (list.some((x) => x.id === m.id)) return list
+  let i = list.length
+  while (i > 0 && list[i - 1].created_at > m.created_at) i--
+  return [...list.slice(0, i), m, ...list.slice(i)]
+}
 
 export function CabalProvider({ boot, children }: { boot: Boot; children: React.ReactNode }) {
   const supabase = createClient()
   const router = useRouter()
   const { mutate } = useSWRConfig()
   const { userId, community } = boot
+  const { session: e2ee } = useE2ee()
 
   const [settings, setSettings] = useState<Settings>(boot.settings)
   const [role, setRole] = useState(boot.role)
@@ -272,31 +282,49 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         pending: true,
       }
       setOutbox((o) => ({ ...o, [channelId]: [...(o[channelId] ?? []).filter((m) => m.id !== id), draft] }))
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({ id, channel_id: channelId, author_id: userId, body })
-        .select(MESSAGE_COLUMNS)
-        .single()
-      if (error && error.code !== '23505') {
+      const fail = () =>
         setOutbox((o) => ({
           ...o,
           [channelId]: (o[channelId] ?? []).map((m) => (m.id === id ? { ...m, pending: false, failed: true } : m)),
         }))
-        if (error.code === 'P0429') toast.error(error.message)
+
+      // Direct messages are sealed here, on this device; the server only ever sees the sealed text.
+      const dm = live.current.channels.find((c) => c.id === channelId)?.kind === 'dm'
+      const peer = live.current.channels.find((c) => c.id === channelId)?.other_user_id ?? null
+      const insert = async () => {
+        const row: Pick<Message, 'id' | 'channel_id' | 'author_id' | 'body' | 'sealed'> = dm
+          ? { id, channel_id: channelId, author_id: userId, body: '', sealed: await e2ee.seal(channelId, id, peer ?? '', body) }
+          : { id, channel_id: channelId, author_id: userId, body }
+        return supabase.from('messages').insert(row).select(MESSAGE_COLUMNS).single()
+      }
+      let result: Awaited<ReturnType<typeof insert>>
+      try {
+        result = await insert()
+        // They reset their keys since we looked: pick up the new one and try once more.
+        if (dm && peer && result.error?.code === 'P0409') {
+          e2ee.forgetPeer(peer)
+          result = await insert()
+        }
+      } catch (err) {
+        fail()
+        toast.error(friendlyError(err))
+        return false
+      }
+      const { data, error } = result
+      if (error && error.code !== '23505') {
+        fail()
+        if (error.code === 'P0429' || error.code === 'P0409' || error.code === '22023') toast.error(error.message)
         return false
       }
       if (data) {
-        mutate(
-          messagesKey(channelId),
-          (cur?: Message[]) => (cur ? (cur.some((m) => m.id === id) ? cur : [...cur, data as Message]) : cur),
-          { revalidate: false },
-        )
+        const sent = dm ? { ...(data as Message), body, e2ee: 'ok' as const } : (data as Message)
+        mutate(messagesKey(channelId), (cur?: Message[]) => (cur ? insertInOrder(cur, sent) : cur), { revalidate: false })
       }
       setOutbox((o) => ({ ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }))
       markRead(channelId)
       return true
     },
-    [supabase, userId, mutate, markRead],
+    [supabase, userId, mutate, markRead, e2ee],
   )
 
   const discard = useCallback((channelId: string, id: string) => {
@@ -420,12 +448,9 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   // --- realtime ---------------------------------------------------------------
 
   const handleIncoming = useCallback(
-    async (m: Message) => {
-      mutate(
-        messagesKey(m.channel_id),
-        (cur?: Message[]) => (cur ? (cur.some((x) => x.id === m.id) ? cur : [...cur, m]) : cur),
-        { revalidate: false },
-      )
+    async (raw: Message) => {
+      const m = await e2ee.open(raw)
+      mutate(messagesKey(m.channel_id), (cur?: Message[]) => (cur ? insertInOrder(cur, m) : cur), { revalidate: false })
       setOutbox((o) => (o[m.channel_id]?.some((x) => x.id === m.id) ? { ...o, [m.channel_id]: o[m.channel_id].filter((x) => x.id !== m.id) } : o))
 
       let channel = live.current.channels.find((c) => c.id === m.channel_id)
@@ -471,14 +496,14 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         const where = channel.kind === 'room' ? `#${channel.slug}` : channel.team_name ?? 'your team'
         showNotification({
           title: isDm ? authorName : `${authorName} in ${where}`,
-          body: plainText(m.body, linkLabel(live.current.channels)),
+          body: m.sealed && m.e2ee !== 'ok' ? 'New encrypted message' : plainText(m.body, linkLabel(live.current.channels)),
           tag: m.channel_id,
           onClick: () => open(m.channel_id),
         })
         if (s.notify_sound) playChime()
       }
     },
-    [mutate, mutateChannels, refreshMembers, userId, markRead, community.id, open],
+    [mutate, mutateChannels, refreshMembers, userId, markRead, community.id, open, e2ee],
   )
 
   // Realtime callbacks read the latest handlers through a ref, so the socket
@@ -499,8 +524,8 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p) =>
           h().handleIncoming(p.new as Message),
         )
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (p) => {
-          const m = p.new as Message
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (p) => {
+          const m = await e2ee.open(p.new as Message)
           mutate(messagesKey(m.channel_id), (cur?: Message[]) => cur?.map((x) => (x.id === m.id ? m : x)), {
             revalidate: false,
           })
@@ -575,7 +600,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       window.removeEventListener('offline', onOffline)
       if (channel) void supabase.removeChannel(channel)
     }
-  }, [supabase, userId, community.id, mutate])
+  }, [supabase, userId, community.id, mutate, e2ee])
 
   // Channel lists can change without a realtime event (added to a team,
   // removed from one). A slow refresh keeps them honest.

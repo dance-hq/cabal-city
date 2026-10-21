@@ -14,20 +14,30 @@ import { WorkSessionProvider } from './work-session'
 import { Home } from './home'
 import { DesktopBuddies } from './desktop-buddies'
 import { PinPrompt } from './pin-prompt'
+import { E2eeProvider } from './e2ee-provider'
+import { E2eeBar } from './e2ee-bar'
+import { UnlockDialog } from './e2ee-unlock'
+import { RecoveryKeyDialog } from './e2ee-recovery'
+import { ApproveDevices } from './e2ee-approve'
 import { useMedia } from '@/hooks/use-media'
 
 export function AppShell({ boot }: { boot: Boot }) {
   return (
     <SWRConfig value={{ revalidateOnFocus: false, dedupingInterval: 1500, errorRetryInterval: 4000 }}>
-      <CabalProvider boot={boot}>
-        <WorkSessionProvider>
-          <Layout />
-          <ProfileDialog />
-          <SettingsDialog />
-          <DesktopBuddies />
-          <PinPrompt />
-        </WorkSessionProvider>
-      </CabalProvider>
+      <E2eeProvider userId={boot.userId}>
+        <CabalProvider boot={boot}>
+          <WorkSessionProvider>
+            <Layout />
+            <ProfileDialog />
+            <SettingsDialog />
+            <DesktopBuddies />
+            <PinPrompt />
+            <UnlockDialog />
+            <RecoveryKeyDialog />
+            <ApproveDevices />
+          </WorkSessionProvider>
+        </CabalProvider>
+      </E2eeProvider>
     </SWRConfig>
   )
 }
@@ -48,6 +58,7 @@ function Layout() {
     return (
       <div className="flex h-svh flex-col overflow-hidden bg-sidebar">
         <UpdateBar />
+        <E2eeBar />
         {active ? <MainPane active={active} compact /> : <BuddyList compact />}
       </div>
     )
@@ -56,6 +67,7 @@ function Layout() {
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-background">
       <UpdateBar />
+      <E2eeBar />
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar" aria-label="People and channels">
           <BuddyList />

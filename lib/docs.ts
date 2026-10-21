@@ -46,6 +46,8 @@ const BOARD = 'supabase/migrations/0014_build_cabal_opportunities.sql'
 const LOCK_IN = 'supabase/migrations/0009_lock_in.sql'
 const RESUME = 'supabase/migrations/0010_lock_in_auto_resume.sql'
 const STORE = 'components/cabal/store.tsx'
+const E2EE = 'lib/e2ee/crypto.ts'
+const E2EE_SCHEMA = 'supabase/migrations/0017_dm_encryption.sql'
 const SIGN_IN = 'app/api/auth/code/route.ts'
 
 export const BUILT_ON: Fact[] = [
@@ -127,6 +129,13 @@ export const JOURNEYS: Journey[] = [
         sources: [{ path: 'hooks/use-messages.ts' }],
       },
       {
+        text: 'In a direct message, your app first encrypts the text on your device, for exactly the two of you. The database only ever gets something your two devices can open.',
+        sources: [
+          { path: E2EE, proves: ["name: 'AES-GCM'"] },
+          { path: STORE, proves: ['e2ee.seal('] },
+        ],
+      },
+      {
         text: 'It saves the message directly to the database. Before accepting it, the database checks you’re allowed in that conversation and, in a direct message, that neither of you has blocked the other.',
         sources: [{ path: SCHEMA }],
       },
@@ -141,6 +150,31 @@ export const JOURNEYS: Journey[] = [
       {
         text: 'If your connection drops while sending, the app tries again with the same ID, so the message can’t arrive twice.',
         sources: [{ path: 'hooks/use-messages.ts' }],
+      },
+    ],
+  },
+  {
+    id: 'new-device',
+    title: 'Using a new device',
+    steps: [
+      {
+        text: 'The keys that open your direct messages are made on your device and only ever kept on your devices. A new one starts with direct messages locked; rooms and teams work straight away.',
+        sources: [{ path: 'lib/e2ee/vault.ts' }],
+      },
+      {
+        text: 'To unlock it, approve it from a device you already use. Both screens show the same six digits, and you approve only if they match.',
+        sources: [{ path: 'components/cabal/e2ee-approve.tsx' }],
+      },
+      {
+        text: 'Each device commits to its part of that code before seeing the other’s, so nobody in between, including us, can slip in a key of their own and fake a match.',
+        sources: [{ path: E2EE_SCHEMA, proves: ["commitment = encode(sha256(decode(p_nonce, 'base64')), 'base64')"] }],
+      },
+      {
+        text: 'No other device to hand? Your recovery key opens a backup of your keys. The backup is locked with that key, and only you have it.',
+        sources: [{ path: E2EE, proves: ['cabal-recovery-v1'] }],
+      },
+      {
+        text: 'Lost both? You can start over with new keys. Earlier direct messages then stay unreadable for good, and the people you talk to see your security code change.',
       },
     ],
   },
@@ -198,8 +232,11 @@ export const WHO_SEES_WHAT: Fact[] = [
   { label: 'Invite-only teams', body: 'Only the people on the team.' },
   {
     label: 'Direct messages',
-    body: 'Only the two of you. Community admins can’t read them.',
-    sources: [{ path: SCHEMA, proves: ['p.channel_id = c.id and p.user_id = auth.uid()'] }],
+    body: 'Only the two of you. They’re end-to-end encrypted, so community admins, the team that runs cabal.city and anyone who got into the database can’t read them.',
+    sources: [
+      { path: SCHEMA, proves: ['p.channel_id = c.id and p.user_id = auth.uid()'] },
+      { path: E2EE_SCHEMA, proves: ['new.body := \'\''] },
+    ],
   },
   {
     label: 'Your profile',
@@ -281,8 +318,27 @@ export const GOOD_TO_KNOW: Fact[] = [
     body: 'We don’t watch your keyboard or mouse, on purpose. Someone can show as online while they’re away from their desk. Away is something you choose.',
   },
   {
-    label: 'Messages aren’t end-to-end encrypted',
-    body: 'They’re encrypted on their way to our servers. The small team that runs cabal.city could technically read the database, and only does so to keep the service running or when the law requires it.',
+    label: 'Rooms and teams aren’t end-to-end encrypted',
+    body: 'Direct messages are. Rooms and team rooms are encrypted on their way to our servers, but the small team that runs cabal.city could technically read them, and only does so to keep the service running or when the law requires it.',
+  },
+  {
+    label: 'Encryption hides what you say, not that you talked',
+    body: 'Who you message and when still pass through our servers, because that’s how messages get delivered and unread counts work.',
+  },
+  {
+    label: 'Keep your recovery key',
+    body: 'If you lose every device you’re signed in on and your recovery key, nobody can get those direct messages back, including us. Clearing a browser’s site data removes its keys too.',
+    sources: [{ path: 'components/cabal/e2ee-recovery.tsx' }],
+  },
+  {
+    label: 'Reporting a direct message shares only that message',
+    body: 'Your app gives the admins the key to that one message, and the server checks it opens what was actually sent before filing the report. The rest of the conversation stays sealed.',
+    sources: [{ path: 'app/api/reports/sealed/route.ts', proves: ['openWithMessageKey'] }],
+  },
+  {
+    label: 'Older direct messages',
+    body: 'Ones sent before encryption arrived stay as they were, and are marked “sent before encryption”.',
+    sources: [{ path: 'components/cabal/message-list.tsx', proves: ['sent before encryption'] }],
   },
   {
     label: 'Mac downloads aren’t signed yet',

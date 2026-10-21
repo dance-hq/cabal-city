@@ -26,8 +26,14 @@ export default function PrivacyPage() {
             to add. Other signed-in members can see these.
           </li>
           <li>
-            <strong>Your messages</strong> in rooms, team rooms and direct messages, plus when each was sent. If you
-            delete a message, its text is erased and only a &ldquo;deleted&rdquo; marker remains.
+            <strong>Your messages</strong> in rooms, team rooms and direct messages, plus when each was sent. Direct
+            messages are stored end-to-end encrypted, so we hold them but can&apos;t read them. If you delete a
+            message, its text is erased and only a &ldquo;deleted&rdquo; marker remains.
+          </li>
+          <li>
+            <strong>Your public encryption key</strong>, so people can send you encrypted direct messages, and a
+            backup of your private keys that only your recovery key can open. We never have your private keys or
+            your recovery key.
           </li>
           <li>
             <strong>How you use conversations</strong>: which ones you&apos;ve read up to where, which you&apos;ve
@@ -43,7 +49,9 @@ export default function PrivacyPage() {
             on your own device.
           </li>
           <li>
-            <strong>Reports</strong> you file, including a short excerpt of the reported message and your reason.
+            <strong>Reports</strong> you file, including a short excerpt of the reported message and your reason. When
+            you report a direct message, your app shares the key to that one message so it can be checked; the rest
+            of the conversation stays encrypted.
           </li>
           <li>
             <strong>Feedback</strong> you send, and, if you leave &ldquo;Include app details&rdquo; on, the page you
@@ -71,7 +79,10 @@ export default function PrivacyPage() {
             Public teams: anyone in the Chicago community who joins them, including earlier messages.
             Invite-only teams: only the people on that team.
           </li>
-          <li>Direct messages: only the people in the conversation. Community admins can&apos;t read them.</li>
+          <li>
+            Direct messages: only the two people in the conversation. They&apos;re end-to-end encrypted, so neither
+            community admins nor the team that runs cabal.city can read them.
+          </li>
           <li>
             Reports: the person who filed them and community admins. Admins can also remove members from the
             community.
@@ -79,10 +90,12 @@ export default function PrivacyPage() {
           <li>Feedback: the person who sent it and community admins.</li>
         </ul>
         <p>
-          Messages are encrypted in transit and stored on our database, but they aren&apos;t end-to-end encrypted.
-          The small team that operates cabal.city could technically access the database, and only does so to keep
-          the service running or when the law requires it. Profile photos are stored at public web addresses, so
-          anyone with the exact link can open one.
+          Direct messages are end-to-end encrypted on your device; we can see who messaged whom and when, but not
+          what was said. Messages that were sent before encryption arrived stay as they were. Room and team
+          messages are encrypted in transit and stored on our database, but they aren&apos;t end-to-end encrypted:
+          the small team that operates cabal.city could technically access them, and only does so to keep the
+          service running or when the law requires it. Profile photos are stored at public web addresses, so anyone
+          with the exact link can open one.
         </p>
       </LegalSection>
 

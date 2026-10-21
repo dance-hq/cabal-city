@@ -16,6 +16,7 @@ import { Avatar } from './avatar'
 import { AdminPanel } from './admin-panel'
 import { IdentityPicker } from './identity-picker'
 import { DeleteAccount } from './delete-account'
+import { EncryptionSettings } from './e2ee-settings'
 import { PinSetting } from './pin-prompt'
 import { copyInviteLink } from './buddy-list'
 import { CreateTeamDialog } from './team-dialogs'
@@ -438,6 +439,8 @@ function AppSettings() {
           You&apos;re using Cabal in a browser. The desktop app adds a menu bar icon, a keyboard shortcut and launch at login.
         </p>
       )}
+
+      <EncryptionSettings />
 
       <div className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">Account</h3>

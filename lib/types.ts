@@ -1,4 +1,5 @@
 import type { Identity } from './identity'
+import type { Envelope } from './e2ee/crypto'
 
 export type Availability = 'online' | 'away' | 'dnd' | 'invisible'
 export type ShownStatus = 'online' | 'away' | 'dnd' | 'offline'
@@ -73,9 +74,13 @@ export type Message = {
   body: string
   created_at: string
   deleted_at: string | null
+  /** Direct messages: the encrypted text. `body` is empty until this device opens it. */
+  sealed?: Envelope | null
   // Client-only: optimistic sends.
   pending?: boolean
   failed?: boolean
+  /** Client-only, sealed messages: opened, waiting for this device to be unlocked, or not openable here. */
+  e2ee?: 'ok' | 'locked' | 'unreadable'
 }
 
 export type PresenceSession = {

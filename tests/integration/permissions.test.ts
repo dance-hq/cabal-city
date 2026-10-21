@@ -4,6 +4,19 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import {
+  commitmentOf,
+  contextOf,
+  conversationKey,
+  exportPublicKey,
+  lockWithRecoveryKey,
+  newDeviceOffer,
+  newKeyPair,
+  newRecoveryKey,
+  openMessage,
+  packKeyring,
+  sealMessage,
+} from '@/lib/e2ee/crypto'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -44,6 +57,36 @@ async function join(p: Person, displayName: string) {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Direct messages are end-to-end encrypted: each test person gets a key pair,
+// and DMs are sealed exactly the way the app does it.
+type Keys = { id: string; pair: CryptoKeyPair; publicKey: string }
+const keys = new Map<string, Keys>()
+
+async function publishKey(p: Person) {
+  const pair = await newKeyPair()
+  const publicKey = await exportPublicKey(pair.publicKey)
+  const id = crypto.randomUUID()
+  const backup = await lockWithRecoveryKey(await packKeyring([{ id, privateKey: pair.privateKey, publicKey }]), newRecoveryKey(), p.id)
+  const { error } = await p.db.rpc('e2ee_publish_key', {
+    p_id: id,
+    p_public_key: publicKey,
+    p_backup_iv: backup.iv,
+    p_backup: backup.keyring,
+    p_replace: false,
+  })
+  if (error) throw error
+  keys.set(p.id, { id, pair, publicKey })
+}
+
+async function sealedRow(from: Person, to: Person, channelId: string, text: string, over: { rk?: string } = {}) {
+  const mine = keys.get(from.id)!
+  const theirs = keys.get(to.id)!
+  const id = crypto.randomUUID()
+  const ctx = { channelId, messageId: id, authorId: from.id, sk: mine.id, rk: over.rk ?? theirs.id }
+  const sealed = await sealMessage(await conversationKey(mine.pair.privateKey, theirs.pair.publicKey), ctx, text)
+  return { id, channel_id: channelId, author_id: from.id, body: '', sealed }
+}
+
 describe.skipIf(!run)('permissions and messaging (live database)', () => {
   let ada: Person, grace: Person, outsider: Person
   let dmId = ''
@@ -65,6 +108,7 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     await join(ada, 'Ada Test')
     await join(grace, 'Grace Test')
     await join(outsider, 'Outsider Test')
+    await Promise.all([publishKey(ada), publishKey(grace)])
   })
 
   afterAll(async () => {
@@ -212,11 +256,20 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect(error).toBeNull()
     dmId = data as string
 
-    const sent = await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: 'hi grace' }).select().single()
+    const sent = await ada.db.from('messages').insert(await sealedRow(ada, grace, dmId, 'hi grace')).select('body').single()
     expect(sent.error).toBeNull()
+    // The database never sees the words.
+    expect(sent.data?.body).toBe('')
 
-    const forGrace = await grace.db.from('messages').select('body').eq('channel_id', dmId)
-    expect(forGrace.data?.map((m) => m.body)).toEqual(['hi grace'])
+    const forGrace = await grace.db.from('messages').select('id, channel_id, author_id, body, sealed').eq('channel_id', dmId)
+    expect(forGrace.data).toHaveLength(1)
+    const m = forGrace.data![0]
+    const g = keys.get(grace.id)!
+    const a = keys.get(ada.id)!
+    expect(JSON.stringify(m)).not.toContain('hi grace')
+    expect(await openMessage(await conversationKey(g.pair.privateKey, a.pair.publicKey), contextOf(m, m.sealed), m.sealed)).toBe(
+      'hi grace',
+    )
 
     const forOutsider = await outsider.db.from('messages').select('body').eq('channel_id', dmId)
     expect(forOutsider.data).toEqual([])
@@ -237,6 +290,71 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect(spoof.error).not.toBeNull()
     const system = await grace.db.from('messages').insert({ channel_id: dmId, author_id: grace.id, kind: 'system', body: 'official' })
     expect(system.error).not.toBeNull()
+  })
+
+  it('only accepts sealed messages addressed to the right two keys', async () => {
+    const wrongKey = await sealedRow(ada, grace, dmId, 'hi', { rk: keys.get(ada.id)!.id })
+    expect((await ada.db.from('messages').insert(wrongKey)).error?.code).toBe('P0409')
+
+    const extra = await sealedRow(ada, grace, dmId, 'hi')
+    const tampered = { ...extra, sealed: { ...extra.sealed, note: 'x' } }
+    expect((await ada.db.from('messages').insert(tampered)).error).not.toBeNull()
+
+    const { data: lobby } = await ada.db.from('channels').select('id').eq('community_id', communityId).eq('slug', 'lobby').single()
+    const inRoom = await sealedRow(ada, grace, lobby!.id, 'hi')
+    expect((await ada.db.from('messages').insert(inRoom)).error).not.toBeNull()
+
+    // Sealed messages can only be reported through the route that checks them.
+    const { data: sent } = await grace.db.from('messages').select('id').eq('channel_id', dmId).limit(1).single()
+    expect((await grace.db.rpc('report_message', { p_message: sent!.id, p_reason: 'test' })).error).not.toBeNull()
+    const direct = await grace.db.rpc('report_sealed_message', {
+      p_reporter: grace.id,
+      p_message: sent!.id,
+      p_reason: 'test',
+      p_excerpt: 'made up',
+    })
+    expect(direct.error).not.toBeNull()
+  })
+
+  it('keeps keys, backups and unlock requests to their owner', async () => {
+    // One key at a time; a second device can't quietly replace it.
+    const pair = await newKeyPair()
+    const second = await ada.db.rpc('e2ee_publish_key', {
+      p_id: crypto.randomUUID(),
+      p_public_key: await exportPublicKey(pair.publicKey),
+      p_backup_iv: 'AAAAAAAAAAAAAAAA',
+      p_backup: 'A'.repeat(40),
+      p_replace: false,
+    })
+    expect(second.error?.code).toBe('P0409')
+
+    expect((await ada.db.from('e2ee_backups').select('user_id')).data).toEqual([{ user_id: ada.id }])
+    expect((await grace.db.from('e2ee_backups').select('user_id').eq('user_id', ada.id)).data).toEqual([])
+    expect((await outsider.db.from('e2ee_keys').select('id').eq('user_id', ada.id)).data).toHaveLength(1)
+
+    const offer = await newDeviceOffer()
+    const req = await ada.db.rpc('e2ee_request_device', {
+      p_label: 'Test browser',
+      p_key: offer.publicKey,
+      p_commitment: await commitmentOf(offer.nonce),
+    })
+    expect(req.error).toBeNull()
+    expect((await grace.db.from('e2ee_device_requests').select('id')).data).toEqual([])
+
+    // The new device can only reveal the nonce it committed to.
+    const approver = await newDeviceOffer()
+    expect((await ada.db.rpc('e2ee_claim_device', { p_request: req.data, p_key: approver.publicKey, p_nonce: approver.nonce })).error).toBeNull()
+    expect((await ada.db.rpc('e2ee_reveal_device', { p_request: req.data, p_nonce: approver.nonce })).error).not.toBeNull()
+    expect((await ada.db.rpc('e2ee_reveal_device', { p_request: req.data, p_nonce: offer.nonce })).error).toBeNull()
+    await ada.db.from('e2ee_device_requests').delete().eq('id', req.data)
+  })
+
+  it('refuses plain direct messages once encryption is required', async ({ skip }) => {
+    // Enforced by 0018, which goes live after the app that encrypts DMs.
+    const { data: applied } = await admin.from('cabal_migrations').select('name').eq('name', '0018_require_encrypted_dms.sql')
+    if (!applied?.length) skip()
+    const plain = await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: 'in the clear' })
+    expect(plain.error).not.toBeNull()
   })
 
   it('keeps private team messages away from non-members, including realtime', async () => {
@@ -379,18 +497,18 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect((await grace.db.from('blocks').insert({ blocker_id: grace.id, blocked_id: ada.id })).error).toBeNull()
     try {
       // Existing history stays readable; only new messages are refused, in both directions.
-      expect((await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: 'hello?' })).error).not.toBeNull()
-      expect((await grace.db.from('messages').insert({ channel_id: dmId, author_id: grace.id, body: 'hi' })).error).not.toBeNull()
+      expect((await ada.db.from('messages').insert(await sealedRow(ada, grace, dmId, 'hello?'))).error).not.toBeNull()
+      expect((await grace.db.from('messages').insert(await sealedRow(grace, ada, dmId, 'hi'))).error).not.toBeNull()
     } finally {
       await grace.db.from('blocks').delete().eq('blocker_id', grace.id)
     }
-    expect((await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: 'unblocked' })).error).toBeNull()
+    expect((await ada.db.from('messages').insert(await sealedRow(ada, grace, dmId, 'unblocked'))).error).toBeNull()
   })
 
   it('rate-limits message floods', async () => {
     let limited = false
     for (let i = 0; i < 18 && !limited; i++) {
-      const { error } = await ada.db.from('messages').insert({ channel_id: dmId, author_id: ada.id, body: `spam ${i}` })
+      const { error } = await ada.db.from('messages').insert(await sealedRow(ada, grace, dmId, `spam ${i}`))
       if (error) limited = /too quickly/i.test(error.message)
     }
     expect(limited).toBe(true)

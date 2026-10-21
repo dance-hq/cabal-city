@@ -15,6 +15,9 @@ import { STATUS_LABEL } from './status-dot'
 import { TeamIcon, TeamManageDialog } from './team-dialogs'
 import { TeamWelcome } from './team-welcome'
 import { useCabal } from './store'
+import { useE2ee } from './e2ee-provider'
+import { DmEncryptionNotice, EncryptionBadge, dmSendBlock, usePeerEncryption } from './e2ee-dm'
+import { VerifyDialog } from './e2ee-verify'
 import { useMessages } from '@/hooks/use-messages'
 import { useTyping } from '@/hooks/use-typing'
 import { useMedia } from '@/hooks/use-media'
@@ -125,6 +128,18 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   const otherStatus = channel.other_user_id ? statusOf(channel.other_user_id) : 'offline'
   const isBlocked = !!channel.other_user_id && blocked.has(channel.other_user_id)
 
+  const { status: e2eeStatus } = useE2ee()
+  const peerId = channel.kind === 'dm' ? channel.other_user_id : null
+  const peerEncryption = usePeerEncryption(peerId)
+  const [verifying, setVerifying] = useState(false)
+  const otherName = other?.display_name ?? 'They'
+  const dmBlock =
+    channel.kind !== 'dm'
+      ? null
+      : !peerId
+        ? 'This person isn’t on Cabal any more'
+        : dmSendBlock(e2eeStatus, peerEncryption.data, otherName)
+
   const lastNotice = useMemo(() => messages.findLast((m) => m.kind === 'system')?.id ?? null, [messages])
   const people = usePeopleIn(channel, lastNotice)
 
@@ -216,6 +231,9 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
                   <MoreHorizontal className="size-4" aria-hidden />
                 </IconButton>
               ))}
+            {channel.kind === 'dm' && e2eeStatus === 'ready' && peerEncryption.data?.key && (
+              <EncryptionBadge peer={peerEncryption.data} onClick={() => setVerifying(true)} />
+            )}
             {muteButton}
             {hasPanel && (
               <IconButton
@@ -275,16 +293,36 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
           )}
         </div>
 
+        {peerId && !isBlocked && (
+          <DmEncryptionNotice
+            peerId={peerId}
+            name={otherName}
+            peer={peerEncryption.data}
+            onVerify={() => setVerifying(true)}
+            onAcknowledged={() => void peerEncryption.mutate()}
+          />
+        )}
+
         <Composer
           channelId={channel.id}
           placeholder={placeholder}
           onSend={(body) => send(channel.id, body)}
           onTyping={ping}
           onStopTyping={stop}
-          disabled={isBlocked}
-          disabledReason="You blocked this person. Unblock them from their profile to message."
+          disabled={isBlocked || !!dmBlock}
+          disabledReason={isBlocked ? 'You blocked this person. Unblock them from their profile to message.' : (dmBlock ?? undefined)}
         />
       </div>
+
+      {peerId && (
+        <VerifyDialog
+          open={verifying}
+          onOpenChange={setVerifying}
+          peerId={peerId}
+          name={otherName}
+          peer={peerEncryption.data}
+        />
+      )}
 
       {panelOpen && !docked && (
         <div className="absolute inset-0 z-10 bg-background/50" onClick={() => setFloatingOpen(false)} aria-hidden />
