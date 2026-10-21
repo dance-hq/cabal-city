@@ -45,8 +45,8 @@ export default async function Home() {
             Chicago builders, it&apos;s time to lock in.
           </h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
-            Cabal is an open-source messenger for people building things in Chicago. See who&apos;s heads-down,
-            send a DM, or drop into a room and ship together.
+            Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
+            see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
           <div className="flex flex-col gap-3 pt-2">
             <div className="flex flex-wrap gap-3">
