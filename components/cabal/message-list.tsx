@@ -300,7 +300,9 @@ export function MessageList({
                           <time
                             dateTime={m.created_at}
                             title={fullTime(m.created_at)}
-                            className="hidden pt-0.5 font-mono text-[10px] leading-6 text-muted-foreground group-hover:block"
+                            // h-0 keeps the time out of the row's height so showing it never shifts lines;
+                            // its line box matches the message's first line (text-sm × leading-relaxed).
+                            className="invisible block h-0 whitespace-nowrap font-mono text-[10px] leading-[1.421875rem] text-muted-foreground tabular-nums group-hover:visible"
                           >
                             {shortClock(m.created_at)}
                           </time>
