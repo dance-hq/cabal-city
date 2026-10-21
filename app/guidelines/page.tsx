@@ -3,7 +3,7 @@ import { LegalPage, LegalSection, contactEmail } from '@/components/marketing/le
 
 export const metadata: Metadata = {
   title: 'Community guidelines',
-  description: "How we treat each other on Cabal's Chicago buddy list.",
+  description: "How we treat each other in Cabal's Chicago community.",
 }
 
 export default function GuidelinesPage() {

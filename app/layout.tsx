@@ -13,7 +13,7 @@ const description =
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "Cabal: Chicago's builders, one buddy list away", template: '%s · Cabal' },
+  title: { default: "Cabal: Chicago builders, it's time to lock in", template: '%s · Cabal' },
   description,
   applicationName: 'Cabal',
   openGraph: { type: 'website', siteName: 'cabal.city', description, locale: 'en_US' },

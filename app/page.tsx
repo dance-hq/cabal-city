@@ -35,11 +35,11 @@ export default async function Home() {
             )}
           </p>
           <h1 className="max-w-3xl text-4xl leading-[1.02] font-semibold tracking-tight text-balance md:text-7xl">
-            Chicago&apos;s builders, one buddy list away.
+            Chicago builders, it&apos;s time to lock in.
           </h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
-            Cabal is an open-source instant messenger for people building things in Chicago. See who&apos;s around,
-            send a DM, or drop into a room. AIM&apos;s buddy list meets IRC&apos;s rooms.
+            Cabal is an open-source messenger for people building things in Chicago. See who&apos;s heads-down,
+            send a DM, or drop into a room and ship together.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
@@ -67,7 +67,7 @@ export default async function Home() {
               What Cabal does
             </h2>
             <div className="grid gap-10 md:grid-cols-3">
-              <Feature title="A buddy list, first" mono="buddies">
+              <Feature title="Know who&apos;s around" mono="status">
                 Online, away, do not disturb, or invisible. You set it; Cabal never watches your keyboard or your
                 screen.
               </Feature>
@@ -88,11 +88,11 @@ export default async function Home() {
             <ChicagoStar className="size-10 md:size-14" />
             <div className="flex max-w-2xl flex-col gap-4">
               <h2 id="chicago-title" className="text-2xl font-semibold tracking-tight text-balance md:text-3xl">
-                Chicago first. One city, one buddy list.
+                Chicago first. One city, one community.
               </h2>
               <p className="leading-relaxed text-muted-foreground text-pretty">
                 Right now Cabal has one community, and it&apos;s Chicago: founders, engineers, designers, and whoever
-                runs the meetup you went to last month. Signing up puts you on the city&apos;s buddy list. When it
+                runs the meetup you went to last month. Signing up puts you in the same place as all of them. When it
                 feels right here, we&apos;ll open the next city.
               </p>
               {githubUrl && (

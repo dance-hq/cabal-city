@@ -44,7 +44,7 @@ function Layout() {
 
   return (
     <div className="flex h-svh overflow-hidden bg-background">
-      <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar" aria-label="Buddy list">
+      <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar" aria-label="People and rooms">
         <BuddyList />
       </aside>
       <main className="flex min-w-0 flex-1 flex-col">{active ? <Conversation /> : <NothingOpen />}</main>

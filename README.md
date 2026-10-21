@@ -1,12 +1,12 @@
 # Cabal
 
-A buddy list and chat rooms for your local builder community. Think AIM's buddy list with IRC's rooms, made for the people building things in your city.
+An open-source messenger for your local builder community: who's online, direct messages and IRC-style rooms, made for the people building things in your city.
 
 The first community running on it is **Chicago AI Cabal**. Cabal is MIT-licensed and works for any community.
 
 Join it at **[www.cabal.city](https://www.cabal.city)**, or get the [desktop app](https://github.com/dance-hq/cabal-city/releases/latest).
 
-- **Buddy list.** See who's around, who's busy and what they're working on. Invisible really means invisible: other people get no presence at all from you.
+- **Who's around.** See who's online, who's busy and what they're working on. Invisible really means invisible: other people get no presence at all from you.
 - **Direct messages.** Click anyone's name.
 - **Rooms.** `#lobby` and `#introductions` to start, IRC-style: compact lines, join notices, a list of who's in the room.
 - **Private teams.** A channel for your startup or crew. Only invited members can read it, and that's enforced by the database, not by hiding buttons.

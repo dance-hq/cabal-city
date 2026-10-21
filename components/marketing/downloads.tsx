@@ -35,7 +35,7 @@ export function Downloads({ release }: { release: ReleaseInfo }) {
           Get Cabal on your desktop
         </h2>
         <p className="max-w-xl text-sm leading-relaxed text-muted-foreground text-pretty">
-          A menu bar buddy list, a show/hide shortcut, and notifications that know when to keep quiet. It&apos;s the
+          Who&apos;s online in your menu bar, a show/hide shortcut, and notifications that know when to keep quiet. It&apos;s the
           same Cabal as the browser version, in its own window.
         </p>
       </div>
