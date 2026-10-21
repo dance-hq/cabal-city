@@ -5,7 +5,7 @@ import { githubUrl } from '@/lib/config'
 import { cn } from '@/lib/utils'
 
 export function SiteHeader({ current }: { current?: string }) {
-  const here = current === '/how-it-works'
+  const here = current === '/docs'
   return (
     <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
       <Link href="/" aria-label="cabal.city home" className="rounded-md focus-visible:ring-2 focus-visible:ring-ring">
@@ -13,11 +13,11 @@ export function SiteHeader({ current }: { current?: string }) {
       </Link>
       <nav aria-label="Site" className="flex items-center gap-5 text-sm text-muted-foreground">
         <Link
-          href="/how-it-works"
+          href="/docs"
           aria-current={here ? 'page' : undefined}
           className={cn('hover:text-foreground', here && 'text-foreground')}
         >
-          How it works
+          Docs
         </Link>
         {/* A plain anchor: next/link ignores a click when the URL already ends in #download. */}
         <a href="/#download" className="hidden hover:text-foreground sm:inline">
