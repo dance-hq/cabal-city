@@ -4,6 +4,8 @@ import { ArrowDownToLine, ArrowUpRight } from 'lucide-react'
 import { getCommunity } from '@/lib/community'
 import { onlineCount } from '@/lib/online-count'
 import { latestRelease } from '@/lib/releases'
+import { githubUrl } from '@/lib/config'
+import { GithubIcon } from '@/components/brand/github-icon'
 import { ChicagoFlag } from '@/components/marketing/chicago-flag'
 import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
@@ -39,21 +41,24 @@ export default async function Home() {
             Cabal is an open-source messenger for people building things in Chicago. See who&apos;s heads-down,
             send a DM, or drop into a room and ship together.
           </p>
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href="#download"
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <ArrowDownToLine className="size-4" aria-hidden />
-              Get the desktop app
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Open in browser
-              <ArrowUpRight className="size-4" aria-hidden />
-            </Link>
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="#download"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <ArrowDownToLine className="size-4" aria-hidden />
+                Get the desktop app
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Open in browser
+                <ArrowUpRight className="size-4" aria-hidden />
+              </Link>
+            </div>
+            <p className="text-sm text-muted-foreground">Free and open source. Works on Windows, Mac, Linux or any browser.</p>
           </div>
         </section>
 
@@ -65,21 +70,46 @@ export default async function Home() {
               What Cabal does
             </h2>
             <div className="grid gap-10 md:grid-cols-3">
-              <Feature title="Know who&apos;s around" mono="status">
-                Online, away, do not disturb, or invisible. You set it; Cabal never watches your keyboard or your
-                screen.
+              <Feature title="Find your people" mono="#introductions">
+                Get to know Chicago&apos;s builders. Introduce yourself, see what others are making, and message the
+                people you want to build alongside.
               </Feature>
-              <Feature title="Messages that keep up" mono="/msg">
-                Direct messages and a couple of city-wide rooms, with real history, unread markers and quiet
-                notifications.
+              <Feature title="Lock in, on your terms" mono="status">
+                Say what you&apos;re working on and choose when you&apos;re around, away, or heads-down with
+                notifications muted. Cabal never watches your keyboard or screen.
               </Feature>
-              <Feature title="A room for your team" mono="#your-team">
-                Start a private team and invite your co-founders. Nobody else in the community can read it.
+              <Feature title="Help each other ship" mono="#lobby">
+                Share what you&apos;re launching, ask for feedback, and make the intro someone needs. Start a team
+                room for your crew. Build your thing, just not alone.
               </Feature>
             </div>
           </section>
 
           <Downloads release={release} />
+
+          {githubUrl && (
+            <section
+              aria-labelledby="open-title"
+              className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-10"
+            >
+              <div className="flex max-w-xl flex-col gap-2">
+                <h2 id="open-title" className="text-2xl font-semibold tracking-tight md:text-3xl">
+                  Built in the open.
+                </h2>
+                <p className="leading-relaxed text-muted-foreground text-pretty">
+                  Cabal is open source and MIT licensed. Read the code, suggest a change, or help shape what it
+                  becomes.
+                </p>
+              </div>
+              <a
+                href={githubUrl}
+                className="inline-flex h-11 shrink-0 items-center gap-2 self-start rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring md:self-auto"
+              >
+                <GithubIcon className="size-4" aria-hidden />
+                View on GitHub
+              </a>
+            </section>
+          )}
         </div>
       </main>
 

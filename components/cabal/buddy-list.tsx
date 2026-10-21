@@ -1,14 +1,14 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, ChevronRight, Hash, Info, Link2, Lock, Plus, Search, Settings, X } from 'lucide-react'
+import { Check, ChevronRight, Compass, Hash, Info, Link2, Lock, Plus, Search, Settings, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
 import { MeCard } from './me-card'
 import { ConnectionBanner } from './connection-banner'
 import { WelcomeCard } from './welcome-card'
-import { CreateTeamDialog } from './team-dialogs'
+import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
 import { useCabal } from './store'
 import { compareByPresence } from '@/lib/presence'
 import { createClient } from '@/lib/supabase/client'
@@ -52,6 +52,9 @@ export function BuddyList() {
   const [query, setQuery] = useState('')
   const [showOffline, setShowOffline] = useState(true)
   const [creatingTeam, setCreatingTeam] = useState(false)
+  const [browsingTeams, setBrowsingTeams] = useState(false)
+  const teamRooms = useTeamRooms(community.id)
+  const joinable = teamRooms.data?.filter((r) => !r.joined).length ?? 0
 
   const dmByUser = useMemo(() => {
     const map = new Map<string, Channel>()
@@ -190,7 +193,7 @@ export function BuddyList() {
               type="button"
               onClick={() => setCreatingTeam(true)}
               className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Create a team"
+              aria-label="Start a team room"
             >
               <Plus className="size-3.5" aria-hidden />
             </button>
@@ -198,19 +201,27 @@ export function BuddyList() {
         >
           {visibleTeams.map((t) => (
             <Row key={t.id} selected={active === t.id} onClick={() => open(t.id)} unread={t.unread} muted={t.muted}>
-              <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <TeamIcon visibility={t.team_visibility} className="size-3.5 shrink-0 text-muted-foreground" />
               <span className={cn('truncate text-[13px]', t.unread > 0 && !t.muted && 'font-semibold text-foreground')}>
                 {t.team_name}
               </span>
             </Row>
           ))}
-          {teams.length === 0 && !q && (
+          {!q && (
             <button
               type="button"
-              onClick={() => setCreatingTeam(true)}
-              className="mx-2 rounded-md px-2 py-1.5 text-left text-xs leading-relaxed text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => setBrowsingTeams(true)}
+              className="mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs leading-relaxed text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Start a private room for your startup or crew.
+              <Compass className="size-3.5 shrink-0" aria-hidden />
+              <span className="flex-1">
+                {teams.length === 0 && joinable === 0 ? 'Find or start a team room' : 'Browse team rooms'}
+              </span>
+              {joinable > 0 && (
+                <span className="font-mono text-[11px]" aria-label={`${joinable} to join`}>
+                  {joinable}
+                </span>
+              )}
             </button>
           )}
         </Section>
@@ -296,6 +307,7 @@ export function BuddyList() {
       )}
 
       <CreateTeamDialog open={creatingTeam} onOpenChange={setCreatingTeam} />
+      <BrowseTeamsDialog open={browsingTeams} onOpenChange={setBrowsingTeams} onCreate={() => setCreatingTeam(true)} />
     </div>
   )
 }

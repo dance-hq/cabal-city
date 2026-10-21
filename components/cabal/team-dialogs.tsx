@@ -1,42 +1,201 @@
 'use client'
 
 import { useState } from 'react'
-import useSWR from 'swr'
-import { Loader2, Search } from 'lucide-react'
+import useSWR, { mutate as mutateGlobal } from 'swr'
+import { Loader2, Lock, Search, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Avatar } from './avatar'
 import { useCabal } from './store'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import type { Channel } from '@/lib/types'
+import type { Channel, TeamRoom, TeamVisibility } from '@/lib/types'
+
+const teamRoomsKey = (communityId: string) => ['team-rooms', communityId] as const
+
+export function useTeamRooms(communityId: string) {
+  return useSWR(
+    teamRoomsKey(communityId),
+    async () => {
+      const { data, error } = await createClient().rpc('community_teams', { p_community: communityId })
+      if (error) throw error
+      return (data ?? []) as TeamRoom[]
+    },
+    { refreshInterval: 60_000 },
+  )
+}
+
+export function refreshTeamRooms(communityId: string) {
+  return mutateGlobal(teamRoomsKey(communityId))
+}
+
+export function TeamIcon({ visibility, className }: { visibility: TeamVisibility | null; className?: string }) {
+  const Icon = visibility === 'public' ? Users : Lock
+  return <Icon className={className} aria-hidden />
+}
+
+async function openTeam(communityId: string, teamId: string, openChannel: (id: string) => void, refresh: () => void) {
+  const { data } = await createClient().rpc('my_channels', { p_community: communityId })
+  refresh()
+  void refreshTeamRooms(communityId)
+  const ch = (data as Channel[] | null)?.find((c) => c.team_id === teamId)
+  if (ch) openChannel(ch.id)
+}
+
+function activeLabel(iso: string | null) {
+  if (!iso) return 'no messages yet'
+  const minutes = Math.round((Date.now() - Date.parse(iso)) / 60_000)
+  if (minutes < 2) return 'active now'
+  if (minutes < 60) return `active ${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `active ${hours}h ago`
+  const days = Math.round(hours / 24)
+  return days < 30 ? `active ${days}d ago` : 'quiet lately'
+}
+
+export function BrowseTeamsDialog({
+  open,
+  onOpenChange,
+  onCreate,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onCreate: () => void
+}) {
+  const { community, open: openChannel, refreshChannels } = useCabal()
+  const rooms = useTeamRooms(community.id)
+  const [query, setQuery] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const q = query.trim().toLowerCase()
+  const list = (rooms.data ?? [])
+    .filter((r) => !q || r.name.toLowerCase().includes(q))
+    .sort((a, b) => {
+      if (a.joined !== b.joined) return a.joined ? 1 : -1
+      return (Date.parse(b.last_message_at ?? b.created_at) || 0) - (Date.parse(a.last_message_at ?? a.created_at) || 0)
+    })
+
+  async function enter(room: TeamRoom) {
+    setBusyId(room.id)
+    if (!room.joined) {
+      const { error } = await createClient().rpc('join_team', { p_team: room.id })
+      if (error) {
+        setBusyId(null)
+        toast.error(friendlyError(error))
+        void rooms.mutate()
+        return
+      }
+    }
+    await openTeam(community.id, room.id, openChannel, refreshChannels)
+    setBusyId(null)
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Team rooms</DialogTitle>
+          <DialogDescription>
+            Rooms where teams in {community.name} build out loud. Join any of them to follow along, say hi, or lend a
+            hand.
+          </DialogDescription>
+        </DialogHeader>
+
+        {(rooms.data?.length ?? 0) > 5 && (
+          <label className="relative block">
+            <span className="sr-only">Search team rooms</span>
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team rooms" className="pl-8" />
+          </label>
+        )}
+
+        {rooms.isLoading && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Loading" />}
+        {rooms.error && <p className="text-sm text-muted-foreground">{"Couldn't load team rooms. Try again in a moment."}</p>}
+
+        {rooms.data && rooms.data.length === 0 && (
+          <p className="rounded-md border border-dashed px-3 py-4 text-sm leading-relaxed text-muted-foreground">
+            No team rooms yet. Start the first one for your startup or crew.
+          </p>
+        )}
+        {rooms.data && rooms.data.length > 0 && list.length === 0 && (
+          <p className="text-sm text-muted-foreground">{`No team rooms match "${query}".`}</p>
+        )}
+
+        {list.length > 0 && (
+          <ul className="-mx-2 flex max-h-80 flex-col overflow-y-auto">
+            {list.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-accent">
+                <TeamIcon visibility={r.visibility} className="size-4 shrink-0 text-muted-foreground" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{r.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {r.member_count} {r.member_count === 1 ? 'member' : 'members'} · {activeLabel(r.last_message_at)}
+                    {r.visibility === 'private' && ' · invite-only'}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant={r.joined ? 'ghost' : 'secondary'}
+                  disabled={busyId !== null}
+                  onClick={() => enter(r)}
+                  aria-label={r.joined ? `Open ${r.name}` : `Join ${r.name}`}
+                >
+                  {busyId === r.id && <Loader2 className="animate-spin" aria-hidden />}
+                  {r.joined ? 'Open' : 'Join'}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <DialogFooter className="sm:justify-between">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              onOpenChange(false)
+              onCreate()
+            }}
+          >
+            Start a team room
+          </Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { community, open: openChannel } = useCabal()
+  const { community, open: openChannel, refreshChannels } = useCabal()
   const [name, setName] = useState('')
+  const [inviteOnly, setInviteOnly] = useState(false)
   const [busy, setBusy] = useState(false)
-  const { refreshChannels } = useCabal()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    const supabase = createClient()
-    const { data: teamId, error } = await supabase.rpc('create_team', { p_community: community.id, p_name: name.trim() })
+    const { data: teamId, error } = await createClient().rpc('create_team', {
+      p_community: community.id,
+      p_name: name.trim(),
+      p_visibility: inviteOnly ? 'private' : 'public',
+    })
     if (error) {
       setBusy(false)
       toast.error(friendlyError(error))
       return
     }
-    const { data } = await supabase.rpc('my_channels', { p_community: community.id })
-    refreshChannels()
-    const ch = (data as Channel[] | null)?.find((c) => c.team_id === teamId)
+    await openTeam(community.id, teamId as string, openChannel, refreshChannels)
     setBusy(false)
     setName('')
+    setInviteOnly(false)
     onOpenChange(false)
-    if (ch) openChannel(ch.id)
   }
 
   return (
@@ -44,9 +203,9 @@ export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpen
       <DialogContent className="sm:max-w-sm">
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Create a team</DialogTitle>
+            <DialogTitle>Start a team room</DialogTitle>
             <DialogDescription>
-              A private room for your startup or crew. Only people you invite can see it or read its messages.
+              A room for your startup or crew. Anyone in {community.name} can find it and join.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2">
@@ -62,13 +221,22 @@ export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpen
               placeholder="Acme Robotics"
             />
           </div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="team-invite-only">Invite-only</Label>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Hide it from everyone else. Only people you invite can see or read it.
+              </p>
+            </div>
+            <Switch id="team-invite-only" checked={inviteOnly} onCheckedChange={setInviteOnly} />
+          </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={busy || name.trim().length < 2}>
               {busy && <Loader2 className="animate-spin" aria-hidden />}
-              Create team
+              Start room
             </Button>
           </DialogFooter>
         </form>
@@ -89,9 +257,10 @@ export function TeamManageDialog({
   onOpenChange: (o: boolean) => void
   channel: Channel
 }) {
-  const { userId, members, profileById, refreshChannels, open: openChannel } = useCabal()
+  const { community, userId, members, profileById, refreshChannels, open: openChannel } = useCabal()
   const teamId = channel.team_id!
   const isOwner = channel.team_role === 'owner'
+  const isPublic = channel.team_visibility === 'public'
   const [query, setQuery] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -136,8 +305,39 @@ export function TeamManageDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{channel.team_name}</DialogTitle>
-          <DialogDescription>Private team. Messages are visible only to the people listed here.</DialogDescription>
+          <DialogDescription>
+            {isPublic
+              ? `Open team room. Anyone in ${community.name} can join and read it.`
+              : 'Invite-only team room. Messages are visible only to the people listed here.'}
+          </DialogDescription>
         </DialogHeader>
+
+        {isOwner && (
+          <div className="flex items-start justify-between gap-4 rounded-md border px-3 py-2.5">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="team-visibility">Invite-only</Label>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {isPublic
+                  ? 'Hide this room so only people you invite can join. Everyone here stays.'
+                  : 'Turn off to open it up. Anyone who joins can read earlier messages too.'}
+              </p>
+            </div>
+            <Switch
+              id="team-visibility"
+              checked={!isPublic}
+              disabled={busyId === 'visibility'}
+              onCheckedChange={async (inviteOnly) => {
+                const ok = await run('visibility', () =>
+                  supabase.rpc('set_team_visibility', { p_team: teamId, p_visibility: inviteOnly ? 'private' : 'public' }),
+                )
+                if (ok) {
+                  refreshChannels()
+                  void refreshTeamRooms(community.id)
+                }
+              }}
+            />
+          </div>
+        )}
 
         {isOwner && (
           <div className="flex flex-col gap-2">
@@ -190,7 +390,7 @@ export function TeamManageDialog({
             Members · {team.data?.members.length ?? '…'}
           </h3>
           {team.isLoading && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Loading" />}
-          <ul className="flex flex-col">
+          <ul className="flex max-h-64 flex-col overflow-y-auto">
             {team.data?.members.map((m) => {
               const p = profileById(m.user_id)
               const self = m.user_id === userId
@@ -277,10 +477,11 @@ export function TeamManageDialog({
                 onOpenChange(false)
                 openChannel(null)
                 refreshChannels()
+                void refreshTeamRooms(community.id)
               }
             }}
           >
-            Leave team
+            Leave room
           </Button>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
             Done

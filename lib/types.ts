@@ -30,6 +30,18 @@ export type Member = { user_id: string; role: 'member' | 'admin'; joined_at: str
 
 export type ChannelKind = 'room' | 'team' | 'dm'
 
+export type TeamVisibility = 'public' | 'private'
+
+export type TeamRoom = {
+  id: string
+  name: string
+  visibility: TeamVisibility
+  member_count: number
+  joined: boolean
+  last_message_at: string | null
+  created_at: string
+}
+
 export type Channel = {
   id: string
   kind: ChannelKind
@@ -40,6 +52,7 @@ export type Channel = {
   team_id: string | null
   team_name: string | null
   team_role: 'owner' | 'member' | null
+  team_visibility: TeamVisibility | null
   other_user_id: string | null
   last_message_at: string | null
   last_read_at: string | null
