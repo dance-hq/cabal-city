@@ -4,6 +4,8 @@ A buddy list and chat rooms for your local builder community. Think AIM's buddy 
 
 The first community running on it is **Chicago AI Cabal**. Cabal is MIT-licensed and works for any community.
 
+Join it at **[www.cabal.city](https://www.cabal.city)**, or get the [desktop app](https://github.com/dance-hq/cabal-city/releases/latest).
+
 - **Buddy list.** See who's around, who's busy and what they're working on. Invisible really means invisible: other people get no presence at all from you.
 - **Direct messages.** Click anyone's name.
 - **Rooms.** `#lobby` and `#introductions` to start, IRC-style: compact lines, join notices, a list of who's in the room.
