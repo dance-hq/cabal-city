@@ -19,7 +19,11 @@ const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json')
 const APP_URL = (process.env.CABAL_APP_URL || config.appUrl).replace(/\/+$/, '')
 const ORIGINS = rules.allowedOrigins(APP_URL, config.allowedOrigins)
 const OFFLINE_PAGE = path.join(__dirname, 'offline.html')
+const OVERLAY_PAGE = path.join(__dirname, 'overlay.html')
+const OVERLAY_SIZE = { width: 128, height: 34 }
 const BUILD = path.join(__dirname, '..', 'build')
+// Sessions that started before this launch are left over from last time.
+const LAUNCHED_AT = Date.now()
 
 if (!ORIGINS.size) {
   console.error(`Cabal: "${APP_URL}" is not a usable app address. Set appUrl in app.json or CABAL_APP_URL.`)
@@ -75,6 +79,10 @@ let installing = false
 let retryTimer = null
 let pendingLink = rules.findDeepLink(process.argv)
 let unread = 0
+let sessionStartedAt = null
+let overlay = null
+let overlayReady = false
+let overlayTimer = null
 
 function startUrl() {
   if (pendingLink?.kind === 'join') return `${APP_URL}/join/${encodeURIComponent(pendingLink.code)}`
@@ -134,7 +142,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       spellcheck: true,
-      additionalArguments: [`--cabal-version=${app.getVersion()}`],
+      additionalArguments: [`--cabal-version=${app.getVersion()}`, `--cabal-launched=${LAUNCHED_AT}`],
     },
   })
 
@@ -161,8 +169,11 @@ function createWindow() {
   })
   win.on('closed', () => {
     win = null
+    // Otherwise the corner timer alone would keep the app from quitting.
+    overlay?.destroy()
   })
   win.on('focus', () => win?.flashFrame(false))
+  for (const event of ['focus', 'blur', 'show', 'hide', 'minimize', 'restore']) win.on(event, scheduleOverlay)
 
   const contents = win.webContents
   contents.setWindowOpenHandler(({ url }) => {
@@ -192,6 +203,87 @@ function createWindow() {
   return win
 }
 
+// --- session timer overlay ------------------------------------------------------------
+
+// Shown while a session runs and Cabal itself isn't the window you're looking at.
+function overlayWanted() {
+  if (sessionStartedAt === null || !settings.sessionOverlay) return false
+  const cabalInFront = win && win.isVisible() && !win.isMinimized() && win.isFocused()
+  return !cabalInFront
+}
+
+function createOverlay() {
+  const primary = screen.getPrimaryDisplay().workArea
+  const position = rules.overlayPosition(readJson('overlay.json'), screen.getAllDisplays(), primary, OVERLAY_SIZE)
+  overlayReady = false
+  overlay = new BrowserWindow({
+    ...position,
+    ...OVERLAY_SIZE,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    title: 'Cabal session',
+    webPreferences: {
+      preload: path.join(__dirname, 'overlay-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: false,
+    },
+  })
+  overlay.setAlwaysOnTop(true, 'floating')
+  overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+  const contents = overlay.webContents
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  contents.on('will-navigate', (event) => event.preventDefault())
+
+  let saveTimer = null
+  overlay.on('move', () => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      if (!overlay) return
+      const { x, y } = overlay.getBounds()
+      writeJson('overlay.json', { x, y })
+    }, 400)
+  })
+  overlay.on('closed', () => {
+    overlay = null
+    overlayReady = false
+  })
+  overlay.once('ready-to-show', () => {
+    overlayReady = true
+    updateOverlay()
+  })
+  overlay.loadFile(OVERLAY_PAGE)
+}
+
+function updateOverlay() {
+  if (!overlayWanted()) {
+    overlay?.hide()
+    return
+  }
+  if (!overlay) return createOverlay()
+  if (!overlayReady) return
+  overlay.webContents.send('cabal:overlay-session', sessionStartedAt)
+  // showInactive so the timer never steals focus from what you're doing.
+  if (!overlay.isVisible()) overlay.showInactive()
+}
+
+// Focus moves in small bursts (blur, then focus elsewhere); settle first so the timer doesn't flicker.
+function scheduleOverlay() {
+  clearTimeout(overlayTimer)
+  overlayTimer = setTimeout(updateOverlay, 150)
+}
+
 // --- tray, badge, shortcut ---------------------------------------------------------
 
 function trayImage() {
@@ -207,8 +299,14 @@ function refreshTray() {
   if (process.platform === 'darwin') tray.setTitle(unread ? String(unread) : '')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Show Cabal', click: showWindow },
-      { type: 'separator' },
+    { label: 'Show Cabal', click: showWindow },
+    {
+      label: 'Show session timer',
+      type: 'checkbox',
+      checked: settings.sessionOverlay,
+      click: (item) => applySettings({ sessionOverlay: item.checked }),
+    },
+    { type: 'separator' },
       { label: 'Quit Cabal', click: () => app.quit() },
     ]),
   )
@@ -258,6 +356,10 @@ function applySettings(patch) {
   if (patch.alwaysOnTop !== undefined) win?.setAlwaysOnTop(next.alwaysOnTop)
   settings = next
   writeJson('settings.json', settings)
+  if (patch.sessionOverlay !== undefined) {
+    scheduleOverlay()
+    refreshTray()
+  }
   return settings
 }
 
@@ -282,6 +384,14 @@ ipcMain.on('cabal:install-update', (event) => {
   // Quit the normal way first so the page can tell friends you went offline; finishQuit then installs and relaunches.
   if (win && rules.isAppUrl(win.webContents.getURL(), ORIGINS)) app.quit()
   else finishQuit()
+})
+ipcMain.on('cabal:session', (event, startedAt) => {
+  if (!fromApp(event)) return
+  sessionStartedAt = rules.sessionStart(startedAt, Date.now())
+  scheduleOverlay()
+})
+ipcMain.on('cabal:overlay-open', (event) => {
+  if (overlay && event.sender === overlay.webContents) showWindow()
 })
 ipcMain.handle('cabal:get-settings', (event) => (fromApp(event) ? settings : null))
 ipcMain.handle('cabal:set-settings', (event, raw) => (fromApp(event) ? applySettings(rules.settingsPatch(raw)) : null))

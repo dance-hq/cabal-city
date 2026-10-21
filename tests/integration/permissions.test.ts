@@ -124,6 +124,38 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     await admin.from('community_members').update({ role: 'member' }).eq('user_id', ada.id).eq('community_id', communityId)
   })
 
+  it('keeps work sessions private, with one running at a time', async () => {
+    const none = await grace.db.rpc('current_work_session')
+    expect(none.error).toBeNull()
+    expect(none.data).toBeNull()
+
+    const first = await grace.db.rpc('start_work_session')
+    expect(first.error).toBeNull()
+    const second = await grace.db.rpc('start_work_session')
+    expect(second.error).toBeNull()
+    const current = await grace.db.rpc('current_work_session')
+    expect(Date.parse(current.data)).toBe(Date.parse(second.data))
+
+    const open = await admin.from('work_sessions').select('id').eq('user_id', grace.id).is('ended_at', null)
+    expect(open.data).toHaveLength(1)
+    const others = await ada.db.from('work_sessions').select('id').eq('user_id', grace.id)
+    expect(others.data ?? []).toHaveLength(0)
+    const direct = await grace.db.from('work_sessions').insert({ user_id: grace.id })
+    expect(direct.error).not.toBeNull()
+
+    const ended = await grace.db.rpc('end_work_session')
+    expect(typeof ended.data).toBe('number')
+    const again = await grace.db.rpc('end_work_session')
+    expect(again.data).toBeNull()
+
+    // A session left running for over 12 hours is treated as over.
+    await admin
+      .from('work_sessions')
+      .insert({ user_id: grace.id, started_at: new Date(Date.now() - 13 * 3600_000).toISOString() })
+    const stale = await grace.db.rpc('current_work_session')
+    expect(stale.data).toBeNull()
+  })
+
   it('hides the invite code column from direct reads', async () => {
     const { error } = await grace.db.from('communities').select('invite_code').eq('slug', slug)
     expect(error).not.toBeNull()

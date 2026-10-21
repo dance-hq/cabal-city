@@ -57,6 +57,29 @@ test('a window saved on a missing screen comes back on screen', () => {
   assert.deepEqual(rules.restoreBounds(null, displays, fallback), fallback)
 })
 
+test('a session start from the page must be a sensible time', () => {
+  const now = Date.parse('2026-10-21T12:00:00Z')
+  assert.equal(rules.sessionStart(now - 5 * 60_000, now), now - 5 * 60_000)
+  assert.equal(rules.sessionStart(null, now), null)
+  assert.equal(rules.sessionStart('123', now), null)
+  assert.equal(rules.sessionStart(Number.NaN, now), null)
+  assert.equal(rules.sessionStart(now + 10 * 60_000, now), null)
+  assert.equal(rules.sessionStart(now - 2 * 24 * 3600_000, now), null)
+})
+
+test('the corner timer stays on a screen, bottom-right by default', () => {
+  const size = { width: 128, height: 34 }
+  const primary = { x: 0, y: 25, width: 1440, height: 875 }
+  const displays = [{ workArea: primary }]
+  assert.deepEqual(rules.overlayPosition(null, displays, primary, size), { x: 1292, y: 846 })
+  assert.deepEqual(rules.overlayPosition({ x: 40, y: 60 }, displays, primary, size), { x: 40, y: 60 })
+  // Dragged onto a monitor that's gone, or half off the edge: back to the corner.
+  assert.deepEqual(rules.overlayPosition({ x: 2000, y: 60 }, displays, primary, size), { x: 1292, y: 846 })
+  assert.deepEqual(rules.overlayPosition({ x: 1400, y: 60 }, displays, primary, size), { x: 1292, y: 846 })
+  assert.equal(rules.normalizeSettings({ sessionOverlay: false }).sessionOverlay, false)
+  assert.equal(rules.normalizeSettings(null).sessionOverlay, true)
+})
+
 test('badge counts are whole, positive and capped', () => {
   assert.equal(rules.badgeCount(3), 3)
   assert.equal(rules.badgeCount(-1), 0)

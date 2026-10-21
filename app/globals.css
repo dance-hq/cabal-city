@@ -207,6 +207,58 @@
   }
 }
 
+/* The session light breathes about ten times a minute, like a slow breath. */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(2.1);
+    opacity: 0.38;
+  }
+}
+.breathing-light {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--light, 10px);
+  height: var(--light, 10px);
+  border-radius: 9999px;
+  background: var(--primary);
+}
+.breathing-light::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--primary);
+  animation: breathe 6s ease-in-out infinite;
+}
+
+/* The welcome screen settles in line by line. */
+@keyframes calm-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.calm-in {
+  animation: calm-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 140ms + 80ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .breathing-light::after,
+  .calm-in {
+    animation: none;
+  }
+}
+
 /* The flag's stars land one after another on first paint. */
 @keyframes star-in {
   from {

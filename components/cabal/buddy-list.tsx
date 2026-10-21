@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
 import { MeCard } from './me-card'
+import { SessionBar } from './session-bar'
 import { ConnectionBanner } from './connection-banner'
 import { WelcomeCard } from './welcome-card'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
@@ -144,6 +145,7 @@ export function BuddyList() {
       </header>
       <ConnectionBanner />
       <MeCard />
+      <SessionBar />
       <div className="px-3 pb-2">
         <label className="relative block">
           <span className="sr-only">Search people and rooms</span>

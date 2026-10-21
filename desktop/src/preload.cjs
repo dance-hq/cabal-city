@@ -14,6 +14,8 @@ function listen(channel, wrap) {
 contextBridge.exposeInMainWorld('cabalDesktop', {
   version: arg('cabal-version'),
   platform: process.platform,
+  launchedAt: Number(arg('cabal-launched')) || undefined,
+  setSession: (startedAt) => ipcRenderer.send('cabal:session', startedAt === null ? null : Number(startedAt)),
   show: () => ipcRenderer.send('cabal:show'),
   setBadge: (count) => ipcRenderer.send('cabal:badge', Number(count) || 0),
   getSettings: () => ipcRenderer.invoke('cabal:get-settings'),

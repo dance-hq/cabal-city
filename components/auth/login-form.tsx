@@ -141,9 +141,9 @@ export function LoginForm({ communityName, invite }: { communityName: string; in
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1.5">
         <p className="font-mono text-xs text-muted-foreground">{communityName}</p>
-        <h1 className="text-xl font-semibold text-balance">Sign in or join</h1>
+        <h1 className="text-xl font-semibold text-balance">Welcome. Glad you&apos;re here.</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          {"We'll email you a short code. No password to remember."}
+          {"Sign in or join with your email. We'll send a short code, no password to remember."}
         </p>
       </div>
       <form onSubmit={requestCode} className="flex flex-col gap-4">

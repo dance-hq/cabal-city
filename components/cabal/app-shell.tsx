@@ -8,6 +8,8 @@ import { Conversation } from './conversation'
 import { ProfileDialog } from './profile-dialog'
 import { SettingsDialog } from './settings-dialog'
 import { UpdateBar } from './update-bar'
+import { SessionWelcome } from './session-welcome'
+import { WorkSessionProvider, useWorkSession } from './work-session'
 import { useMedia } from '@/hooks/use-media'
 import { CabalMark } from '@/components/brand/logo'
 
@@ -15,9 +17,11 @@ export function AppShell({ boot }: { boot: Boot }) {
   return (
     <SWRConfig value={{ revalidateOnFocus: false, dedupingInterval: 1500, errorRetryInterval: 4000 }}>
       <CabalProvider boot={boot}>
-        <Layout />
-        <ProfileDialog />
-        <SettingsDialog />
+        <WorkSessionProvider>
+          <Layout />
+          <ProfileDialog />
+          <SettingsDialog />
+        </WorkSessionProvider>
       </CabalProvider>
     </SWRConfig>
   )
@@ -25,6 +29,7 @@ export function AppShell({ boot }: { boot: Boot }) {
 
 function Layout() {
   const { active, open } = useCabal()
+  const { phase } = useWorkSession()
   const compact = useMedia('(max-width: 719px)')
 
   useEffect(() => {
@@ -34,6 +39,8 @@ function Layout() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [compact, active, open])
+
+  if (phase !== 'app') return <SessionWelcome />
 
   if (compact) {
     return (

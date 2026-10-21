@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Cabal session</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+      body { font: 500 12.5px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .pill {
+        -webkit-app-region: drag; cursor: grab; box-sizing: border-box; height: 100%;
+        display: flex; align-items: center; gap: 9px; padding: 0 4px 0 13px; border-radius: 999px;
+        background: rgba(24, 24, 29, 0.88); border: 1px solid rgba(255, 255, 255, 0.1); color: #e8e8ec;
+        opacity: 0.72; transition: opacity 0.25s ease;
+      }
+      .pill:hover { opacity: 1; }
+      .light { position: relative; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: #f5b82e; }
+      .light::after {
+        content: ''; position: absolute; inset: 0; border-radius: 50%; background: #f5b82e;
+        animation: breathe 6s ease-in-out infinite;
+      }
+      @keyframes breathe {
+        0%, 100% { transform: scale(0.8); opacity: 0.1; }
+        50% { transform: scale(2.1); opacity: 0.38; }
+      }
+      time { flex: 1; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; white-space: nowrap; }
+      button {
+        -webkit-app-region: no-drag; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+        width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+        background: transparent; color: #9a9aa6;
+      }
+      button:hover { background: rgba(255, 255, 255, 0.08); color: #e8e8ec; }
+      button:focus-visible { outline: 2px solid #f5b82e; outline-offset: 1px; }
+      @media (prefers-reduced-motion: reduce) { .light::after { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="pill" title="Your Cabal session. Drag to move it.">
+      <span class="light" aria-hidden="true"></span>
+      <time id="elapsed" aria-live="off">0m</time>
+      <button id="open" type="button" aria-label="Open Cabal" title="Open Cabal">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 17 17 7" /><path d="M8 7h9v9" />
+        </svg>
+      </button>
+    </div>
+    <script>
+      const elapsed = document.getElementById('elapsed')
+      let startedAt = null
+
+      // Whole minutes, same as inside Cabal: present, not ticking at you.
+      function format(ms) {
+        const minutes = Math.max(0, Math.floor(ms / 60000))
+        const hours = Math.floor(minutes / 60)
+        return hours ? `${hours}h ${String(minutes % 60).padStart(2, '0')}m` : `${minutes}m`
+      }
+      function tick() {
+        if (startedAt !== null) elapsed.textContent = format(Date.now() - startedAt)
+      }
+
+      window.cabalOverlay?.onSession((value) => {
+        startedAt = value
+        tick()
+      })
+      setInterval(tick, 5000)
+      document.getElementById('open').addEventListener('click', () => window.cabalOverlay?.open())
+    </script>
+  </body>
+</html>

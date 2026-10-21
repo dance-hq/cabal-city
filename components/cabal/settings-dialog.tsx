@@ -319,6 +319,15 @@ function AppSettings() {
             checked={desk.alwaysOnTop}
             onChange={(v) => patch({ alwaysOnTop: v })}
           />
+          {desk.sessionOverlay !== undefined && (
+            <Toggle
+              id="d-overlay"
+              label="Show the session timer when Cabal is in the background"
+              hint="A small clock in the corner of your screen while a session runs. Drag it wherever you like."
+              checked={desk.sessionOverlay}
+              onChange={(v) => patch({ sessionOverlay: v })}
+            />
+          )}
           <form
             className="flex flex-col gap-2"
             onSubmit={(e) => {

@@ -8,7 +8,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   alwaysOnTop: false,
   closeToTray: true,
   shortcut: 'CommandOrControl+Alt+C',
+  sessionOverlay: true,
 })
+
+const BOOLEAN_SETTINGS = ['launchAtLogin', 'alwaysOnTop', 'closeToTray', 'sessionOverlay']
 
 function originOf(url) {
   try {
@@ -71,7 +74,7 @@ function findDeepLink(argv) {
 function normalizeSettings(raw) {
   const s = { ...DEFAULT_SETTINGS }
   if (raw && typeof raw === 'object') {
-    for (const key of ['launchAtLogin', 'alwaysOnTop', 'closeToTray']) {
+    for (const key of BOOLEAN_SETTINGS) {
       if (typeof raw[key] === 'boolean') s[key] = raw[key]
     }
     if (typeof raw.shortcut === 'string' && raw.shortcut.length <= 60) s.shortcut = raw.shortcut.trim()
@@ -83,7 +86,7 @@ function normalizeSettings(raw) {
 function settingsPatch(raw) {
   const patch = {}
   if (!raw || typeof raw !== 'object') return patch
-  for (const key of ['launchAtLogin', 'alwaysOnTop', 'closeToTray']) {
+  for (const key of BOOLEAN_SETTINGS) {
     if (typeof raw[key] === 'boolean') patch[key] = raw[key]
   }
   if (typeof raw.shortcut === 'string' && raw.shortcut.length <= 60) patch.shortcut = raw.shortcut.trim()
@@ -108,6 +111,35 @@ function badgeCount(n) {
   return Number.isInteger(n) && n > 0 ? Math.min(n, 999) : 0
 }
 
+// When the page says a session started. Anything odd (not a number, in the
+// future, older than a day) means "no session" rather than a wrong clock.
+function sessionStart(raw, now) {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null
+  if (raw > now + 60_000 || raw < now - 24 * 60 * 60 * 1000) return null
+  return Math.round(raw)
+}
+
+// The corner timer goes back where it was dragged, as long as it would be
+// fully on a screen that still exists; otherwise bottom-right of the main one.
+function overlayPosition(saved, displays, primaryArea, size, margin = 20) {
+  if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+    const onScreen = displays.some((d) => {
+      const a = d.workArea
+      return (
+        saved.x >= a.x &&
+        saved.y >= a.y &&
+        saved.x + size.width <= a.x + a.width &&
+        saved.y + size.height <= a.y + a.height
+      )
+    })
+    if (onScreen) return { x: Math.round(saved.x), y: Math.round(saved.y) }
+  }
+  return {
+    x: primaryArea.x + primaryArea.width - size.width - margin,
+    y: primaryArea.y + primaryArea.height - size.height - margin,
+  }
+}
+
 module.exports = {
   DEFAULT_SETTINGS,
   allowedOrigins,
@@ -119,4 +151,6 @@ module.exports = {
   settingsPatch,
   restoreBounds,
   badgeCount,
+  sessionStart,
+  overlayPosition,
 }

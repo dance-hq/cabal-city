@@ -6,6 +6,8 @@ export type DesktopSettings = {
   alwaysOnTop: boolean
   closeToTray: boolean
   shortcut: string
+  // Desktop apps released before the session timer don't have this.
+  sessionOverlay?: boolean
 }
 
 export type DesktopBridge = {
@@ -23,6 +25,9 @@ export type DesktopBridge = {
   getUpdate?(): Promise<DesktopUpdate | null>
   installUpdate?(): void
   onUpdate?(cb: (update: DesktopUpdate) => void): () => void
+  // Desktop apps released before the session timer don't have these.
+  launchedAt?: number
+  setSession?(startedAt: number | null): void
 }
 
 export type DesktopUpdate = { version: string }
