@@ -39,6 +39,11 @@ export default function PrivacyPage() {
             nothing.
           </li>
           <li>
+            <strong>Lock-in sessions</strong>: when you lock in, plus when each session started, paused and ended.
+            While one runs, people in the community see that you&apos;re locked in and for how long, unless you&apos;re
+            invisible.
+          </li>
+          <li>
             <strong>Your settings</strong>: notification preferences on our server; theme and window preferences
             on your own device.
           </li>
