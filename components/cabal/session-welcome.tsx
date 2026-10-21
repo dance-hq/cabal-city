@@ -2,17 +2,11 @@
 
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { CabalWordmark } from '@/components/brand/logo'
 import { useCabal } from './store'
 import { useWorkSession } from './work-session'
-import { createClient } from '@/lib/supabase/client'
-import { STATUS_MAX } from '@/lib/config'
 import { desktop } from '@/lib/desktop'
-import { friendlyError } from '@/lib/errors'
 import { calmLine, greeting } from '@/lib/session'
 
 export function SessionWelcome() {
@@ -34,23 +28,15 @@ export function SessionWelcome() {
 }
 
 function Welcome() {
-  const { me, userId, refreshMembers } = useCabal()
+  const { me } = useCabal()
   const { start, skip } = useWorkSession()
-  const [focus, setFocus] = useState(me.status_text ?? '')
   const [busy, setBusy] = useState(false)
   const [today] = useState(() => new Date())
   const firstName = (me.display_name ?? '').trim().split(/\s+/)[0]
   const hasOverlay = Boolean(desktop()?.setSession)
 
-  async function begin(e: React.FormEvent) {
-    e.preventDefault()
+  async function begin() {
     setBusy(true)
-    const value = focus.trim().slice(0, STATUS_MAX) || null
-    if (value !== (me.status_text ?? null)) {
-      const { error } = await createClient().from('profiles').update({ status_text: value }).eq('id', userId)
-      if (error) toast.error(friendlyError(error))
-      else refreshMembers()
-    }
     if (!(await start())) setBusy(false)
   }
 
@@ -67,23 +53,8 @@ function Welcome() {
         </p>
       </div>
 
-      <form onSubmit={begin} className="calm-in flex flex-col gap-4 [--i:3]">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="session-focus">What are you working on?</Label>
-          <Input
-            id="session-focus"
-            value={focus}
-            maxLength={STATUS_MAX}
-            onChange={(e) => setFocus(e.target.value)}
-            placeholder="e.g. Shipping the onboarding flow"
-            autoComplete="off"
-            className="h-11"
-          />
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Optional. It shows next to your name so people know what you&apos;re on.
-          </p>
-        </div>
-        <Button type="submit" disabled={busy} className="h-11">
+      <div className="calm-in flex flex-col gap-4 [--i:3]">
+        <Button onClick={begin} disabled={busy} autoFocus className="h-11">
           {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
           Start session
         </Button>
@@ -94,7 +65,7 @@ function Welcome() {
         >
           Just catching up? Look around first
         </button>
-      </form>
+      </div>
 
       <p className="calm-in text-center text-xs leading-relaxed text-muted-foreground text-pretty [--i:4]">
         {hasOverlay
