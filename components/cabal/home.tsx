@@ -97,7 +97,7 @@ function LockedIn({ lockIns, now }: { lockIns: ReturnType<typeof useLockIns>; no
     <Block label={`Locked in · ${rows.length}`}>
       {rows.length === 0 ? (
         <Quiet>
-          Nobody&apos;s locked in right now. When you want to focus, lock in from the sidebar and say what you&apos;re on.
+          Nobody&apos;s locked in right now. When you want to focus, tap Lock in in the sidebar.
         </Quiet>
       ) : (
         <ul className="flex flex-col">
@@ -118,7 +118,7 @@ function LockedIn({ lockIns, now }: { lockIns: ReturnType<typeof useLockIns>; no
                       {mine && <span className="font-normal text-muted-foreground"> (you)</span>}
                     </span>
                     <span className="truncate text-[13px] leading-snug text-muted-foreground">
-                      {r.focus || 'Heads down'}
+                      {r.profile!.status_text || 'Heads down'}
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground">

@@ -549,7 +549,7 @@ function PersonRow({
   menu: React.ReactNode
 }) {
   const sub = lockedIn
-    ? `Locked in${lockedIn.focus ? ` · ${lockedIn.focus}` : ''}`
+    ? `Locked in${statusText ? ` · ${statusText}` : ''}`
     : statusText || (status === 'away' || status === 'dnd' ? STATUS_LABEL[status] : null)
   return (
     <div
