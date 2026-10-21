@@ -39,9 +39,9 @@ export default function PrivacyPage() {
             nothing.
           </li>
           <li>
-            <strong>Lock-in sessions</strong>: when you lock in, plus when each session started, paused and ended.
-            While one runs, people in the community see that you&apos;re locked in and for how long, unless you&apos;re
-            invisible.
+            <strong>Lock-in sessions</strong>: when you lock in, plus when each session started, paused and ended,
+            and a check-in about once a minute while one runs. While one runs, people in the community see that
+            you&apos;re locked in and for how long, unless you&apos;re invisible.
           </li>
           <li>
             <strong>Your settings</strong>: notification preferences on our server; theme and window preferences
@@ -64,7 +64,8 @@ export default function PrivacyPage() {
       <LegalSection title="What we don't collect">
         <ul>
           <li>No analytics, advertising or tracking scripts, and no cookies apart from the one that keeps you signed in.</li>
-          <li>No keyboard, mouse or screen activity. &ldquo;Away&rdquo; is something you choose, never something we detect.</li>
+          <li>No keyboard, mouse or screen activity. &ldquo;Away&rdquo; is something you choose, never something we detect.
+            A lock-in timer pauses on its own only when Cabal is closed or your computer sleeps.</li>
           <li>No contacts, location or files from your computer.</li>
         </ul>
       </LegalSection>
