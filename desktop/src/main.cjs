@@ -172,8 +172,12 @@ function createWindow() {
     // Otherwise the corner timer alone would keep the app from quitting.
     overlay?.destroy()
   })
-  win.on('focus', () => win?.flashFrame(false))
-  for (const event of ['focus', 'blur', 'show', 'hide', 'minimize', 'restore']) win.on(event, scheduleOverlay)
+  win.on('focus', () => {
+    win?.flashFrame(false)
+    // With "Keep the window on top" on, both windows float; clicking Cabal
+    // would otherwise slide it over the timer.
+    if (overlay?.isVisible()) overlay.moveTop()
+  })
 
   const contents = win.webContents
   contents.setWindowOpenHandler(({ url }) => {
@@ -218,11 +222,9 @@ let drag = null
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), Math.max(lo, hi))
 const areaAround = (b) => screen.getDisplayNearestPoint({ x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }).workArea
 
-// Shown while a session runs and Cabal itself isn't the window you're looking at.
+// Shown for the whole session, including while Cabal itself is open or maximized.
 function overlayWanted() {
-  if (sessionStartedAt === null || !settings.sessionOverlay) return false
-  const cabalInFront = win && win.isVisible() && !win.isMinimized() && win.isFocused()
-  return !cabalInFront
+  return sessionStartedAt !== null && settings.sessionOverlay
 }
 
 function overlayTargetBounds() {

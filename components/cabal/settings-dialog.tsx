@@ -327,11 +327,11 @@ function AppSettings() {
           {desk.sessionOverlay !== undefined && (
             <Toggle
               id="d-overlay"
-              label="Show the session timer when Cabal is in the background"
+              label="Show the session timer"
               hint={
                 desktop()?.setBuddies
-                  ? 'A small clock in the corner of your screen while a session runs. Click it for your buddy list; drag it wherever you like.'
-                  : 'A small clock in the corner of your screen while a session runs. Drag it wherever you like.'
+                  ? 'A small clock that stays in the corner of your screen while a session runs, even over Cabal. Click it for your buddy list; drag it wherever you like.'
+                  : 'A small clock that stays in the corner of your screen while a session runs, even over Cabal. Drag it wherever you like.'
               }
               checked={desk.sessionOverlay}
               onChange={(v) => patch({ sessionOverlay: v })}
