@@ -31,7 +31,7 @@ function Sync() {
         name: m.profile.display_name || m.profile.username || 'Someone',
         status: statusOf(m.user_id),
         note: lockIns.has(m.user_id)
-          ? `Locked in${lockIns.get(m.user_id)!.focus ? ` · ${lockIns.get(m.user_id)!.focus}` : ''}`
+          ? `Locked in${m.profile.status_text ? ` · ${m.profile.status_text}` : ''}`
           : m.profile.status_text,
       }))
     const arranged = arrangeBuddies(people, buddy.groups, buddy.placements)

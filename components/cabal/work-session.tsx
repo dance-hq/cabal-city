@@ -20,8 +20,7 @@ type WorkSession = LockInState & {
   // long you were away (that time didn't count).
   awayMs: number | null
   dismissAway(): void
-  lockIn(focus: string, shared: boolean): Promise<boolean>
-  edit(focus: string, shared: boolean): Promise<boolean>
+  lockIn(): Promise<boolean>
   pause(): Promise<void>
   resume(): Promise<void>
   end(): Promise<void>
@@ -153,14 +152,9 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
     return () => off?.()
   }, [])
 
-  const lockIn = useCallback(
-    async (focus: string, shared: boolean) => (await call('lock_in', { p_focus: focus, p_shared: shared })).ok,
-    [call],
-  )
-  const edit = useCallback(
-    async (focus: string, shared: boolean) => (await call('edit_lock_in', { p_focus: focus, p_shared: shared })).ok,
-    [call],
-  )
+  // Always visible to the community, with no note of its own; a status
+  // message is how people say what they're on.
+  const lockIn = useCallback(async () => (await call('lock_in', { p_focus: null, p_shared: true })).ok, [call])
   const pause = useCallback(async () => void (await call('pause_lock_in')), [call])
   const resume = useCallback(async () => void (await call('resume_lock_in')), [call])
 
@@ -179,8 +173,8 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
   const dismissAway = useCallback(() => setAwayMs(null), [])
 
   const value = useMemo(
-    () => ({ ...state, ready, awayMs, dismissAway, lockIn, edit, pause, resume, end }),
-    [state, ready, awayMs, dismissAway, lockIn, edit, pause, resume, end],
+    () => ({ ...state, ready, awayMs, dismissAway, lockIn, pause, resume, end }),
+    [state, ready, awayMs, dismissAway, lockIn, pause, resume, end],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
