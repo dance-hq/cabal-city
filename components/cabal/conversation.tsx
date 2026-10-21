@@ -62,6 +62,13 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
     if (document.visibilityState === 'visible') markRead(channel.id)
   }, [channel.id, markRead])
 
+  // A count can still turn up on the conversation you're looking at: a message
+  // that arrived while another window had focus, or a list refresh that landed
+  // before the read was saved. It's on screen, so it's read.
+  useEffect(() => {
+    if (channel.unread > 0 && document.visibilityState === 'visible') markRead(channel.id)
+  }, [channel.unread, channel.id, markRead])
+
   const other = channel.kind === 'dm' ? profileById(channel.other_user_id) : undefined
   const otherStatus = channel.other_user_id ? statusOf(channel.other_user_id) : 'offline'
   const isBlocked = !!channel.other_user_id && blocked.has(channel.other_user_id)

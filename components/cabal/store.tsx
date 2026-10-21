@@ -432,8 +432,11 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       if (m.kind === 'system' && channel.kind === 'team' && !counted) void mutateChannels()
       if (m.author_id === userId) return
 
-      const viewing = live.current.active === m.channel_id && live.current.visible
-      if (viewing) {
+      // On screen counts as read even if another window (or the page around an
+      // embedded preview) has focus; notifications still need Cabal focused.
+      const onScreen = live.current.active === m.channel_id && document.visibilityState === 'visible'
+      const viewing = onScreen && live.current.visible
+      if (onScreen) {
         markRead(m.channel_id)
       } else if (!counted) {
         mutate(
@@ -583,9 +586,9 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
 
   useEffect(() => {
     const update = () => {
-      const visible = document.visibilityState === 'visible' && document.hasFocus()
-      live.current.visible = visible
-      if (visible && live.current.active) {
+      const onScreen = document.visibilityState === 'visible'
+      live.current.visible = onScreen && document.hasFocus()
+      if (onScreen && live.current.active) {
         const c = live.current.channels.find((x) => x.id === live.current.active)
         if (c && c.unread > 0) markRead(c.id)
       }
