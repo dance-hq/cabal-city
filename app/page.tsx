@@ -58,7 +58,7 @@ export default async function Home() {
                 <ArrowUpRight className="size-4" aria-hidden />
               </Link>
             </div>
-            <p className="text-sm text-muted-foreground">Free and open source. On Mac, Windows, Linux or any browser.</p>
+            <p className="text-sm text-muted-foreground">Free and open source. On Windows, Mac, Linux or any browser.</p>
           </div>
         </section>
 
