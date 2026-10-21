@@ -4,13 +4,11 @@ import { ArrowDownToLine, ArrowUpRight } from 'lucide-react'
 import { getCommunity } from '@/lib/community'
 import { onlineCount } from '@/lib/online-count'
 import { latestRelease } from '@/lib/releases'
-import { githubUrl } from '@/lib/config'
 import { ChicagoFlag } from '@/components/marketing/chicago-flag'
 import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import { SiteHeader } from '@/components/marketing/site-header'
-import { ChicagoStar } from '@/components/marketing/star'
 
 export const revalidate = 60
 
@@ -78,32 +76,6 @@ export default async function Home() {
               <Feature title="A room for your team" mono="#your-team">
                 Start a private team and invite your co-founders. Nobody else in the community can read it.
               </Feature>
-            </div>
-          </section>
-
-          <section
-            aria-labelledby="chicago-title"
-            className="grid gap-6 md:grid-cols-[auto_1fr] md:items-start md:gap-10"
-          >
-            <ChicagoStar className="size-10 md:size-14" />
-            <div className="flex max-w-2xl flex-col gap-4">
-              <h2 id="chicago-title" className="text-2xl font-semibold tracking-tight text-balance md:text-3xl">
-                Chicago first. One city, one community.
-              </h2>
-              <p className="leading-relaxed text-muted-foreground text-pretty">
-                Right now Cabal has one community, and it&apos;s Chicago: founders, engineers, designers, and whoever
-                runs the meetup you went to last month. Signing up puts you in the same place as all of them. When it
-                feels right here, we&apos;ll open the next city.
-              </p>
-              {githubUrl && (
-                <p className="leading-relaxed text-muted-foreground text-pretty">
-                  Can&apos;t wait for your city? Cabal is open source.{' '}
-                  <a href={githubUrl} className="text-foreground underline underline-offset-4 hover:text-flag">
-                    Run your own
-                  </a>{' '}
-                  for any group you like.
-                </p>
-              )}
             </div>
           </section>
 
