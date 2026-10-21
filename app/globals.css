@@ -94,21 +94,6 @@
   --star-foreground: oklch(0.99 0 0);
 }
 
-/* The app's own accent, resolved on <html> before .chicago changes it, so
-   public pages can show the real interface in its real colors (.app-look). */
-:root {
-  --app-primary: var(--primary);
-  --app-primary-foreground: var(--primary-foreground);
-  --app-ring: var(--ring);
-  --app-mark: var(--mark);
-}
-.app-look {
-  --primary: var(--app-primary);
-  --primary-foreground: var(--app-primary-foreground);
-  --ring: var(--app-ring);
-  --mark: var(--app-mark);
-}
-
 /* Public pages (home, legal) speak Chicago: red for action, flag blue for detail. */
 .chicago {
   --primary: var(--star);
