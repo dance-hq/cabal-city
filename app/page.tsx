@@ -77,7 +77,7 @@ export default async function Home() {
               )}
             </div>
             <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground">
-              <span>Free</span>
+              <span>Open source</span>
               <span aria-hidden className="text-muted-foreground/50">
                 ·
               </span>
