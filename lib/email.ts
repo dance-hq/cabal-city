@@ -9,6 +9,48 @@ const from = () => {
   return value.includes('<') ? value : `Cabal <${value}>`
 }
 
+export function adminEmails() {
+  return (process.env.CABAL_ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim())
+    .filter((e) => e.includes('@'))
+}
+
+// Plain text on purpose: the body is whatever someone typed, so there's no
+// HTML to escape and nothing that renders.
+export async function sendFeedbackEmail(f: {
+  kind: 'bug' | 'idea'
+  body: string
+  name: string
+  username: string | null
+  email: string | null
+  context: Record<string, string>
+}): Promise<Delivery> {
+  const to = adminEmails()
+  const key = process.env.RESEND_API_KEY
+  if (!key || to.length === 0) return 'unconfigured'
+
+  const label = f.kind === 'bug' ? 'Bug report' : 'Suggestion'
+  const who = f.username ? `${f.name} (@${f.username})` : f.name
+  const firstLine = f.body.split('\n')[0].slice(0, 60)
+  const details = Object.entries(f.context)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n')
+
+  const { error } = await new Resend(key).emails.send({
+    from: from(),
+    to,
+    replyTo: f.email ?? undefined,
+    subject: `${label} from ${f.name}: ${firstLine}`,
+    text: `${label} from ${who}${f.email ? ` <${f.email}>` : ''}\n\n${f.body}\n\n${details ? `--\n${details}\n\n` : ''}Reply to this email to answer them. Mark it resolved in Cabal: Settings → Community & admin.`,
+  })
+  if (error) {
+    console.error('[cabal] Resend error', error.message)
+    return 'failed'
+  }
+  return 'sent'
+}
+
 export async function sendSignInCode(email: string, code: string): Promise<Delivery> {
   const key = process.env.RESEND_API_KEY
   if (!key) {

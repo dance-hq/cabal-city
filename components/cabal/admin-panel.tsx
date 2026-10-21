@@ -17,7 +17,16 @@ type Report = {
   created_at: string
 }
 
-// Deliberately small: open reports, banning, and the join policy.
+type Feedback = {
+  id: string
+  author_id: string
+  kind: 'bug' | 'idea'
+  body: string
+  context: { app?: string; page?: string }
+  created_at: string
+}
+
+// Deliberately small: open reports, bug reports and ideas, banning, and the join policy.
 export function AdminPanel() {
   const { community, profileById, refreshMembers } = useCabal()
   const supabase = createClient()
@@ -37,6 +46,18 @@ export function AdminPanel() {
       .limit(50)
     if (error) throw error
     return data as Report[]
+  })
+
+  const feedback = useSWR(['feedback', community.id], async () => {
+    const { data, error } = await supabase
+      .from('feedback')
+      .select('id, author_id, kind, body, context, created_at')
+      .eq('community_id', community.id)
+      .is('resolved_at', null)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (error) throw error
+    return data as Feedback[]
   })
 
   async function call(fn: () => PromiseLike<{ error: unknown }>, done: string) {
@@ -129,6 +150,40 @@ export function AdminPanel() {
                       Remove member
                     </Button>
                   )}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-medium">Bugs & suggestions · {feedback.data?.length ?? 0}</p>
+        {feedback.data?.length === 0 && <p className="text-xs text-muted-foreground">Nothing new.</p>}
+        <ul className="flex flex-col gap-2">
+          {feedback.data?.map((f) => {
+            const author = profileById(f.author_id)
+            const where = [f.context.app, f.context.page].filter(Boolean).join(' · ')
+            return (
+              <li key={f.id} className="flex flex-col gap-2 rounded-md border p-3 text-sm">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{f.kind === 'bug' ? 'Bug' : 'Idea'}</span> from{' '}
+                  {author?.display_name ?? 'a former member'} · {fullTime(f.created_at)}
+                </p>
+                <p className="leading-relaxed whitespace-pre-wrap">{f.body}</p>
+                {where && <p className="truncate font-mono text-[11px] text-muted-foreground">{where}</p>}
+                <div>
+                  <Button
+                    size="xs"
+                    variant="secondary"
+                    onClick={() =>
+                      call(() => supabase.rpc('resolve_feedback', { p_feedback: f.id }), 'Marked done').then(() =>
+                        feedback.mutate(),
+                      )
+                    }
+                  >
+                    Mark done
+                  </Button>
                 </div>
               </li>
             )

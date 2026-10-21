@@ -93,6 +93,37 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect(row?.role).toBe('member')
   })
 
+  it('keeps feedback between its author and admins', async () => {
+    const direct = await grace.db
+      .from('feedback')
+      .insert({ community_id: communityId, author_id: grace.id, kind: 'bug', body: 'direct' })
+    expect(direct.error).not.toBeNull()
+
+    const { data: row, error } = await admin
+      .from('feedback')
+      .insert({ community_id: communityId, author_id: grace.id, kind: 'bug', body: 'The send button jumps' })
+      .select('id')
+      .single()
+    if (error) throw error
+
+    const own = await grace.db.from('feedback').select('id').eq('id', row.id)
+    expect(own.data).toHaveLength(1)
+    const other = await ada.db.from('feedback').select('id').eq('id', row.id)
+    expect(other.data ?? []).toHaveLength(0)
+
+    const denied = await ada.db.rpc('resolve_feedback', { p_feedback: row.id })
+    expect(denied.error?.message).toMatch(/admins only/i)
+
+    await admin.from('community_members').update({ role: 'admin' }).eq('user_id', ada.id).eq('community_id', communityId)
+    const seen = await ada.db.from('feedback').select('id').eq('id', row.id)
+    expect(seen.data).toHaveLength(1)
+    const resolved = await ada.db.rpc('resolve_feedback', { p_feedback: row.id })
+    expect(resolved.error).toBeNull()
+    const { data: after } = await admin.from('feedback').select('resolved_at, resolved_by').eq('id', row.id).single()
+    expect(after?.resolved_by).toBe(ada.id)
+    await admin.from('community_members').update({ role: 'member' }).eq('user_id', ada.id).eq('community_id', communityId)
+  })
+
   it('hides the invite code column from direct reads', async () => {
     const { error } = await grace.db.from('communities').select('invite_code').eq('slug', slug)
     expect(error).not.toBeNull()

@@ -46,6 +46,10 @@ export default function PrivacyPage() {
             <strong>Reports</strong> you file, including a short excerpt of the reported message and your reason.
           </li>
           <li>
+            <strong>Feedback</strong> you send, and, if you leave &ldquo;Include app details&rdquo; on, the page you
+            were on, the app version, your browser and window size. Admins get a copy by email so they can reply.
+          </li>
+          <li>
             <strong>Sign-in protection</strong>: a scrambled (hashed) form of your email and IP address each time a
             code is requested, used only to stop abuse and deleted after 24 hours.
           </li>
@@ -72,6 +76,7 @@ export default function PrivacyPage() {
             Reports: the person who filed them and community admins. Admins can also remove members from the
             community.
           </li>
+          <li>Feedback: the person who sent it and community admins.</li>
         </ul>
         <p>
           Messages are encrypted in transit and stored on our database, but they aren&apos;t end-to-end encrypted.
@@ -92,7 +97,8 @@ export default function PrivacyPage() {
             pages requested) for security and debugging.
           </li>
           <li>
-            <strong>Resend</strong> delivers sign-in emails, so it sees your email address.
+            <strong>Resend</strong> delivers sign-in emails and feedback copies to admins, so it sees your email
+            address and any feedback you send.
           </li>
           <li>
             <strong>GitHub</strong> hosts the desktop app downloads. The desktop app checks GitHub for updates
@@ -105,7 +111,7 @@ export default function PrivacyPage() {
       <LegalSection title="Keeping and deleting your data">
         <p>
           We keep your account until you delete it. To delete it, open <strong>Settings → App → Delete account</strong>.
-          That removes your email, profile, photo and every message you wrote, right away. Teams you own pass to their
+          That removes your email, profile, photo, feedback and every message you wrote, right away. Teams you own pass to their
           longest-standing member. Messages other people sent you stay with them.
         </p>
         <p>

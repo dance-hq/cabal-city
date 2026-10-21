@@ -1,7 +1,20 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, ChevronRight, Compass, Hash, Info, Link2, Lock, Plus, Search, Settings, X } from 'lucide-react'
+import {
+  Check,
+  ChevronRight,
+  Compass,
+  Hash,
+  Info,
+  Link2,
+  Lock,
+  MessageSquareWarning,
+  Plus,
+  Search,
+  Settings,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
@@ -9,6 +22,7 @@ import { MeCard } from './me-card'
 import { ConnectionBanner } from './connection-banner'
 import { WelcomeCard } from './welcome-card'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
+import { FeedbackDialog } from './feedback-dialog'
 import { useCabal } from './store'
 import { compareByPresence } from '@/lib/presence'
 import { createClient } from '@/lib/supabase/client'
@@ -52,6 +66,7 @@ export function BuddyList() {
   const [query, setQuery] = useState('')
   const [showOffline, setShowOffline] = useState(true)
   const [creatingTeam, setCreatingTeam] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [browsingTeams, setBrowsingTeams] = useState(false)
   const teamRooms = useTeamRooms(community.id)
   const joinable = teamRooms.data?.filter((r) => !r.joined).length ?? 0
@@ -107,14 +122,25 @@ export function BuddyList() {
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="app-drag flex h-11 shrink-0 items-center justify-between gap-2 pr-2 pl-3">
         <span className="truncate font-mono text-xs font-medium text-muted-foreground">{community.name}</span>
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Settings"
-        >
-          <Settings className="size-4" aria-hidden />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Report a bug or suggest something"
+            title="Report a bug or suggest something"
+          >
+            <MessageSquareWarning className="size-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Settings"
+          >
+            <Settings className="size-4" aria-hidden />
+          </button>
+        </div>
       </header>
       <ConnectionBanner />
       <MeCard />
@@ -307,6 +333,7 @@ export function BuddyList() {
       )}
 
       <CreateTeamDialog open={creatingTeam} onOpenChange={setCreatingTeam} />
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
       <BrowseTeamsDialog open={browsingTeams} onOpenChange={setBrowsingTeams} onCreate={() => setCreatingTeam(true)} />
     </div>
   )
