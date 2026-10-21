@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowDown, Loader2, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -16,6 +16,8 @@ import { clock, clock24, dayKey, dayLabel, fullTime } from '@/lib/time'
 import type { Channel, Message } from '@/lib/types'
 
 const GROUP_MS = 5 * 60_000
+// Keep in step with .message-enter in globals.css.
+const ENTER_MS = 380
 
 export function MessageList({
   channel,
@@ -41,32 +43,78 @@ export function MessageList({
   const { userId, me, profileById, send, discard, showProfile, blocked, isAdmin } = useCabal()
   const scroller = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
-  const prevCount = useRef(0)
   const prevHeight = useRef(0)
   const loadingOlderRef = useRef(false)
+  const seededFor = useRef<string | null>(null)
+  const known = useRef(new Set<string>())
+  const glide = useRef(0)
+  const [entering, setEntering] = useState<Set<string>>(() => new Set())
   const [showJump, setShowJump] = useState(false)
   const [reporting, setReporting] = useState<Message | null>(null)
   const irc = channel.kind === 'room'
 
+  // While a new message opens up, keep the bottom pinned every frame so the
+  // conversation glides up with it instead of jumping.
+  const pinToBottom = useCallback((ms: number) => {
+    const el = scroller.current
+    if (!el) return
+    cancelAnimationFrame(glide.current)
+    const until = performance.now() + ms
+    const step = () => {
+      el.scrollTop = el.scrollHeight
+      if (performance.now() < until) glide.current = requestAnimationFrame(step)
+    }
+    step()
+  }, [])
+  const stopGlide = () => cancelAnimationFrame(glide.current)
+
+  useEffect(() => () => cancelAnimationFrame(glide.current), [])
+
   useLayoutEffect(() => {
     const el = scroller.current
     if (!el) return
+    if (seededFor.current !== channel.id) {
+      seededFor.current = channel.id
+      known.current = new Set(messages.map((m) => m.id))
+      atBottom.current = true
+      setShowJump(false)
+      setEntering((s) => (s.size ? new Set() : s))
+      el.scrollTop = el.scrollHeight
+      return
+    }
     if (loadingOlderRef.current) {
+      for (const m of messages) known.current.add(m.id)
       el.scrollTop = el.scrollHeight - prevHeight.current
       loadingOlderRef.current = false
-    } else if (prevCount.current === 0 || atBottom.current) {
-      el.scrollTop = el.scrollHeight
-    } else if (messages.length > prevCount.current) {
-      setShowJump(true)
+      return
     }
-    prevCount.current = messages.length
-  }, [messages])
-
-  useEffect(() => {
-    prevCount.current = 0
-    atBottom.current = true
-    setShowJump(false)
-  }, [channel.id])
+    const added = messages.filter((m) => !known.current.has(m.id))
+    for (const m of added) known.current.add(m.id)
+    if (added.length === 0) {
+      if (atBottom.current) el.scrollTop = el.scrollHeight
+      return
+    }
+    // A burst (e.g. catching up after a reconnect) just lands; a few messages ease in.
+    const calm = added.length <= 4 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (calm) {
+      setEntering((s) => {
+        const next = new Set(s)
+        for (const m of added) next.add(m.id)
+        return next
+      })
+    }
+    if (atBottom.current) {
+      if (calm) pinToBottom(ENTER_MS + 80)
+      else el.scrollTop = el.scrollHeight
+    } else if (added.some((m) => m.author_id !== userId)) {
+      setShowJump(true)
+    } else {
+      // You sent something while scrolled up: take you to it.
+      atBottom.current = true
+      if (calm) pinToBottom(ENTER_MS + 80)
+      else el.scrollTop = el.scrollHeight
+    }
+  }, [messages, channel.id, userId, pinToBottom])
 
   const onScroll = () => {
     const el = scroller.current
@@ -116,6 +164,9 @@ export function MessageList({
       <div
         ref={scroller}
         onScroll={onScroll}
+        onWheel={stopGlide}
+        onTouchMove={stopGlide}
+        onKeyDown={stopGlide}
         className={cn('quiet-scroll flex min-h-0 flex-1 flex-col overflow-y-auto py-3', irc ? 'px-3' : 'px-4')}
         role="log"
         aria-live="polite"
@@ -158,7 +209,8 @@ export function MessageList({
           const hidden = m.author_id && blocked.has(m.author_id)
 
           return (
-            <Fragment key={m.id}>
+            <div key={m.id} className={cn(entering.has(m.id) && 'message-enter')}>
+              <div>
               {newDay && (
                 <div className="my-3 flex items-center gap-3" role="separator" aria-label={dayLabel(m.created_at)}>
                   <div className="h-px flex-1 bg-border" />
@@ -177,10 +229,10 @@ export function MessageList({
               ) : (
                 <div
                   className={cn(
-                    'group relative -mx-2 flex rounded-md px-2 hover:bg-accent/50',
+                    'group relative -mx-2 flex rounded-md px-2 transition-opacity duration-500 ease-out hover:bg-accent/50',
                     irc ? 'gap-3 py-0.5' : grouped ? 'gap-3 py-0.5' : 'mt-2.5 gap-3 py-0.5',
                     mentioned && 'bg-primary/10 hover:bg-primary/15',
-                    m.pending && 'opacity-60',
+                    m.pending && 'opacity-70',
                   )}
                 >
                   {irc ? (
@@ -269,9 +321,15 @@ export function MessageList({
                       onReport={() => setReporting(m)}
                     />
                   )}
+                  {m.pending && (
+                    <span className="pending-note pointer-events-none absolute right-2 bottom-0.5 font-mono text-[10.5px] text-muted-foreground">
+                      sending…
+                    </span>
+                  )}
                 </div>
               )}
-            </Fragment>
+              </div>
+            </div>
           )
         })}
       </div>
@@ -304,8 +362,9 @@ export function MessageList({
   )
 }
 
+// "sending…" floats over the row instead (see .pending-note) so the message
+// never changes height when the server confirms it.
 function SendState({ m, onRetry, onDiscard }: { m: Message; onRetry: () => void; onDiscard: () => void }) {
-  if (m.pending) return <span className="ml-2 font-mono text-[10.5px] text-muted-foreground">sending…</span>
   if (!m.failed) return null
   return (
     <span className="ml-2 inline-flex items-center gap-2 font-mono text-[11px] text-destructive" role="alert">
@@ -410,7 +469,7 @@ function ConversationStart({ channel, empty }: { channel: Channel; empty: boolea
       <p className="text-sm font-semibold">{channel.team_name}</p>
       <p className="text-sm leading-relaxed text-muted-foreground">
         {channel.team_visibility === 'public'
-          ? 'Open team room. Anyone in the community can join, read along and say hi.'
+          ? 'Public team. Anyone in the community can join, read along and say hi.'
           : 'Invite-only. Nobody else in the community can see or read it.'}
       </p>
     </div>

@@ -18,7 +18,7 @@ export default function GuidelinesPage() {
         <ul>
           <li>Be kind and assume good intent. Disagree with ideas, not people.</li>
           <li>Help people out. Answer the question you know the answer to.</li>
-          <li>Keep rooms on topic. Take long back-and-forths to a DM or a team room.</li>
+          <li>Keep channels on topic. Take long back-and-forths to a DM or a team.</li>
           <li>Respect &ldquo;away&rdquo; and &ldquo;do not disturb&rdquo;. People will get back to you.</li>
         </ul>
       </LegalSection>
@@ -49,7 +49,7 @@ export default function GuidelinesPage() {
 
       <LegalSection title="What admins can do">
         <p>
-          Admins can delete messages in community rooms that break these guidelines and remove people from the
+          Admins can delete messages in community channels that break these guidelines and remove people from the
           community. They can&apos;t read your DMs or invite-only team rooms, so report anything there that needs attention. We start with a
           friendly word where we can, and act right away for threats, harassment, spam or anything illegal. If you
           think we got it wrong, email us and a different person will take a look.

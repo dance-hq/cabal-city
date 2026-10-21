@@ -19,7 +19,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           {community?.description && <p className="text-sm leading-relaxed text-muted-foreground">{community.description}</p>}
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Cabal is a small instant messenger. See who&apos;s around, send a message, or drop into a room.
+          Cabal is a small instant messenger. See who&apos;s around, send a message, or drop into a channel.
         </p>
         <JoinButton code={safeCode} />
       </div>

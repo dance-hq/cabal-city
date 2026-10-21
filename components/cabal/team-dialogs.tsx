@@ -99,31 +99,30 @@ export function BrowseTeamsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Team rooms</DialogTitle>
+          <DialogTitle>Teams</DialogTitle>
           <DialogDescription>
-            Rooms where teams in {community.name} build out loud. Join any of them to follow along, say hi, or lend a
-            hand.
+            Where teams in {community.name} build out loud. Join any of them to follow along, say hi, or lend a hand.
           </DialogDescription>
         </DialogHeader>
 
         {(rooms.data?.length ?? 0) > 5 && (
           <label className="relative block">
-            <span className="sr-only">Search team rooms</span>
+            <span className="sr-only">Search teams</span>
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team rooms" className="pl-8" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search teams" className="pl-8" />
           </label>
         )}
 
         {rooms.isLoading && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Loading" />}
-        {rooms.error && <p className="text-sm text-muted-foreground">{"Couldn't load team rooms. Try again in a moment."}</p>}
+        {rooms.error && <p className="text-sm text-muted-foreground">{"Couldn't load teams. Try again in a moment."}</p>}
 
         {rooms.data && rooms.data.length === 0 && (
           <p className="rounded-md border border-dashed px-3 py-4 text-sm leading-relaxed text-muted-foreground">
-            No team rooms yet. Start the first one for your startup or crew.
+            No teams yet. Start the first one for your startup or crew.
           </p>
         )}
         {rooms.data && rooms.data.length > 0 && list.length === 0 && (
-          <p className="text-sm text-muted-foreground">{`No team rooms match "${query}".`}</p>
+          <p className="text-sm text-muted-foreground">{`No teams match "${query}".`}</p>
         )}
 
         {list.length > 0 && (
@@ -161,7 +160,7 @@ export function BrowseTeamsDialog({
               onCreate()
             }}
           >
-            Start a team room
+            Start a team
           </Button>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
             Done
@@ -203,9 +202,10 @@ export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpen
       <DialogContent className="sm:max-w-sm">
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Start a team room</DialogTitle>
+            <DialogTitle>Start a team</DialogTitle>
             <DialogDescription>
-              A room for your startup or crew. Anyone in {community.name} can find it and join.
+              A home for your startup or crew. Anyone in {community.name} can find it and join. You can change the
+              name or make it invite-only later.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2">
@@ -236,7 +236,7 @@ export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpen
             </Button>
             <Button type="submit" disabled={busy || name.trim().length < 2}>
               {busy && <Loader2 className="animate-spin" aria-hidden />}
-              Start room
+              Start team
             </Button>
           </DialogFooter>
         </form>
@@ -263,6 +263,13 @@ export function TeamManageDialog({
   const isPublic = channel.team_visibility === 'public'
   const [query, setQuery] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [name, setName] = useState(channel.team_name ?? '')
+  const [wasOpen, setWasOpen] = useState(open)
+  // Start from the current name each time the dialog opens (it may have been renamed meanwhile).
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setName(channel.team_name ?? '')
+  }
 
   const team = useSWR(open ? ['team', teamId] : null, async () => {
     const supabase = createClient()
@@ -304,13 +311,50 @@ export function TeamManageDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{channel.team_name}</DialogTitle>
+          <DialogTitle>{isOwner ? 'Team settings' : channel.team_name}</DialogTitle>
           <DialogDescription>
             {isPublic
-              ? `Open team room. Anyone in ${community.name} can join and read it.`
-              : 'Invite-only team room. Messages are visible only to the people listed here.'}
+              ? `Public team. Anyone in ${community.name} can join and read it.`
+              : 'Invite-only team. Messages are visible only to the people listed here.'}
           </DialogDescription>
         </DialogHeader>
+
+        {isOwner && (
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              const next = name.trim()
+              if (next.length < 2 || next === channel.team_name) return
+              const ok = await run('name', () => supabase.rpc('rename_team', { p_team: teamId, p_name: next }), 'Team renamed')
+              if (ok) {
+                refreshChannels()
+                void refreshTeamRooms(community.id)
+              }
+            }}
+          >
+            <Label htmlFor="team-rename">Name</Label>
+            <div className="flex gap-2">
+              <Input
+                id="team-rename"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                minLength={2}
+                maxLength={60}
+                required
+                autoComplete="off"
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={busyId === 'name' || name.trim().length < 2 || name.trim() === channel.team_name}
+              >
+                {busyId === 'name' && <Loader2 className="animate-spin" aria-hidden />}
+                Save
+              </Button>
+            </div>
+          </form>
+        )}
 
         {isOwner && (
           <div className="flex items-start justify-between gap-4 rounded-md border px-3 py-2.5">
@@ -318,8 +362,8 @@ export function TeamManageDialog({
               <Label htmlFor="team-visibility">Invite-only</Label>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {isPublic
-                  ? 'Hide this room so only people you invite can join. Everyone here stays.'
-                  : 'Turn off to open it up. Anyone who joins can read earlier messages too.'}
+                  ? 'Hide this team so only people you invite can join. Everyone here stays.'
+                  : 'Turn off to make it public. Anyone who joins can read earlier messages too.'}
               </p>
             </div>
             <Switch
@@ -481,7 +525,7 @@ export function TeamManageDialog({
               }
             }}
           >
-            Leave room
+            Leave team
           </Button>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
             Done

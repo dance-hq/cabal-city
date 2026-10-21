@@ -1,11 +1,15 @@
 // The Electron preload exposes `window.cabalDesktop`. In a normal browser it
 // is undefined and every call below is a no-op.
 
+import type { BuddyAction, OverlayBuddies } from './buddy-groups'
+
 export type DesktopSettings = {
   launchAtLogin: boolean
   alwaysOnTop: boolean
   closeToTray: boolean
   shortcut: string
+  // Desktop apps released before the session timer don't have this.
+  sessionOverlay?: boolean
 }
 
 export type DesktopBridge = {
@@ -23,6 +27,12 @@ export type DesktopBridge = {
   getUpdate?(): Promise<DesktopUpdate | null>
   installUpdate?(): void
   onUpdate?(cb: (update: DesktopUpdate) => void): () => void
+  // Desktop apps released before the session timer don't have these.
+  launchedAt?: number
+  setSession?(startedAt: number | null): void
+  // Desktop apps released before the corner buddy list don't have these.
+  setBuddies?(list: OverlayBuddies): void
+  onBuddyAction?(cb: (action: BuddyAction) => void): () => void
 }
 
 export type DesktopUpdate = { version: string }

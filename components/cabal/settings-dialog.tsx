@@ -229,7 +229,7 @@ function NotificationSettings() {
       <Toggle
         id="n-mentions"
         label="Mentions"
-        hint="When someone writes your @username in a room or team. Rooms are otherwise quiet."
+        hint="When someone writes your @username in a channel or team. Channels are otherwise quiet."
         checked={settings.notify_mentions}
         onChange={(v) => updateSettings({ notify_mentions: v })}
       />
@@ -319,6 +319,19 @@ function AppSettings() {
             checked={desk.alwaysOnTop}
             onChange={(v) => patch({ alwaysOnTop: v })}
           />
+          {desk.sessionOverlay !== undefined && (
+            <Toggle
+              id="d-overlay"
+              label="Show the session timer when Cabal is in the background"
+              hint={
+                desktop()?.setBuddies
+                  ? 'A small clock in the corner of your screen while a session runs. Click it for your buddy list; drag it wherever you like.'
+                  : 'A small clock in the corner of your screen while a session runs. Drag it wherever you like.'
+              }
+              checked={desk.sessionOverlay}
+              onChange={(v) => patch({ sessionOverlay: v })}
+            />
+          )}
           <form
             className="flex flex-col gap-2"
             onSubmit={(e) => {

@@ -57,6 +57,112 @@ test('a window saved on a missing screen comes back on screen', () => {
   assert.deepEqual(rules.restoreBounds(null, displays, fallback), fallback)
 })
 
+test('a session start from the page must be a sensible time', () => {
+  const now = Date.parse('2026-10-21T12:00:00Z')
+  assert.equal(rules.sessionStart(now - 5 * 60_000, now), now - 5 * 60_000)
+  assert.equal(rules.sessionStart(null, now), null)
+  assert.equal(rules.sessionStart('123', now), null)
+  assert.equal(rules.sessionStart(Number.NaN, now), null)
+  assert.equal(rules.sessionStart(now + 10 * 60_000, now), null)
+  assert.equal(rules.sessionStart(now - 2 * 24 * 3600_000, now), null)
+})
+
+test('the corner timer stays on a screen, bottom-right by default', () => {
+  const size = { width: 128, height: 34 }
+  const primary = { x: 0, y: 25, width: 1440, height: 875 }
+  const displays = [{ workArea: primary }]
+  assert.deepEqual(rules.overlayPosition(null, displays, primary, size), { x: 1292, y: 846 })
+  assert.deepEqual(rules.overlayPosition({ x: 40, y: 60 }, displays, primary, size), { x: 40, y: 60 })
+  // Dragged onto a monitor that's gone, or half off the edge: back to the corner.
+  assert.deepEqual(rules.overlayPosition({ x: 2000, y: 60 }, displays, primary, size), { x: 1292, y: 846 })
+  assert.deepEqual(rules.overlayPosition({ x: 1400, y: 60 }, displays, primary, size), { x: 1292, y: 846 })
+  assert.equal(rules.normalizeSettings({ sessionOverlay: false }).sessionOverlay, false)
+  assert.equal(rules.normalizeSettings(null).sessionOverlay, true)
+})
+
+test('the open buddy list grows from the pill toward the middle of the screen', () => {
+  const area = { x: 0, y: 0, width: 1440, height: 900 }
+  const pill = { width: 128, height: 34 }
+  const panel = { width: 248, height: 400 }
+  // Closed: just the pill where it was left.
+  assert.deepEqual(rules.overlayBounds({ x: 10, y: 20 }, pill, null, area), { x: 10, y: 20, width: 128, height: 34 })
+  // Top-left pill: list hangs down and to the right from it.
+  assert.deepEqual(rules.overlayBounds({ x: 20, y: 20 }, pill, panel, area), { x: 20, y: 20, width: 248, height: 400 })
+  // Bottom-right pill (the default): list grows up and to the left, its corner on the pill's.
+  assert.deepEqual(rules.overlayBounds({ x: 1292, y: 846 }, pill, panel, area), { x: 1172, y: 480, width: 248, height: 400 })
+  // Never taller than the screen, never off it.
+  const tall = rules.overlayBounds({ x: 20, y: 20 }, pill, { width: 248, height: 5000 }, area)
+  assert.equal(tall.height, 900)
+  assert.equal(tall.y, 0)
+})
+
+test('an open list dragged somewhere new reopens in the same spot', () => {
+  const area = { x: 0, y: 0, width: 1440, height: 900 }
+  const pill = { width: 128, height: 34 }
+  const panel = { width: 248, height: 400 }
+  for (const bounds of [
+    { x: 30, y: 40, width: 248, height: 400 },
+    { x: 1100, y: 450, width: 248, height: 400 },
+    { x: 900, y: 60, width: 248, height: 400 },
+  ]) {
+    const anchor = rules.anchorFromBounds(bounds, pill, area)
+    assert.deepEqual(rules.overlayBounds(anchor, pill, panel, area), bounds)
+  }
+  // A closed pill's own bounds are its anchor.
+  assert.deepEqual(rules.anchorFromBounds({ x: 1292, y: 846, width: 128, height: 34 }, pill, area), { x: 1292, y: 846 })
+})
+
+test('the list height the corner asks for is kept sensible', () => {
+  assert.equal(rules.panelHeight(300), 300)
+  assert.equal(rules.panelHeight(20), 160)
+  assert.equal(rules.panelHeight(9999), 520)
+  assert.equal(rules.panelHeight(NaN), 160)
+})
+
+const ANA = '11111111-1111-4111-8111-111111111111'
+const GROUP = '22222222-2222-4222-8222-222222222222'
+
+test('the corner only gets the fields it draws from the buddy list', () => {
+  const list = rules.buddySnapshot({
+    groups: [
+      { id: GROUP, name: '  Night   owls ', collapsed: true, total: 3, people: [{ id: ANA, name: 'Ana', status: 'online', unread: 2, extra: 'x' }] },
+      { id: 'not-a-uuid', name: 'Bad', people: [] },
+    ],
+    here: [{ id: ANA, name: '', status: 'sleeping', note: 'heads down' }],
+    offline: 'nope',
+  })
+  assert.equal(list.groups.length, 1)
+  assert.equal(list.groups[0].name, 'Night owls')
+  assert.deepEqual(list.groups[0].people[0], { id: ANA, name: 'Ana', status: 'online', note: null, unread: 2, group: null })
+  assert.deepEqual(list.here[0], { id: ANA, name: 'Someone', status: 'offline', note: 'heads down', unread: 0, group: null })
+  assert.deepEqual(list.offline, [])
+  assert.equal(rules.buddySnapshot(null), null)
+  const many = Array.from({ length: 800 }, () => ({ id: ANA, name: 'A', status: 'online' }))
+  assert.equal(rules.buddySnapshot({ here: many }).here.length, 600)
+})
+
+test('the corner can only ask for a short list of things', () => {
+  assert.deepEqual(rules.overlayAction({ type: 'open-dm', userId: ANA.toUpperCase() }), { type: 'open-dm', userId: ANA })
+  assert.deepEqual(rules.overlayAction({ type: 'move', userId: ANA, groupId: null }), { type: 'move', userId: ANA, groupId: null })
+  assert.deepEqual(rules.overlayAction({ type: 'move', userId: ANA, groupId: GROUP }), { type: 'move', userId: ANA, groupId: GROUP })
+  assert.deepEqual(rules.overlayAction({ type: 'create-group', name: ' Co-founders ' }), {
+    type: 'create-group',
+    name: 'Co-founders',
+    userId: null,
+  })
+  assert.deepEqual(rules.overlayAction({ type: 'collapse-group', groupId: GROUP, collapsed: true }), {
+    type: 'collapse-group',
+    groupId: GROUP,
+    collapsed: true,
+  })
+  assert.equal(rules.overlayAction({ type: 'move', userId: ANA }), null)
+  assert.equal(rules.overlayAction({ type: 'create-group', name: '   ' }), null)
+  assert.equal(rules.overlayAction({ type: 'create-group', name: 'x', userId: 'bad' }), null)
+  assert.equal(rules.overlayAction({ type: 'rename-group', groupId: GROUP, name: '' }), null)
+  assert.equal(rules.overlayAction({ type: 'send-message', userId: ANA, body: 'hi' }), null)
+  assert.equal(rules.overlayAction('open-dm'), null)
+})
+
 test('badge counts are whole, positive and capped', () => {
   assert.equal(rules.badgeCount(3), 3)
   assert.equal(rules.badgeCount(-1), 0)

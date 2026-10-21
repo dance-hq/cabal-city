@@ -66,10 +66,10 @@ export default function PrivacyPage() {
 
       <LegalSection title="Who can see what">
         <ul>
-          <li>Community rooms: every signed-in member of the Chicago community.</li>
+          <li>Community channels: every signed-in member of the Chicago community.</li>
           <li>
-            Open team rooms: anyone in the Chicago community who joins them, including earlier messages.
-            Invite-only team rooms: only the people on that team.
+            Public teams: anyone in the Chicago community who joins them, including earlier messages.
+            Invite-only teams: only the people on that team.
           </li>
           <li>Direct messages: only the people in the conversation. Community admins can&apos;t read them.</li>
           <li>

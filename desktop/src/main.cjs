@@ -19,7 +19,11 @@ const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json')
 const APP_URL = (process.env.CABAL_APP_URL || config.appUrl).replace(/\/+$/, '')
 const ORIGINS = rules.allowedOrigins(APP_URL, config.allowedOrigins)
 const OFFLINE_PAGE = path.join(__dirname, 'offline.html')
+const OVERLAY_PAGE = path.join(__dirname, 'overlay.html')
+const OVERLAY_SIZE = { width: 144, height: 34 }
 const BUILD = path.join(__dirname, '..', 'build')
+// Sessions that started before this launch are left over from last time.
+const LAUNCHED_AT = Date.now()
 
 if (!ORIGINS.size) {
   console.error(`Cabal: "${APP_URL}" is not a usable app address. Set appUrl in app.json or CABAL_APP_URL.`)
@@ -75,6 +79,10 @@ let installing = false
 let retryTimer = null
 let pendingLink = rules.findDeepLink(process.argv)
 let unread = 0
+let sessionStartedAt = null
+let overlay = null
+let overlayReady = false
+let overlayTimer = null
 
 function startUrl() {
   if (pendingLink?.kind === 'join') return `${APP_URL}/join/${encodeURIComponent(pendingLink.code)}`
@@ -134,7 +142,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       spellcheck: true,
-      additionalArguments: [`--cabal-version=${app.getVersion()}`],
+      additionalArguments: [`--cabal-version=${app.getVersion()}`, `--cabal-launched=${LAUNCHED_AT}`],
     },
   })
 
@@ -161,8 +169,11 @@ function createWindow() {
   })
   win.on('closed', () => {
     win = null
+    // Otherwise the corner timer alone would keep the app from quitting.
+    overlay?.destroy()
   })
   win.on('focus', () => win?.flashFrame(false))
+  for (const event of ['focus', 'blur', 'show', 'hide', 'minimize', 'restore']) win.on(event, scheduleOverlay)
 
   const contents = win.webContents
   contents.setWindowOpenHandler(({ url }) => {
@@ -192,6 +203,158 @@ function createWindow() {
   return win
 }
 
+// --- session timer overlay ------------------------------------------------------------
+// A pill in the corner while a session runs. Click it and it opens into your
+// buddy list. The corner page never talks to Cabal's servers: the Cabal window
+// hands it the list, and it hands back small checked requests.
+
+const PANEL_WIDTH = 248
+let overlayAnchor = null
+let overlayExpanded = false
+let overlayHeight = 360
+let buddies = null
+let drag = null
+
+const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), Math.max(lo, hi))
+const areaAround = (b) => screen.getDisplayNearestPoint({ x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }).workArea
+
+// Shown while a session runs and Cabal itself isn't the window you're looking at.
+function overlayWanted() {
+  if (sessionStartedAt === null || !settings.sessionOverlay) return false
+  const cabalInFront = win && win.isVisible() && !win.isMinimized() && win.isFocused()
+  return !cabalInFront
+}
+
+function overlayTargetBounds() {
+  const area = areaAround({ ...overlayAnchor, ...OVERLAY_SIZE })
+  const panel = overlayExpanded ? { width: PANEL_WIDTH, height: overlayHeight } : null
+  return rules.overlayBounds(overlayAnchor, OVERLAY_SIZE, panel, area)
+}
+
+function placeOverlay() {
+  if (overlay && !drag) overlay.setBounds(overlayTargetBounds())
+}
+
+function saveOverlay() {
+  writeJson('overlay.json', { x: overlayAnchor.x, y: overlayAnchor.y, expanded: overlayExpanded })
+}
+
+// The window follows the cursor itself, so the same pill can be clicked (open
+// the list) or dragged (move it) — a native drag area would swallow clicks.
+function startDrag() {
+  if (!overlay || drag) return
+  drag = {
+    cursor: screen.getCursorScreenPoint(),
+    bounds: overlay.getBounds(),
+    until: Date.now() + 20_000,
+    timer: setInterval(followCursor, 16),
+  }
+}
+
+function followCursor() {
+  if (!overlay || !drag || Date.now() > drag.until) return endDrag()
+  const c = screen.getCursorScreenPoint()
+  const { x, y, width, height } = drag.bounds
+  const area = screen.getDisplayNearestPoint(c).workArea
+  overlay.setBounds({
+    x: Math.round(clamp(x + c.x - drag.cursor.x, area.x, area.x + area.width - width)),
+    y: Math.round(clamp(y + c.y - drag.cursor.y, area.y, area.y + area.height - height)),
+    width,
+    height,
+  })
+}
+
+function endDrag() {
+  if (!drag) return
+  clearInterval(drag.timer)
+  drag = null
+  if (!overlay) return
+  const bounds = overlay.getBounds()
+  overlayAnchor = rules.anchorFromBounds(bounds, OVERLAY_SIZE, areaAround(bounds))
+  saveOverlay()
+  placeOverlay()
+}
+
+function sendOverlayState() {
+  if (!overlay || !overlayReady) return
+  const contents = overlay.webContents
+  contents.send('cabal:overlay-session', sessionStartedAt)
+  contents.send('cabal:overlay-expanded', overlayExpanded)
+  contents.send('cabal:overlay-buddies', buddies)
+}
+
+function createOverlay() {
+  if (!overlayAnchor) {
+    const saved = readJson('overlay.json')
+    const primary = screen.getPrimaryDisplay().workArea
+    overlayAnchor = rules.overlayPosition(saved, screen.getAllDisplays(), primary, OVERLAY_SIZE)
+    overlayExpanded = saved?.expanded === true
+  }
+  overlayReady = false
+  overlay = new BrowserWindow({
+    ...overlayTargetBounds(),
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    title: 'Cabal session',
+    webPreferences: {
+      preload: path.join(__dirname, 'overlay-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: false,
+    },
+  })
+  overlay.setAlwaysOnTop(true, 'floating')
+  overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+  const contents = overlay.webContents
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  contents.on('will-navigate', (event) => event.preventDefault())
+
+  overlay.on('blur', endDrag)
+  overlay.on('closed', () => {
+    clearInterval(drag?.timer)
+    drag = null
+    overlay = null
+    overlayReady = false
+  })
+  overlay.once('ready-to-show', () => {
+    overlayReady = true
+    updateOverlay()
+  })
+  overlay.loadFile(OVERLAY_PAGE)
+}
+
+function updateOverlay() {
+  if (!overlayWanted()) {
+    overlay?.hide()
+    return
+  }
+  if (!overlay) return createOverlay()
+  if (!overlayReady) return
+  sendOverlayState()
+  // showInactive so the timer never steals focus from what you're doing.
+  if (!overlay.isVisible()) {
+    placeOverlay()
+    overlay.showInactive()
+  }
+}
+
+// Focus moves in small bursts (blur, then focus elsewhere); settle first so the timer doesn't flicker.
+function scheduleOverlay() {
+  clearTimeout(overlayTimer)
+  overlayTimer = setTimeout(updateOverlay, 150)
+}
+
 // --- tray, badge, shortcut ---------------------------------------------------------
 
 function trayImage() {
@@ -207,8 +370,14 @@ function refreshTray() {
   if (process.platform === 'darwin') tray.setTitle(unread ? String(unread) : '')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Show Cabal', click: showWindow },
-      { type: 'separator' },
+    { label: 'Show Cabal', click: showWindow },
+    {
+      label: 'Show session timer',
+      type: 'checkbox',
+      checked: settings.sessionOverlay,
+      click: (item) => applySettings({ sessionOverlay: item.checked }),
+    },
+    { type: 'separator' },
       { label: 'Quit Cabal', click: () => app.quit() },
     ]),
   )
@@ -258,6 +427,10 @@ function applySettings(patch) {
   if (patch.alwaysOnTop !== undefined) win?.setAlwaysOnTop(next.alwaysOnTop)
   settings = next
   writeJson('settings.json', settings)
+  if (patch.sessionOverlay !== undefined) {
+    scheduleOverlay()
+    refreshTray()
+  }
   return settings
 }
 
@@ -282,6 +455,48 @@ ipcMain.on('cabal:install-update', (event) => {
   // Quit the normal way first so the page can tell friends you went offline; finishQuit then installs and relaunches.
   if (win && rules.isAppUrl(win.webContents.getURL(), ORIGINS)) app.quit()
   else finishQuit()
+})
+ipcMain.on('cabal:session', (event, startedAt) => {
+  if (!fromApp(event)) return
+  sessionStartedAt = rules.sessionStart(startedAt, Date.now())
+  scheduleOverlay()
+})
+// The Cabal window's buddy list, passed on to the corner.
+ipcMain.on('cabal:buddies', (event, raw) => {
+  if (!fromApp(event) || !win || event.sender !== win.webContents) return
+  buddies = rules.buddySnapshot(raw)
+  if (overlay && overlayReady) overlay.webContents.send('cabal:overlay-buddies', buddies)
+})
+
+const fromOverlay = (event) => !!overlay && event.sender === overlay.webContents
+
+ipcMain.on('cabal:overlay-open', (event) => fromOverlay(event) && showWindow())
+ipcMain.on('cabal:overlay-expand', (event, value) => {
+  if (!fromOverlay(event)) return
+  overlayExpanded = value === true
+  saveOverlay()
+  placeOverlay()
+  overlay.webContents.send('cabal:overlay-expanded', overlayExpanded)
+})
+ipcMain.on('cabal:overlay-height', (event, value) => {
+  if (!fromOverlay(event)) return
+  const next = rules.panelHeight(Number(value))
+  if (next === overlayHeight) return
+  overlayHeight = next
+  if (overlayExpanded) placeOverlay()
+})
+ipcMain.on('cabal:overlay-drag', (event, phase) => {
+  if (!fromOverlay(event)) return
+  if (phase === 'start') startDrag()
+  else endDrag()
+})
+ipcMain.on('cabal:overlay-action', (event, raw) => {
+  if (!fromOverlay(event)) return
+  const action = rules.overlayAction(raw)
+  if (!action) return
+  if (!win || !rules.isAppUrl(win.webContents.getURL(), ORIGINS)) return showWindow()
+  if (action.type === 'open-dm') showWindow()
+  win.webContents.send('cabal:buddy-action', action)
 })
 ipcMain.handle('cabal:get-settings', (event) => (fromApp(event) ? settings : null))
 ipcMain.handle('cabal:set-settings', (event, raw) => (fromApp(event) ? applySettings(rules.settingsPatch(raw)) : null))

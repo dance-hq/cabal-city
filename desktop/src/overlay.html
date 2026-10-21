@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Cabal session</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: rgba(24, 24, 29, 0.94);
+        --raised: #222228;
+        --line: rgba(255, 255, 255, 0.1);
+        --hover: rgba(255, 255, 255, 0.07);
+        --text: #e8e8ec;
+        --muted: #9a9aa6;
+        --star: #f5b82e;
+        --online: #5bd08f;
+        --dnd: #f2667a;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+      body { font: 13px/1.4 var(--sans); color: var(--text); }
+      button { font: inherit; color: inherit; }
+      button:focus-visible, input:focus-visible { outline: 2px solid var(--star); outline-offset: 1px; }
+
+      #root {
+        height: 100%; display: flex; flex-direction: column; overflow: hidden;
+        background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
+        opacity: 0.72; transition: opacity 0.25s ease;
+      }
+      #root:hover, #root.open { opacity: 1; }
+      #root.open { border-radius: 14px; }
+
+      /* The pill. Closed, it's the whole window; open, it's the list's title bar. */
+      #bar {
+        flex-shrink: 0; height: 32px; display: flex; align-items: center; gap: 9px; padding: 0 4px 0 13px;
+        cursor: pointer; font: 500 12.5px/1 var(--mono);
+      }
+      #bar.dragging { cursor: grabbing; }
+      .light { position: relative; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--star); }
+      .light::after {
+        content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--star);
+        animation: breathe 6s ease-in-out infinite;
+      }
+      @keyframes breathe {
+        0%, 100% { transform: scale(0.8); opacity: 0.1; }
+        50% { transform: scale(2.1); opacity: 0.38; }
+      }
+      #toggle {
+        flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0; border: 0;
+        background: none; cursor: inherit; text-align: left; font: inherit; white-space: nowrap;
+      }
+      #toggle time { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+      #toggle .hint { color: var(--muted); font-size: 11px; display: none; }
+      #root.open #toggle .hint { display: inline; }
+      .caret { color: var(--muted); transition: transform 0.2s ease; }
+      #root.open #bar .caret { transform: rotate(180deg); }
+      .icon {
+        flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+        width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+        background: transparent; color: var(--muted);
+      }
+      .icon:hover { background: var(--hover); color: var(--text); }
+
+      #panel { display: none; min-height: 0; flex: 1; flex-direction: column; border-top: 1px solid var(--line); }
+      #root.open #panel { display: flex; }
+      #list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 6px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+
+      section { border-radius: 8px; margin: 0 4px; }
+      section.drop { background: var(--hover); box-shadow: inset 0 0 0 1px rgba(245, 184, 46, 0.45); }
+      .head { display: flex; align-items: center; height: 26px; padding: 0 2px 0 4px; }
+      .fold {
+        flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 4px;
+        border: 0; border-radius: 5px; background: none; cursor: pointer; text-align: left;
+        font: 500 10.5px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+      }
+      .fold:hover { color: var(--text); }
+      .fold .caret { transform: rotate(-90deg); flex-shrink: 0; }
+      .fold[aria-expanded='true'] .caret { transform: none; }
+      .fold .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .fold .count { flex-shrink: 0; letter-spacing: 0; opacity: 0.8; }
+      .head .icon { width: 22px; height: 22px; border-radius: 5px; opacity: 0; }
+      .head:hover .icon, .head .icon:focus-visible, .head .icon.always { opacity: 1; }
+
+      ul { list-style: none; margin: 0; padding: 0 0 2px; }
+      .row { display: flex; align-items: center; border-radius: 6px; }
+      .row:hover { background: var(--hover); }
+      .row.dragging { opacity: 0.4; }
+      .person {
+        flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 6px 0 10px;
+        border: 0; border-radius: 6px; background: none; cursor: pointer; text-align: left;
+      }
+      .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .name { color: var(--text); }
+      .row.offline .name { color: var(--muted); }
+      .row.unread .name { font-weight: 600; }
+      .note { color: var(--muted); font-size: 12px; margin-left: 6px; }
+      .badge {
+        flex-shrink: 0; min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px;
+        background: var(--star); color: #1a1407; font: 600 10.5px/17px var(--mono); text-align: center;
+      }
+      .row .icon { width: 22px; height: 22px; border-radius: 5px; margin-right: 2px; opacity: 0; }
+      .row:hover .icon, .row .icon:focus-visible { opacity: 1; }
+
+      .dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; position: relative; }
+      .dot.online { background: var(--online); }
+      .dot.away { border: 2px solid var(--muted); }
+      .dot.dnd { background: var(--dnd); }
+      .dot.dnd::after { content: ''; position: absolute; left: 1.5px; right: 1.5px; top: 3.25px; height: 1.5px; background: var(--bg); border-radius: 1px; }
+      .dot.offline { border: 1.5px solid rgba(154, 154, 166, 0.5); }
+
+      .quiet { margin: 0; padding: 2px 12px 6px 26px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+      .empty { padding: 18px 16px; color: var(--muted); font-size: 12.5px; line-height: 1.5; text-align: center; }
+
+      footer { flex-shrink: 0; padding: 6px 8px 8px; border-top: 1px solid var(--line); }
+      .add {
+        display: flex; align-items: center; gap: 6px; width: 100%; height: 28px; padding: 0 8px; border: 0;
+        border-radius: 6px; background: none; color: var(--muted); cursor: pointer; font-size: 12.5px;
+      }
+      .add:hover { background: var(--hover); color: var(--text); }
+      .namer { display: flex; gap: 6px; padding: 2px 4px; }
+      .namer input {
+        flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px;
+        background: rgba(0, 0, 0, 0.25); color: var(--text); font: inherit; outline: none;
+      }
+      .namer input:focus { border-color: rgba(245, 184, 46, 0.7); }
+
+      #menu {
+        position: fixed; z-index: 10; min-width: 168px; max-width: 220px; max-height: calc(100vh - 12px); overflow-y: auto;
+        padding: 4px; border: 1px solid var(--line); border-radius: 9px; background: var(--raised);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      }
+      #menu[hidden] { display: none; }
+      #menu .label { padding: 6px 8px 3px; color: var(--muted); font: 500 10px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+      #menu .sep { height: 1px; margin: 4px 2px; background: var(--line); }
+      #menu button {
+        display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 8px; border: 0;
+        border-radius: 6px; background: none; cursor: pointer; text-align: left; font-size: 12.5px;
+      }
+      #menu button:hover, #menu button:focus { background: var(--hover); outline: none; }
+      #menu button span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #menu button.danger { color: var(--dnd); }
+      #menu .check { color: var(--star); }
+
+      @media (prefers-reduced-motion: reduce) { .light::after { animation: none; } .caret { transition: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="bar" title="Click to see your buddy list. Drag to move.">
+        <span class="light" aria-hidden="true"></span>
+        <button id="toggle" type="button" aria-expanded="false" aria-controls="panel">
+          <time id="elapsed" aria-live="off">0m</time>
+          <span class="hint">in session</span>
+        </button>
+        <svg class="caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6" /></svg>
+        <button id="open" class="icon" type="button" aria-label="Open Cabal" title="Open Cabal">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 17 17 7" /><path d="M8 7h9v9" />
+          </svg>
+        </button>
+      </div>
+      <div id="panel" aria-label="Your buddy list">
+        <div id="list"><div id="content"></div></div>
+        <footer id="footer"></footer>
+      </div>
+    </div>
+    <div id="menu" role="menu" hidden></div>
+    <script>
+      const api = window.cabalOverlay
+      const $ = (id) => document.getElementById(id)
+      const root = $('root'), bar = $('bar'), toggleButton = $('toggle'), elapsed = $('elapsed')
+      const content = $('content'), footer = $('footer'), menuEl = $('menu')
+      const DRAG_TYPE = 'text/x-cabal-person'
+
+      let startedAt = null
+      let expanded = false
+      let list = null
+      let naming = null // { kind: 'create', userId, forName } | { kind: 'rename', groupId, name }
+      const pendingCollapse = new Map()
+      const sections = (() => {
+        try { return { here: false, offline: true, ...JSON.parse(localStorage.getItem('cabal.overlay.sections') || '{}') } }
+        catch { return { here: false, offline: true } }
+      })()
+
+      // --- timer -------------------------------------------------------------------
+      // Whole minutes, same as inside Cabal: present, not ticking at you.
+      function format(ms) {
+        const minutes = Math.max(0, Math.floor(ms / 60000))
+        const hours = Math.floor(minutes / 60)
+        return hours ? `${hours}h ${String(minutes % 60).padStart(2, '0')}m` : `${minutes}m`
+      }
+      function tick() {
+        if (startedAt !== null) elapsed.textContent = format(Date.now() - startedAt)
+      }
+      setInterval(tick, 5000)
+
+      // --- small DOM helpers ----------------------------------------------------------
+      function el(tag, props = {}, children = []) {
+        const node = document.createElement(tag)
+        for (const [key, value] of Object.entries(props)) {
+          if (value === undefined || value === null || value === false) continue
+          if (key === 'class') node.className = value
+          else if (key === 'text') node.textContent = value
+          else if (key.startsWith('on')) node.addEventListener(key.slice(2), value)
+          else node.setAttribute(key, value === true ? '' : value)
+        }
+        for (const child of [].concat(children)) if (child) node.append(child)
+        return node
+      }
+      const ICONS = {
+        caret: '<path d="m6 9 6 6 6-6" />',
+        more: '<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />',
+        plus: '<path d="M12 5v14M5 12h14" />',
+        check: '<path d="M20 6 9 17l-5-5" />',
+      }
+      function icon(name, size = 12, cls = '') {
+        const span = document.createElement('span')
+        span.style.display = 'contents'
+        // Fixed markup from ICONS above, never data.
+        span.innerHTML = `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`
+        return span
+      }
+
+      // --- rendering ------------------------------------------------------------------
+      function isCollapsed(group) {
+        return pendingCollapse.has(group.id) ? pendingCollapse.get(group.id) : group.collapsed
+      }
+
+      function personRow(p) {
+        const status = { online: 'Online', away: 'Away', dnd: 'Do not disturb', offline: 'Offline' }[p.status]
+        const row = el('li', {
+          class: `row ${p.status}${p.unread ? ' unread' : ''}`,
+          draggable: 'true',
+          ondragstart: (e) => {
+            e.dataTransfer.setData(DRAG_TYPE, p.id)
+            e.dataTransfer.effectAllowed = 'move'
+            row.classList.add('dragging')
+          },
+          ondragend: () => row.classList.remove('dragging'),
+          oncontextmenu: (e) => {
+            e.preventDefault()
+            openPersonMenu(p, { x: e.clientX, y: e.clientY })
+          },
+        }, [
+          el('button', {
+            class: 'person',
+            type: 'button',
+            title: `Message ${p.name}`,
+            'aria-label': `Message ${p.name}, ${status}${p.note ? `, ${p.note}` : ''}${p.unread ? `, ${p.unread} unread` : ''}`,
+            onclick: () => api.act({ type: 'open-dm', userId: p.id }),
+          }, [
+            el('span', { class: `dot ${p.status}`, 'aria-hidden': 'true' }),
+            el('span', { class: 'who' }, [
+              el('span', { class: 'name', text: p.name }),
+              p.note || p.status === 'away' || p.status === 'dnd'
+                ? el('span', { class: 'note', text: p.note || status })
+                : null,
+            ]),
+            p.unread ? el('span', { class: 'badge', 'aria-hidden': 'true', text: p.unread > 99 ? '99+' : String(p.unread) }) : null,
+          ]),
+          el('button', {
+            class: 'icon',
+            type: 'button',
+            'aria-label': `Options for ${p.name}`,
+            'aria-haspopup': 'menu',
+            onclick: (e) => openPersonMenu(p, e.currentTarget.getBoundingClientRect()),
+          }, icon('more', 14)),
+        ])
+        return row
+      }
+
+      function dropZone(section, onPerson) {
+        section.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          section.classList.add('drop')
+        })
+        section.addEventListener('dragleave', (e) => {
+          if (!section.contains(e.relatedTarget)) section.classList.remove('drop')
+        })
+        section.addEventListener('drop', (e) => {
+          section.classList.remove('drop')
+          const id = e.dataTransfer.getData(DRAG_TYPE)
+          if (!id) return
+          e.preventDefault()
+          onPerson(id)
+        })
+      }
+
+      function sectionHead({ label, count, expanded, onToggle, action }) {
+        return el('div', { class: 'head' }, [
+          el('button', { class: 'fold', type: 'button', 'aria-expanded': String(expanded), onclick: onToggle }, [
+            icon('caret', 11, 'caret'),
+            el('span', { class: 'label', text: label }),
+            el('span', { class: 'count', text: count }),
+          ]),
+          action,
+        ])
+      }
+
+      function groupSection(g) {
+        const open = !isCollapsed(g)
+        const section = el('section', { 'aria-label': g.name })
+        if (naming?.kind === 'rename' && naming.groupId === g.id) {
+          section.append(namer(g.name, 'Group name', (name) => api.act({ type: 'rename-group', groupId: g.id, name })))
+        } else {
+          section.append(sectionHead({
+            label: g.name,
+            count: `${g.people.length}/${g.total}`,
+            expanded: open,
+            onToggle: () => {
+              pendingCollapse.set(g.id, open)
+              api.act({ type: 'collapse-group', groupId: g.id, collapsed: open })
+              render()
+            },
+            action: el('button', {
+              class: 'icon',
+              type: 'button',
+              'aria-label': `Options for ${g.name}`,
+              'aria-haspopup': 'menu',
+              onclick: (e) => openGroupMenu(g, e.currentTarget.getBoundingClientRect()),
+            }, icon('more', 14)),
+          }))
+        }
+        if (open) {
+          if (g.people.length) section.append(el('ul', {}, g.people.map(personRow)))
+          else section.append(el('p', { class: 'quiet', text: g.total ? 'Nobody in this group is around.' : 'Drag someone here.' }))
+        }
+        dropZone(section, (id) => api.act({ type: 'move', userId: id, groupId: g.id }))
+        return section
+      }
+
+      function plainSection(key, label, people, opts = {}) {
+        const open = !sections[key]
+        const section = el('section', { 'aria-label': label }, [
+          sectionHead({
+            label,
+            count: String(people.length),
+            expanded: open,
+            onToggle: () => {
+              sections[key] = open
+              try { localStorage.setItem('cabal.overlay.sections', JSON.stringify(sections)) } catch {}
+              render()
+            },
+            action: opts.action,
+          }),
+        ])
+        if (open && people.length) section.append(el('ul', {}, people.map(personRow)))
+        if (open && !people.length && opts.empty) section.append(el('p', { class: 'quiet', text: opts.empty }))
+        if (opts.onDrop) dropZone(section, opts.onDrop)
+        return section
+      }
+
+      function namer(initial, placeholder, onSave) {
+        const input = el('input', { maxlength: '40', placeholder, 'aria-label': placeholder, value: initial })
+        const finish = (save) => {
+          const name = input.value.replace(/\s+/g, ' ').trim()
+          naming = null
+          if (save && name) onSave(name)
+          render()
+        }
+        input.addEventListener('keydown', (e) => {
+          if (e.isComposing || e.keyCode === 229) return
+          if (e.key === 'Enter') { e.preventDefault(); finish(true) }
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false) }
+        })
+        // Enter saves; Escape or clicking away leaves things as they were.
+        input.addEventListener('blur', () => naming && finish(false))
+        requestAnimationFrame(() => { input.focus(); input.select() })
+        return el('div', { class: 'namer' }, input)
+      }
+
+      function render() {
+        root.classList.toggle('open', expanded)
+        toggleButton.setAttribute('aria-expanded', String(expanded))
+        if (!expanded) return
+        const scroll = $('list').scrollTop
+        content.replaceChildren()
+        footer.replaceChildren()
+
+        if (!list) {
+          content.append(el('p', { class: 'empty', text: 'Your list shows up here once Cabal finishes loading.' }))
+        } else {
+          const everyone = list.groups.reduce((n, g) => n + g.people.length, 0) + list.here.length + list.offline.length
+          if (!everyone && !list.groups.length) {
+            content.append(el('p', { class: 'empty', text: "It's just you so far. Invite a builder from Cabal and they'll show up here." }))
+          }
+          for (const g of list.groups) content.append(groupSection(g))
+          if (everyone) {
+            content.append(plainSection('here', 'Here now', list.here, {
+              empty: 'Nobody else is around right now.',
+              onDrop: (id) => api.act({ type: 'move', userId: id, groupId: null }),
+            }))
+            if (list.offline.length) content.append(plainSection('offline', 'Offline', list.offline))
+          }
+          if (naming?.kind === 'create') {
+            const { userId, forName } = naming
+            const label = forName ? `Group for ${forName}` : 'New group name'
+            footer.append(namer('', label, (name) => api.act({ type: 'create-group', name, userId })))
+          } else if (everyone) {
+            footer.append(el('button', { class: 'add', type: 'button', onclick: () => startCreate(null) }, [icon('plus', 13), el('span', { text: 'New group' })]))
+          }
+        }
+        footer.hidden = !footer.childElementCount
+        $('list').scrollTop = scroll
+        requestAnimationFrame(reportHeight)
+      }
+
+      function startCreate(person) {
+        closeMenu()
+        naming = { kind: 'create', userId: person?.id ?? null, forName: person?.name ?? null }
+        render()
+      }
+
+      function reportHeight() {
+        if (!expanded) return
+        const footerHeight = footer.hidden ? 0 : footer.offsetHeight
+        api.setHeight(bar.offsetHeight + 1 + content.scrollHeight + 10 + footerHeight + 2)
+      }
+      new ResizeObserver(() => reportHeight()).observe(content)
+
+      // --- menus ----------------------------------------------------------------------
+      function menuButton(label, onClick, opts = {}) {
+        return el('button', { type: 'button', role: 'menuitem', class: opts.danger ? 'danger' : undefined, onclick: () => { closeMenu(); onClick() } }, [
+          el('span', { text: label }),
+          opts.checked ? icon('check', 13, 'check') : null,
+        ])
+      }
+
+      function showMenu(items, at) {
+        menuEl.replaceChildren(...items)
+        menuEl.hidden = false
+        const width = menuEl.offsetWidth, height = menuEl.offsetHeight
+        const x = Math.min(at.left ?? at.x, window.innerWidth - width - 6)
+        const below = (at.bottom ?? at.y) + 4
+        const y = below + height <= window.innerHeight - 6 ? below : Math.max(6, (at.top ?? at.y) - height - 4)
+        menuEl.style.left = `${Math.max(6, x)}px`
+        menuEl.style.top = `${y}px`
+        menuEl.querySelector('button')?.focus()
+      }
+
+      function closeMenu() {
+        if (!menuEl.hidden) menuEl.hidden = true
+      }
+
+      function openPersonMenu(p, at) {
+        const groups = list?.groups ?? []
+        const current = groups.find((g) => g.id === p.group)
+        const items = [
+          menuButton(`Message ${p.name}`, () => api.act({ type: 'open-dm', userId: p.id })),
+          el('div', { class: 'sep', role: 'separator' }),
+          el('div', { class: 'label', text: 'Move to group' }),
+          ...groups.map((g) => menuButton(g.name, () => g.id !== p.group && api.act({ type: 'move', userId: p.id, groupId: g.id }), { checked: g.id === p.group })),
+          menuButton('New group…', () => startCreate(p)),
+        ]
+        if (current) {
+          items.push(el('div', { class: 'sep', role: 'separator' }))
+          items.push(menuButton(`Remove from ${current.name}`, () => api.act({ type: 'move', userId: p.id, groupId: null })))
+        }
+        showMenu(items, at)
+      }
+
+      function openGroupMenu(g, at) {
+        showMenu([
+          menuButton('Rename group', () => { naming = { kind: 'rename', groupId: g.id, name: g.name }; render() }),
+          menuButton('Delete group', () => api.act({ type: 'delete-group', groupId: g.id }), { danger: true }),
+        ], at)
+      }
+
+      document.addEventListener('pointerdown', (e) => {
+        if (!menuEl.hidden && !menuEl.contains(e.target)) closeMenu()
+      }, true)
+      menuEl.addEventListener('keydown', (e) => {
+        const buttons = [...menuEl.querySelectorAll('button')]
+        const at = buttons.indexOf(document.activeElement)
+        if (e.key === 'ArrowDown') { e.preventDefault(); buttons[(at + 1) % buttons.length]?.focus() }
+        if (e.key === 'ArrowUp') { e.preventDefault(); buttons[(at - 1 + buttons.length) % buttons.length]?.focus() }
+      })
+      window.addEventListener('blur', closeMenu)
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return
+        if (!menuEl.hidden) return closeMenu()
+        if (expanded) api.setExpanded(false)
+      })
+
+      // --- open / close and moving the window -------------------------------------------
+      // One press on the pill: a click opens or closes the list, a drag moves it.
+      let press = null
+      bar.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || e.target.closest('#open')) return
+        press = { x: e.screenX, y: e.screenY, dragging: false }
+        bar.setPointerCapture(e.pointerId)
+      })
+      bar.addEventListener('pointermove', (e) => {
+        if (!press || press.dragging) return
+        if (Math.hypot(e.screenX - press.x, e.screenY - press.y) < 4) return
+        press.dragging = true
+        bar.classList.add('dragging')
+        closeMenu()
+        api.dragStart()
+      })
+      const release = (cancelled) => {
+        if (!press) return
+        const { dragging } = press
+        press = null
+        if (dragging) {
+          bar.classList.remove('dragging')
+          api.dragEnd()
+        } else if (!cancelled) {
+          api.setExpanded(!expanded)
+        }
+      }
+      bar.addEventListener('pointerup', () => release(false))
+      bar.addEventListener('pointercancel', () => release(true))
+      // Keyboard (Enter/Space on the timer) opens it too; pointer clicks are handled above.
+      toggleButton.addEventListener('click', (e) => e.detail === 0 && api.setExpanded(!expanded))
+      $('open').addEventListener('click', () => api.open())
+
+      api?.onSession((value) => {
+        startedAt = value
+        tick()
+      })
+      api?.onExpanded((value) => {
+        expanded = value
+        if (!expanded) { naming = null; closeMenu() }
+        render()
+      })
+      api?.onBuddies((value) => {
+        list = value
+        for (const g of list?.groups ?? []) if (pendingCollapse.get(g.id) === g.collapsed) pendingCollapse.delete(g.id)
+        // Don't wipe a name being typed; the list redraws when you're done.
+        if (!naming) render()
+      })
+    </script>
+  </body>
+</html>

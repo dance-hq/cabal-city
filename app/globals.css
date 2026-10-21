@@ -207,6 +207,111 @@
   }
 }
 
+/* The session light breathes about ten times a minute, like a slow breath. */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(2.1);
+    opacity: 0.38;
+  }
+}
+.breathing-light {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--light, 10px);
+  height: var(--light, 10px);
+  border-radius: 9999px;
+  background: var(--primary);
+}
+.breathing-light::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--primary);
+  animation: breathe 6s ease-in-out infinite;
+}
+
+/* A new message opens its own space (height and fade together) so the
+   conversation glides up instead of jumping. The inner box is widened by the
+   row's -mx-2 so its hover background isn't clipped. */
+@keyframes message-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+@keyframes message-rise {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: none;
+  }
+}
+.message-enter {
+  display: grid;
+  animation: message-open 380ms cubic-bezier(0.22, 0.8, 0.28, 1) both;
+}
+.message-enter > div {
+  min-height: 0;
+  overflow: hidden;
+  margin-inline: -0.5rem;
+  padding-inline: 0.5rem;
+  animation: message-rise 380ms cubic-bezier(0.22, 0.8, 0.28, 1) both;
+}
+
+/* Only shows if sending takes a noticeable moment. */
+@keyframes pending-note-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.pending-note {
+  animation: pending-note-in 400ms ease 1.2s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-enter,
+  .message-enter > div {
+    animation: none;
+  }
+}
+
+/* The welcome screen settles in line by line. */
+@keyframes calm-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.calm-in {
+  animation: calm-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 140ms + 80ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .breathing-light::after,
+  .calm-in {
+    animation: none;
+  }
+}
+
 /* The flag's stars land one after another on first paint. */
 @keyframes star-in {
   from {
