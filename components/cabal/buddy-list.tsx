@@ -69,7 +69,7 @@ export function BuddyList() {
     refreshChannels,
   } = useCabal()
   const [query, setQuery] = useState('')
-  const [showOffline, setShowOffline] = useState(true)
+  const [showOffline, setShowOffline] = useState(false)
   const [creatingTeam, setCreatingTeam] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [browsingTeams, setBrowsingTeams] = useState(false)
