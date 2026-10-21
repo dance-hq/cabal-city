@@ -19,7 +19,13 @@ export type DesktopBridge = {
   onPower(cb: (state: 'suspend' | 'resume') => void): () => void
   onBeforeQuit(cb: () => Promise<void> | void): () => void
   onNavigate(cb: (target: string) => void): () => void
+  // Desktop apps released before the in-app update bar don't have these.
+  getUpdate?(): Promise<DesktopUpdate | null>
+  installUpdate?(): void
+  onUpdate?(cb: (update: DesktopUpdate) => void): () => void
 }
+
+export type DesktopUpdate = { version: string }
 
 declare global {
   interface Window {

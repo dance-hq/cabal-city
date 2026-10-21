@@ -7,6 +7,7 @@ import { BuddyList } from './buddy-list'
 import { Conversation } from './conversation'
 import { ProfileDialog } from './profile-dialog'
 import { SettingsDialog } from './settings-dialog'
+import { UpdateBar } from './update-bar'
 import { useMedia } from '@/hooks/use-media'
 import { CabalMark } from '@/components/brand/logo'
 
@@ -37,17 +38,21 @@ function Layout() {
   if (compact) {
     return (
       <div className="flex h-svh flex-col overflow-hidden bg-sidebar">
+        <UpdateBar />
         {active ? <Conversation compact /> : <BuddyList />}
       </div>
     )
   }
 
   return (
-    <div className="flex h-svh overflow-hidden bg-background">
-      <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar" aria-label="People and rooms">
-        <BuddyList />
-      </aside>
-      <main className="flex min-w-0 flex-1 flex-col">{active ? <Conversation /> : <NothingOpen />}</main>
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
+      <UpdateBar />
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar" aria-label="People and rooms">
+          <BuddyList />
+        </aside>
+        <main className="flex min-w-0 flex-1 flex-col">{active ? <Conversation /> : <NothingOpen />}</main>
+      </div>
     </div>
   )
 }
