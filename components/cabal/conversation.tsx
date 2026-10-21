@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Bell, BellOff, Hash, MoreHorizontal, Settings2, Users } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, Hash, Link2, MoreHorizontal, Settings2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { Avatar } from './avatar'
+import { copyChannelLink, useLinkableChannels, useOpenLinkedChannel } from './channel-links'
 import { Composer } from './composer'
 import { MessageList } from './message-list'
 import { PeoplePanel, usePeopleIn } from './people-panel'
@@ -34,22 +36,53 @@ export function Conversation({ compact }: { compact?: boolean }) {
         <Header compact={compact} onBack={() => open(null)}>
           <span className="text-sm text-muted-foreground">{channelsLoading ? 'Loading…' : ''}</span>
         </Header>
-        {!channelsLoading && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
-            <p>{"This conversation isn't available. You may have left it, or it was removed."}</p>
-            <button
-              type="button"
-              onClick={() => open(null)}
-              className="rounded text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Back to everyone
-            </button>
-          </div>
-        )}
+        {!channelsLoading && active && <Unavailable channelId={active} />}
       </div>
     )
   }
   return <OpenConversation key={channel.id} channel={channel} compact={compact} />
+}
+
+// Someone sent you a link to a team you're not on yet: offer to join it
+// rather than calling it unavailable.
+function Unavailable({ channelId }: { channelId: string }) {
+  const { open } = useCabal()
+  const linkables = useLinkableChannels()
+  const { go, dialog } = useOpenLinkedChannel()
+  const target = linkables.data?.find((c) => c.id === channelId)
+
+  if (linkables.isLoading) return null
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
+      {target?.kind === 'team' && !target.joined ? (
+        <>
+          <TeamIcon visibility={target.team_visibility} className="size-5 text-muted-foreground" />
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-semibold text-balance text-foreground">{target.team_name}</p>
+            <p>
+              {target.member_count ?? 0} {target.member_count === 1 ? 'member' : 'members'} · {"you're not on this team yet"}
+            </p>
+          </div>
+          {target.welcome && (
+            <p className="line-clamp-4 max-w-sm leading-relaxed text-pretty text-foreground/85">{target.welcome}</p>
+          )}
+          <Button onClick={() => go(channelId)}>Join {target.team_name}</Button>
+        </>
+      ) : (
+        <p className="max-w-sm text-pretty">
+          {"This conversation isn't available. It may be an invite-only team you're not on, or it was removed."}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={() => open(null)}
+        className="rounded text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Back to everyone
+      </button>
+      {dialog}
+    </div>
+  )
 }
 
 function OpenConversation({ channel, compact }: { channel: Channel; compact?: boolean }) {
@@ -163,6 +196,16 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
             </div>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
+            {channel.kind !== 'dm' && (
+              <IconButton
+                label={`Copy link to ${channel.kind === 'room' ? `#${channel.slug}` : channel.team_name}`}
+                onClick={() =>
+                  copyChannelLink(channel.id, channel.kind === 'room' ? `#${channel.slug}` : (channel.team_name ?? 'this team'))
+                }
+              >
+                <Link2 className="size-4" aria-hidden />
+              </IconButton>
+            )}
             {channel.kind === 'team' &&
               (channel.team_role === 'owner' ? (
                 <IconButton label="Team settings" onClick={() => setManaging(true)}>

@@ -11,7 +11,8 @@ import { desktop } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
 import { playChime, showNotification } from '@/lib/notify'
 import { foldPresence, type UserPresence } from '@/lib/presence'
-import { mentions } from '@/lib/text'
+import { mentions, plainText } from '@/lib/text'
+import { linkLabel } from '@/lib/channel-links'
 import type {
   Availability,
   Channel,
@@ -470,7 +471,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         const where = channel.kind === 'room' ? `#${channel.slug}` : channel.team_name ?? 'your team'
         showNotification({
           title: isDm ? authorName : `${authorName} in ${where}`,
-          body: m.body,
+          body: plainText(m.body, linkLabel(live.current.channels)),
           tag: m.channel_id,
           onClick: () => open(m.channel_id),
         })

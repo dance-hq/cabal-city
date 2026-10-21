@@ -1,12 +1,14 @@
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
 import { tokenize } from '@/lib/text'
+import { ChannelChip, appOrigins } from './channel-links'
 
 export const MessageText = memo(function MessageText({ body, myUsername }: { body: string; myUsername?: string | null }) {
   const me = myUsername?.toLowerCase()
   return (
     <span className="break-words whitespace-pre-wrap">
-      {tokenize(body).map((t, i) => {
+      {tokenize(body, { appOrigins: appOrigins() }).map((t, i) => {
+        if (t.type === 'channel') return <ChannelChip key={i} channelId={t.channelId} />
         if (t.type === 'link') {
           return (
             <a

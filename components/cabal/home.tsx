@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import { compareByPresence } from '@/lib/presence'
 import { shortDuration } from '@/lib/session'
 import { ago } from '@/lib/time'
+import { plainText } from '@/lib/text'
+import { linkLabel } from '@/lib/channel-links'
 import { useLockIns } from '@/hooks/use-lock-ins'
 import type { Channel, Message, Profile, ShownStatus } from '@/lib/types'
 import { Avatar } from './avatar'
@@ -240,7 +242,7 @@ function Recent({ channels, loading, now }: { channels: Channel[]; loading: bool
                         ) : (
                           <>
                             {!dm || author === 'You' ? `${author ?? 'Someone'}: ` : ''}
-                            {m.body}
+                            {plainText(m.body, linkLabel(all))}
                           </>
                         )
                       ) : (

@@ -11,7 +11,8 @@ import { useCabal } from './store'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { mentions } from '@/lib/text'
+import { mentions, plainText } from '@/lib/text'
+import { linkLabel } from '@/lib/channel-links'
 import { clock, clock24, dayKey, dayLabel, fullTime } from '@/lib/time'
 import type { Channel, Message } from '@/lib/types'
 
@@ -40,7 +41,7 @@ export function MessageList({
   loadOlder: () => Promise<void>
   firstUnreadAt: string | null
 }) {
-  const { userId, me, profileById, send, discard, showProfile, blocked, isAdmin } = useCabal()
+  const { userId, me, profileById, send, discard, showProfile, blocked, isAdmin, channels } = useCabal()
   const scroller = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
   const prevHeight = useRef(0)
@@ -351,7 +352,7 @@ export function MessageList({
         open={!!reporting}
         onOpenChange={(o) => !o && setReporting(null)}
         title="Report message"
-        excerpt={reporting?.body}
+        excerpt={reporting ? plainText(reporting.body, linkLabel(channels)) : undefined}
         onSubmit={async (reason) => {
           if (!reporting) return
           const { error } = await createClient().rpc('report_message', { p_message: reporting.id, p_reason: reason })
