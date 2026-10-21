@@ -15,7 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { mentions, plainText } from '@/lib/text'
 import { linkLabel } from '@/lib/channel-links'
-import { clock, clock24, dayKey, dayLabel, fullTime } from '@/lib/time'
+import { clock, dayKey, dayLabel, fullTime, shortClock } from '@/lib/time'
 import type { Channel, Message } from '@/lib/types'
 
 const GROUP_MS = 5 * 60_000
@@ -244,9 +244,9 @@ export function MessageList({
                       <time
                         dateTime={m.created_at}
                         title={fullTime(m.created_at)}
-                        className="w-10 shrink-0 pt-px font-mono text-[11px] leading-6 text-muted-foreground tabular-nums"
+                        className="w-14 shrink-0 whitespace-nowrap pt-px text-right font-mono text-[11px] leading-6 text-muted-foreground tabular-nums"
                       >
-                        {clock24(m.created_at)}
+                        {clock(m.created_at)}
                       </time>
                       <div className="min-w-0 flex-1 text-sm leading-6">
                         {!grouped && (
@@ -300,7 +300,7 @@ export function MessageList({
                             title={fullTime(m.created_at)}
                             className="hidden pt-0.5 font-mono text-[10px] leading-6 text-muted-foreground group-hover:block"
                           >
-                            {clock24(m.created_at)}
+                            {shortClock(m.created_at)}
                           </time>
                         )}
                       </div>
@@ -470,8 +470,11 @@ function SystemLine({ message, irc }: { message: Message; irc: boolean }) {
   return (
     <div className={cn('flex items-baseline gap-3 py-1', !irc && 'my-1 justify-center')}>
       {irc && (
-        <time dateTime={message.created_at} className="w-10 shrink-0 font-mono text-[11px] text-muted-foreground tabular-nums">
-          {clock24(message.created_at)}
+        <time
+          dateTime={message.created_at}
+          className="w-14 shrink-0 whitespace-nowrap text-right font-mono text-[11px] text-muted-foreground tabular-nums"
+        >
+          {clock(message.created_at)}
         </time>
       )}
       <p className="font-mono text-[12px] leading-5 text-muted-foreground">
