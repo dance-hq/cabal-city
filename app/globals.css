@@ -49,6 +49,8 @@
   --sidebar-ring: oklch(0.66 0.13 232);
   /* The city flag: light blue stripes, red six-pointed stars. */
   --flag: oklch(0.72 0.125 228);
+  /* The hot core of the locked-in current. */
+  --spark: oklch(0.58 0.16 240);
   --star: oklch(0.585 0.235 25);
   --star-foreground: oklch(0.99 0 0);
   /* The logo's exact colors (lib/brand.ts), the same in both themes. */
@@ -92,6 +94,7 @@
   --sidebar-border: oklch(0.25 0.006 260);
   --sidebar-ring: oklch(0.76 0.12 228);
   --flag: oklch(0.76 0.12 228);
+  --spark: oklch(0.97 0.05 220);
   --star: var(--brand-star);
   --star-foreground: oklch(0.99 0 0);
 }
@@ -303,6 +306,121 @@
   .breathing-light::after,
   .calm-in {
     animation: none;
+  }
+}
+
+/* Locked in: a live current runs around the avatar. Two bright pulses travel
+   a charged ring, short arcs crackle the other way in jumps, and the halo
+   flickers like a live wire. The ring sits just outside the photo, so it
+   never covers a face. */
+@keyframes current-run {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes current-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  12% {
+    opacity: 0.25;
+  }
+  16% {
+    opacity: 0.9;
+  }
+  41% {
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  74% {
+    opacity: 1;
+  }
+}
+@keyframes current-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px 1px var(--current-glow);
+  }
+  7% {
+    box-shadow: 0 0 3px 0 var(--current-glow);
+  }
+  9% {
+    box-shadow: 0 0 12px 3px var(--current-glow);
+  }
+  44% {
+    box-shadow: 0 0 6px 1px var(--current-glow);
+  }
+  46% {
+    box-shadow: 0 0 2px 0 var(--current-glow);
+  }
+  48% {
+    box-shadow: 0 0 10px 2px var(--current-glow);
+  }
+}
+.locked-in {
+  --current-base: color-mix(in oklch, var(--flag) 45%, transparent);
+  --current-glow: color-mix(in oklch, var(--flag) 60%, transparent);
+  border-radius: 9999px;
+  animation: current-glow 2.6s steps(1, end) infinite;
+}
+.locked-in::before,
+.locked-in::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--ring, 2px) * -1 - 1.5px);
+  border-radius: 9999px;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring, 2px)), #000 calc(100% - var(--ring, 2px) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring, 2px)), #000 calc(100% - var(--ring, 2px) + 0.5px));
+}
+.locked-in::before {
+  background: conic-gradient(
+    var(--current-base) 0deg,
+    var(--flag) 40deg,
+    var(--spark) 60deg,
+    var(--flag) 78deg,
+    var(--current-base) 120deg 180deg,
+    var(--flag) 220deg,
+    var(--spark) 240deg,
+    var(--flag) 258deg,
+    var(--current-base) 300deg
+  );
+  animation: current-run 1.5s linear infinite;
+}
+.locked-in::after {
+  background: conic-gradient(
+    transparent 0deg 22deg,
+    var(--spark) 22deg 29deg,
+    transparent 29deg 74deg,
+    var(--spark) 74deg 77deg,
+    transparent 77deg 141deg,
+    var(--spark) 141deg 150deg,
+    transparent 150deg 208deg,
+    var(--spark) 208deg 212deg,
+    transparent 212deg 276deg,
+    var(--spark) 276deg 285deg,
+    transparent 285deg 331deg,
+    var(--spark) 331deg 334deg,
+    transparent 334deg
+  );
+  animation:
+    current-run 1.1s steps(9) reverse infinite,
+    current-flicker 1.7s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .locked-in,
+  .locked-in::before,
+  .locked-in::after {
+    animation: none;
+  }
+  .locked-in {
+    box-shadow: 0 0 8px 1px var(--current-glow);
   }
 }
 

@@ -7,16 +7,20 @@ import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
 import { Composer } from './composer'
 import { MessageList } from './message-list'
-import { STATUS_LABEL, StatusDot } from './status-dot'
+import { PeoplePanel, usePeopleIn } from './people-panel'
+import { STATUS_LABEL } from './status-dot'
 import { TeamIcon, TeamManageDialog } from './team-dialogs'
 import { useCabal } from './store'
 import { useMessages } from '@/hooks/use-messages'
 import { useTyping } from '@/hooks/use-typing'
 import { useMedia } from '@/hooks/use-media'
+import { useLockIns } from '@/hooks/use-lock-ins'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { compareByPresence } from '@/lib/presence'
 import type { Channel } from '@/lib/types'
+
+// Whether the docked members panel is shown; kept across conversations.
+let panelDockedOpen = true
 
 export function Conversation({ compact }: { compact?: boolean }) {
   const { active, channels, channelsLoading, open } = useCabal()
@@ -47,13 +51,25 @@ export function Conversation({ compact }: { compact?: boolean }) {
 }
 
 function OpenConversation({ channel, compact }: { channel: Channel; compact?: boolean }) {
-  const { userId, profileById, statusOf, send, markRead, open, members, presence, showProfile, connection, refreshChannels, blocked } =
-    useCabal()
+  const { userId, community, profileById, statusOf, send, markRead, open, showProfile, refreshChannels, blocked } = useCabal()
+  const lockIns = useLockIns(community.id)
   const { messages, error, isLoading, retry, loadOlder, hasMore, loadingOlder } = useMessages(channel.id)
   const { typers, ping, stop } = useTyping(channel.id, userId)
-  const wide = useMedia('(min-width: 1100px)')
-  const [showPeople, setShowPeople] = useState(true)
+  // Wide windows keep the members panel beside the conversation; narrower
+  // ones float it over the messages when asked.
+  const docked = useMedia('(min-width: 960px)')
+  const [dockedOpen, setDockedOpen] = useState(panelDockedOpen)
+  const [floatingOpen, setFloatingOpen] = useState(false)
   const [managing, setManaging] = useState(false)
+  const hasPanel = channel.kind !== 'dm'
+  const panelOpen = hasPanel && (docked ? dockedOpen : floatingOpen)
+
+  function togglePanel() {
+    if (docked) {
+      panelDockedOpen = !dockedOpen
+      setDockedOpen(panelDockedOpen)
+    } else setFloatingOpen((v) => !v)
+  }
 
   // Where the "New" divider goes: whatever was unread when this was opened.
   const firstUnreadAt = useRef(channel.unread > 0 ? channel.last_read_at : null).current
@@ -73,22 +89,8 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   const otherStatus = channel.other_user_id ? statusOf(channel.other_user_id) : 'offline'
   const isBlocked = !!channel.other_user_id && blocked.has(channel.other_user_id)
 
-  const here = useMemo(() => {
-    if (channel.kind !== 'room') return []
-    return members
-      .filter((m) => presence.get(m.user_id)?.rooms.has(channel.id) || (m.user_id === userId && statusOf(userId) !== 'offline'))
-      .map((m) => ({ ...m, status: statusOf(m.user_id), name: m.profile.display_name ?? '' }))
-      .sort(compareByPresence)
-  }, [channel, members, presence, userId, statusOf])
-
-  const elsewhere = useMemo(() => {
-    if (channel.kind !== 'room') return []
-    const inRoom = new Set(here.map((h) => h.user_id))
-    return members
-      .filter((m) => !inRoom.has(m.user_id) && statusOf(m.user_id) !== 'offline')
-      .map((m) => ({ ...m, status: statusOf(m.user_id), name: m.profile.display_name ?? '' }))
-      .sort(compareByPresence)
-  }, [channel, members, here, statusOf])
+  const lastNotice = useMemo(() => messages.findLast((m) => m.kind === 'system')?.id ?? null, [messages])
+  const people = usePeopleIn(channel, lastNotice)
 
   async function toggleMute() {
     const { error } = await createClient().rpc('set_muted', { p_channel: channel.id, p_muted: !channel.muted })
@@ -114,7 +116,7 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   )
 
   return (
-    <div className="flex min-h-0 flex-1 bg-background">
+    <div className="relative flex min-h-0 flex-1 bg-background">
       <div className="flex min-w-0 flex-1 flex-col">
         <Header compact={compact} onBack={() => open(null)}>
           {channel.kind === 'dm' && (
@@ -123,7 +125,13 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
               onClick={() => other && showProfile(other.id)}
               className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-0.5 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Avatar name={other?.display_name ?? '?'} url={other?.avatar_url} size={28} status={otherStatus} />
+              <Avatar
+                name={other?.display_name ?? '?'}
+                url={other?.avatar_url}
+                size={28}
+                status={otherStatus}
+                lockedIn={otherStatus !== 'offline' && !!channel.other_user_id && lockIns.has(channel.other_user_id)}
+              />
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-sm leading-tight font-semibold">{other?.display_name ?? 'Former member'}</span>
                 <span className="truncate text-xs leading-tight text-muted-foreground">
@@ -152,27 +160,27 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
             </div>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
-            {channel.kind === 'room' && (
-              <IconButton
-                label={`${here.length} here now. ${showPeople && wide ? 'Hide' : 'Show'} people`}
-                onClick={() => setShowPeople((v) => !v)}
-                pressed={wide && showPeople}
-              >
-                <Users className="size-4" aria-hidden />
-                <span className="font-mono text-[11px]">{here.length}</span>
-              </IconButton>
-            )}
             {channel.kind === 'team' &&
               (channel.team_role === 'owner' ? (
                 <IconButton label="Team settings" onClick={() => setManaging(true)}>
                   <Settings2 className="size-4" aria-hidden />
                 </IconButton>
               ) : (
-                <IconButton label="Team members" onClick={() => setManaging(true)}>
-                  <Users className="size-4" aria-hidden />
+                <IconButton label="Team details" onClick={() => setManaging(true)}>
+                  <MoreHorizontal className="size-4" aria-hidden />
                 </IconButton>
               ))}
             {muteButton}
+            {hasPanel && (
+              <IconButton
+                label={`${people.online.length} online. ${panelOpen ? 'Hide' : 'Show'} members`}
+                onClick={togglePanel}
+                pressed={panelOpen}
+              >
+                <Users className="size-4" aria-hidden />
+                <span className="font-mono text-[11px]">{people.online.length}</span>
+              </IconButton>
+            )}
             {channel.kind === 'dm' && other && (
               <IconButton label={`${other.display_name}'s profile`} onClick={() => showProfile(other.id)}>
                 <MoreHorizontal className="size-4" aria-hidden />
@@ -180,24 +188,6 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
             )}
           </div>
         </Header>
-
-        {channel.kind === 'room' && !wide && showPeople && here.length > 0 && (
-          <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-4 py-1.5" aria-label="Here now">
-            <span className="shrink-0 font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase">Here</span>
-            {here.map((p) => (
-              <button
-                key={p.user_id}
-                type="button"
-                onClick={() => showProfile(p.user_id)}
-                className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={p.name}
-                title={p.name}
-              >
-                <Avatar name={p.name} url={p.profile.avatar_url} size={22} />
-              </button>
-            ))}
-          </div>
-        )}
 
         <MessageList
           channel={channel}
@@ -239,55 +229,15 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
         />
       </div>
 
-      {channel.kind === 'room' && wide && showPeople && (
-        <aside className="flex w-56 shrink-0 flex-col border-l bg-sidebar" aria-label={`People in #${channel.slug}`}>
-          <div className="app-drag h-11 shrink-0" />
-          <div className="quiet-scroll flex-1 overflow-y-auto pb-4">
-            <PeopleGroup label={`In #${channel.slug} · ${here.length}`} people={here} onPick={showProfile} />
-            {elsewhere.length > 0 && <PeopleGroup label={`Around · ${elsewhere.length}`} people={elsewhere} onPick={showProfile} faint />}
-          </div>
-        </aside>
+      {panelOpen && !docked && (
+        <div className="absolute inset-0 z-10 bg-background/50" onClick={() => setFloatingOpen(false)} aria-hidden />
       )}
+      {panelOpen && <PeoplePanel channel={channel} {...people} onClose={docked ? undefined : () => setFloatingOpen(false)} />}
 
       {channel.kind === 'team' && channel.team_id && (
         <TeamManageDialog open={managing} onOpenChange={setManaging} channel={channel} />
       )}
     </div>
-  )
-}
-
-function PeopleGroup({
-  label,
-  people,
-  onPick,
-  faint,
-}: {
-  label: string
-  people: { user_id: string; name: string; status: ReturnType<ReturnType<typeof useCabal>['statusOf']>; profile: { avatar_url: string | null } }[]
-  onPick: (id: string) => void
-  faint?: boolean
-}) {
-  return (
-    <section className="mt-2">
-      <h3 className="px-4 py-1 font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase">{label}</h3>
-      <ul className="flex flex-col">
-        {people.map((p) => (
-          <li key={p.user_id}>
-            <button
-              type="button"
-              onClick={() => onPick(p.user_id)}
-              className={cn(
-                'mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring',
-                faint && 'text-muted-foreground',
-              )}
-            >
-              <StatusDot status={p.status} size={7} decorative />
-              <span className="truncate">{p.name}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }
 

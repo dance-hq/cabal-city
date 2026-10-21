@@ -577,7 +577,7 @@ function PersonRow({
         aria-label={`Message ${name}, ${STATUS_LABEL[status]}${sub && sub !== STATUS_LABEL[status] ? `, ${sub}` : ''}${unread ? `, ${unread} unread` : ''}`}
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
-        <Avatar name={name} url={avatarUrl} size={28} status={status} />
+        <Avatar name={name} url={avatarUrl} size={28} status={status} lockedIn={!!lockedIn} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span
             className={cn(

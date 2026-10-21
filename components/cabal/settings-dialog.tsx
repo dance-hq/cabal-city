@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar } from './avatar'
 import { AdminPanel } from './admin-panel'
+import { IdentityPicker } from './identity-picker'
 import { DeleteAccount } from './delete-account'
 import { copyInviteLink } from './buddy-list'
 import { useCabal } from './store'
@@ -21,6 +22,7 @@ import { createClient } from '@/lib/supabase/client'
 import { avatarProblem, uploadAvatar } from '@/lib/avatar'
 import { desktop, type DesktopSettings } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
+import type { Identity } from '@/lib/identity'
 import { ensureNotificationPermission, notificationsSupported, playChime } from '@/lib/notify'
 
 type Tab = 'profile' | 'notifications' | 'app' | 'community'
@@ -83,6 +85,7 @@ function ProfileSettings() {
     company: me.company ?? '',
     bio: me.bio ?? '',
   })
+  const [identity, setIdentity] = useState<Identity | null>(me.identity)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
   const file = useRef<HTMLInputElement>(null)
@@ -95,6 +98,7 @@ function ProfileSettings() {
       .update({
         display_name: fields.display_name.trim(),
         username: fields.username.trim(),
+        identity,
         company: fields.company.trim() || null,
         bio: fields.bio.trim() || null,
       })
@@ -173,6 +177,7 @@ function ProfileSettings() {
           />
         </div>
       </div>
+      <IdentityPicker value={identity} onChange={setIdentity} />
       <div className="flex flex-col gap-2">
         <Label htmlFor="s-company">Company or project</Label>
         <Input id="s-company" maxLength={80} value={fields.company} onChange={set('company')} />

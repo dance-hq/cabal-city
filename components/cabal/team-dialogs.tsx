@@ -33,6 +33,28 @@ export function refreshTeamRooms(communityId: string) {
   return mutateGlobal(teamRoomsKey(communityId))
 }
 
+export type TeamMember = { user_id: string; role: 'owner' | 'member' }
+
+const teamMembersKey = (teamId: string) => ['team-members', teamId] as const
+
+// Who's on a team. Joins and leaves aren't live, so this refreshes every
+// minute and whenever the room posts a notice (see PeoplePanel).
+export function useTeamMembers(teamId: string | null) {
+  return useSWR(
+    teamId ? teamMembersKey(teamId) : null,
+    async () => {
+      const { data, error } = await createClient().from('team_members').select('user_id, role').eq('team_id', teamId!)
+      if (error) throw error
+      return (data ?? []) as TeamMember[]
+    },
+    { refreshInterval: 60_000 },
+  )
+}
+
+export function refreshTeamMembers(teamId: string) {
+  return mutateGlobal(teamMembersKey(teamId))
+}
+
 export function TeamIcon({ visibility, className }: { visibility: TeamVisibility | null; className?: string }) {
   const Icon = visibility === 'public' ? Users : Lock
   return <Icon className={className} aria-hidden />
@@ -245,7 +267,6 @@ export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpen
   )
 }
 
-type TeamMember = { user_id: string; role: 'owner' | 'member' }
 type PendingInvite = { id: string; user_id: string }
 
 export function TeamManageDialog({
@@ -302,6 +323,7 @@ export function TeamManageDialog({
     }
     if (done) toast.success(done)
     await team.mutate()
+    void refreshTeamMembers(teamId)
     return true
   }
 

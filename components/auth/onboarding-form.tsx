@@ -8,11 +8,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar } from '@/components/cabal/avatar'
+import { IdentityPicker } from '@/components/cabal/identity-picker'
 import { createClient } from '@/lib/supabase/client'
+import type { Identity } from '@/lib/identity'
 import { avatarProblem, uploadAvatar } from '@/lib/avatar'
 import { friendlyError } from '@/lib/errors'
 
-type Fields = { display_name: string; username: string; company: string; bio: string; avatar_url: string | null }
+type Fields = {
+  display_name: string
+  username: string
+  identity: Identity | null
+  company: string
+  bio: string
+  avatar_url: string | null
+}
 
 export function OnboardingForm({
   userId,
@@ -52,6 +61,7 @@ export function OnboardingForm({
         .update({
           display_name: fields.display_name.trim(),
           username: fields.username.trim(),
+          identity: fields.identity,
           company: fields.company.trim() || null,
           bio: fields.bio.trim() || null,
           avatar_url,
@@ -165,6 +175,7 @@ export function OnboardingForm({
             Letters, numbers and underscores. People @mention you with it.
           </p>
         </div>
+        <IdentityPicker value={fields.identity} onChange={(identity) => setFields((f) => ({ ...f, identity }))} required />
         <div className="flex flex-col gap-2">
           <Label htmlFor="company">
             Company or project <span className="font-normal text-muted-foreground">(optional)</span>
@@ -191,7 +202,7 @@ export function OnboardingForm({
           {error}
         </p>
       )}
-      <Button type="submit" disabled={busy || !name || !usernameValid} className="h-10">
+      <Button type="submit" disabled={busy || !name || !usernameValid || !fields.identity} className="h-10">
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
         Join {communityName}
       </Button>

@@ -13,6 +13,7 @@ import {
 import { Avatar } from './avatar'
 import { StatusDot, STATUS_LABEL } from './status-dot'
 import { useCabal } from './store'
+import { useWorkSession } from './work-session'
 import { createClient } from '@/lib/supabase/client'
 import { STATUS_MAX } from '@/lib/config'
 import { friendlyError } from '@/lib/errors'
@@ -27,6 +28,7 @@ const CHOICES: { value: Availability; hint: string }[] = [
 
 export function MeCard() {
   const { me, settings, setAvailability, statusOf, userId, refreshMembers, showProfile } = useCabal()
+  const session = useWorkSession()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -49,7 +51,7 @@ export function MeCard() {
         className="rounded-full focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="Your profile"
       >
-        <Avatar name={me.display_name ?? ''} url={me.avatar_url} size={36} />
+        <Avatar name={me.display_name ?? ''} url={me.avatar_url} size={36} lockedIn={session.status === 'running'} />
       </button>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5">

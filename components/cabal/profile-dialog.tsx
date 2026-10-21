@@ -9,8 +9,12 @@ import { Avatar } from './avatar'
 import { ReportDialog, setBlocked } from './moderation'
 import { STATUS_LABEL } from './status-dot'
 import { useCabal } from './store'
+import { useWorkSession } from './work-session'
+import { CabalStar } from '@/components/brand/logo'
+import { useLockIns } from '@/hooks/use-lock-ins'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
+import { IDENTITY_LABEL } from '@/lib/identity'
 
 export function ProfileDialog() {
   const {
@@ -35,6 +39,9 @@ export function ProfileDialog() {
   const self = profileOpen === userId
   const status = profileOpen ? statusOf(profileOpen) : 'offline'
   const isBlocked = !!profileOpen && blocked.has(profileOpen)
+  const lockIns = useLockIns(community.id)
+  const session = useWorkSession()
+  const lockedIn = self ? session.status === 'running' : status !== 'offline' && !!profileOpen && lockIns.has(profileOpen)
 
   const close = () => showProfile(null)
 
@@ -45,14 +52,27 @@ export function ProfileDialog() {
           {profile && (
             <>
               <div className="flex flex-col items-start gap-3 p-5">
-                <Avatar name={profile.display_name ?? ''} url={profile.avatar_url} size={64} status={status} />
+                <Avatar name={profile.display_name ?? ''} url={profile.avatar_url} size={64} status={status} lockedIn={lockedIn} />
                 <div className="flex flex-col gap-0.5">
                   <DialogTitle className="text-lg leading-tight">{profile.display_name}</DialogTitle>
                   <DialogDescription className="font-mono text-xs">
                     @{profile.username} · {STATUS_LABEL[status]}
-                    {member?.role === 'admin' ? ' · admin' : ''}
+                    {lockedIn ? ' · locked in' : ''}
                   </DialogDescription>
                 </div>
+                {(profile.identity || member?.role === 'admin') && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {profile.identity && (
+                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">{IDENTITY_LABEL[profile.identity]}</span>
+                    )}
+                    {member?.role === 'admin' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
+                        <CabalStar className="size-3" />
+                        Cabal team
+                      </span>
+                    )}
+                  </div>
+                )}
                 {profile.status_text && (
                   <p className="rounded-md bg-muted px-2.5 py-1.5 text-sm leading-relaxed">{profile.status_text}</p>
                 )}
