@@ -183,8 +183,10 @@ function createWindow() {
     win?.flashFrame(false)
     // With "Keep the window on top" on, both windows float; clicking Cabal
     // would otherwise slide it over the timer.
-    if (overlay?.isVisible()) overlay.moveTop()
+    keepOverlayOnTop()
   })
+  // Switching to another app is exactly when the corner must stay over it.
+  win.on('blur', keepOverlayOnTop)
 
   const contents = win.webContents
   contents.setWindowOpenHandler(({ url }) => {
@@ -220,6 +222,11 @@ function createWindow() {
 // hands it the list, and it hands back small checked requests.
 
 const PANEL_WIDTH = 248
+// Above every other app's windows, including their own floating panels and full-screen apps.
+// 'floating' is the lowest always-on-top level, so other apps' windows could still cover it.
+const OVERLAY_LEVEL = 'screen-saver'
+const ON_TOP_CHECK_MS = 4000
+let onTopTimer = null
 let overlayAnchor = null
 let overlayExpanded = false
 let overlayHeight = 360
@@ -322,16 +329,19 @@ function createOverlay() {
       spellcheck: false,
     },
   })
-  overlay.setAlwaysOnTop(true, 'floating')
+  // On macOS this call resets the window level, so the level has to be set after it.
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  overlay.setAlwaysOnTop(true, OVERLAY_LEVEL)
 
   const contents = overlay.webContents
   contents.setWindowOpenHandler(() => ({ action: 'deny' }))
   contents.on('will-navigate', (event) => event.preventDefault())
 
   overlay.on('blur', endDrag)
+  overlay.on('hide', stopKeepingOnTop)
   overlay.on('closed', () => {
     clearInterval(drag?.timer)
+    stopKeepingOnTop()
     drag = null
     overlay = null
     overlayReady = false
@@ -356,6 +366,21 @@ function updateOverlay() {
     placeOverlay()
     overlay.showInactive()
   }
+  keepOverlayOnTop()
+  if (!onTopTimer) onTopTimer = setInterval(keepOverlayOnTop, ON_TOP_CHECK_MS)
+}
+
+// Other apps can claim "always on top" after us (Windows hands it to whoever asked last, and
+// hiding/showing can drop it), so the corner re-asserts it now and then. Never takes focus.
+function keepOverlayOnTop() {
+  if (!overlay || overlay.isDestroyed() || !overlay.isVisible() || drag) return
+  overlay.setAlwaysOnTop(true, OVERLAY_LEVEL)
+  overlay.moveTop()
+}
+
+function stopKeepingOnTop() {
+  clearInterval(onTopTimer)
+  onTopTimer = null
 }
 
 // Focus moves in small bursts (blur, then focus elsewhere); settle first so the timer doesn't flicker.
