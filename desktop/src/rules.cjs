@@ -13,6 +13,62 @@ const DEFAULT_SETTINGS = Object.freeze({
 
 const BOOLEAN_SETTINGS = ['launchAtLogin', 'alwaysOnTop', 'closeToTray', 'sessionOverlay']
 
+// Same as `build.appId` in package.json (a test holds them equal). The packaged
+// app can't read that file's `build` section: electron-builder strips it.
+const APP_ID = 'community.cabal.desktop'
+
+// --- asking you to pin Cabal to the taskbar / Dock ---------------------------------
+// No installer can pin itself (Windows and macOS both forbid it), so Cabal asks:
+// on first run, then at most twice more a few days apart, until it's pinned or
+// you say stop.
+
+const PIN_MAX_ASKS = 3
+const PIN_ASK_GAP_MS = 3 * 24 * 60 * 60 * 1000
+const PIN_ANSWERS = new Set(['shown', 'later', 'never', 'pinned'])
+
+function normalizePinState(raw) {
+  const s = { asks: 0, lastAskedAt: null, done: false }
+  if (raw && typeof raw === 'object') {
+    if (Number.isInteger(raw.asks) && raw.asks >= 0) s.asks = Math.min(raw.asks, 99)
+    if (Number.isFinite(raw.lastAskedAt)) s.lastAskedAt = raw.lastAskedAt
+    if (raw.done === true) s.done = true
+  }
+  return s
+}
+
+function pinAskDue(state, pinned, now) {
+  if (pinned === true || state.done || state.asks >= PIN_MAX_ASKS) return false
+  return state.lastAskedAt === null || now - state.lastAskedAt >= PIN_ASK_GAP_MS
+}
+
+function pinAnswer(state, answer, now) {
+  if (!PIN_ANSWERS.has(answer)) return state
+  if (answer === 'shown') return { ...state, asks: state.asks + 1, lastAskedAt: now }
+  if (answer === 'never' || answer === 'pinned') return { ...state, done: true }
+  return state
+}
+
+// Windows: `links` are the taskbar's pinned shortcuts, read with shell.readShortcutLink.
+function taskbarHasApp(links, execPath, appId) {
+  const exe = String(execPath || '').toLowerCase()
+  return links.some(
+    (link) =>
+      link &&
+      (link.appUserModelId === appId || (exe !== '' && typeof link.target === 'string' && link.target.toLowerCase() === exe)),
+  )
+}
+
+// macOS: `dockOutput` is `defaults read com.apple.dock persistent-apps`;
+// `bundleUrl` is the app bundle as a file:// URL.
+function dockKeepsApp(dockOutput, bundleUrl) {
+  if (typeof dockOutput !== 'string' || typeof bundleUrl !== 'string' || !bundleUrl) return false
+  const want = bundleUrl.replace(/\/?$/, '/').toLowerCase()
+  for (const match of dockOutput.matchAll(/"?_CFURLString"?\s*=\s*"([^"]+)"/g)) {
+    if (match[1].replace(/\/?$/, '/').toLowerCase() === want) return true
+  }
+  return false
+}
+
 function originOf(url) {
   try {
     const u = new URL(url)
@@ -268,6 +324,12 @@ function overlayAction(raw) {
 }
 
 module.exports = {
+  APP_ID,
+  normalizePinState,
+  pinAskDue,
+  pinAnswer,
+  taskbarHasApp,
+  dockKeepsApp,
   overlayBounds,
   anchorFromBounds,
   panelHeight,

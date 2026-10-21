@@ -1,5 +1,7 @@
 const path = require('node:path')
 const fs = require('node:fs')
+const { execFile } = require('node:child_process')
+const { pathToFileURL } = require('node:url')
 const {
   app,
   BrowserWindow,
@@ -31,6 +33,11 @@ if (!ORIGINS.size) {
 }
 
 if (!app.requestSingleInstanceLock()) app.exit(0)
+
+// The installer stamps this ID on Cabal's Start menu and desktop shortcuts.
+// Without it, a pinned Cabal and the running window show up as two separate
+// taskbar buttons.
+if (process.platform === 'win32') app.setAppUserModelId(rules.APP_ID)
 
 if (process.defaultApp && process.argv.length >= 2) {
   app.setAsDefaultProtocolClient('cabal', process.execPath, [path.resolve(process.argv[1])])
@@ -500,6 +507,75 @@ ipcMain.on('cabal:overlay-action', (event, raw) => {
   if (action.type === 'open-dm') showWindow()
   win.webContents.send('cabal:buddy-action', action)
 })
+// --- pinning to the taskbar / Dock -----------------------------------------------
+
+let pinState = rules.normalizePinState(readJson('pin.json'))
+
+function savePin(next) {
+  pinState = next
+  writeJson('pin.json', pinState)
+}
+
+function readDock() {
+  return new Promise((resolve) => {
+    execFile('defaults', ['read', 'com.apple.dock', 'persistent-apps'], { timeout: 3000 }, (error, stdout) =>
+      resolve(error ? null : String(stdout)),
+    )
+  })
+}
+
+// true / false, or null when this system won't say.
+async function pinnedNow() {
+  if (process.platform === 'win32') {
+    const dir = path.join(app.getPath('appData'), 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned', 'TaskBar')
+    let names
+    try {
+      names = fs.readdirSync(dir)
+    } catch {
+      return null
+    }
+    const links = []
+    for (const name of names) {
+      if (!name.toLowerCase().endsWith('.lnk')) continue
+      try {
+        links.push(shell.readShortcutLink(path.join(dir, name)))
+      } catch {}
+    }
+    return rules.taskbarHasApp(links, process.execPath, rules.APP_ID)
+  }
+  if (process.platform === 'darwin') {
+    const dock = await readDock()
+    if (dock === null) return null
+    const bundle = path.resolve(process.execPath, '..', '..', '..')
+    return rules.dockKeepsApp(dock, pathToFileURL(bundle).href)
+  }
+  return null
+}
+
+async function pinStatus() {
+  if (process.platform !== 'win32' && process.platform !== 'darwin') return { supported: false }
+  const pinned = await pinnedNow()
+  if (pinned === true && !pinState.done) savePin(rules.pinAnswer(pinState, 'pinned', Date.now()))
+  // A Dock icon for an app still on the disk image or in Downloads stops working.
+  const needsMove = process.platform === 'darwin' && app.isPackaged && !app.isInApplicationsFolder()
+  return { supported: true, pinned, needsMove, ask: rules.pinAskDue(pinState, pinned, Date.now()) }
+}
+
+ipcMain.handle('cabal:get-pin', (event) => (fromApp(event) ? pinStatus() : null))
+ipcMain.on('cabal:pin-answer', (event, answer) => {
+  if (fromApp(event)) savePin(rules.pinAnswer(pinState, String(answer), Date.now()))
+})
+// Moves the app, then reopens it from Applications.
+ipcMain.handle('cabal:move-to-applications', (event) => {
+  if (!fromApp(event) || process.platform !== 'darwin' || !app.isPackaged || app.isInApplicationsFolder()) return false
+  try {
+    return app.moveToApplicationsFolder()
+  } catch (error) {
+    console.error('Cabal: could not move to Applications', error)
+    return false
+  }
+})
+
 ipcMain.handle('cabal:get-settings', (event) => (fromApp(event) ? settings : null))
 ipcMain.handle('cabal:set-settings', (event, raw) => (fromApp(event) ? applySettings(rules.settingsPatch(raw)) : null))
 

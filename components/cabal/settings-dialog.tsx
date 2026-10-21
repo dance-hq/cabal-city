@@ -16,6 +16,7 @@ import { Avatar } from './avatar'
 import { AdminPanel } from './admin-panel'
 import { IdentityPicker } from './identity-picker'
 import { DeleteAccount } from './delete-account'
+import { PinSetting } from './pin-prompt'
 import { copyInviteLink } from './buddy-list'
 import { useCabal } from './store'
 import { createClient } from '@/lib/supabase/client'
@@ -304,6 +305,7 @@ function AppSettings() {
       {bridge && desk ? (
         <div className="flex flex-col gap-4">
           <h3 className="text-sm font-medium">Desktop</h3>
+          <PinSetting />
           <Toggle
             id="d-login"
             label="Open Cabal when I log in"
