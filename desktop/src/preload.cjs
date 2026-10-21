@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('cabalDesktop', {
   retry: () => ipcRenderer.send('cabal:retry'),
   onPower: listen('cabal:power', (cb, state) => cb(state)),
   onNavigate: listen('cabal:navigate', (cb, target) => cb(target)),
+  getUpdate: () => ipcRenderer.invoke('cabal:get-update'),
+  installUpdate: () => ipcRenderer.send('cabal:install-update'),
+  onUpdate: listen('cabal:update', (cb, info) => cb(info)),
   // The page gets a moment to say it's leaving (so friends see you go offline) before the app quits.
   onBeforeQuit: listen('cabal:before-quit', async (cb) => {
     try {

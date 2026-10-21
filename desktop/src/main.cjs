@@ -69,6 +69,9 @@ let win = null
 let tray = null
 let quitting = false
 let quitReady = false
+let updater = null
+let updateReady = null
+let installing = false
 let retryTimer = null
 let pendingLink = rules.findDeepLink(process.argv)
 let unread = 0
@@ -271,9 +274,14 @@ ipcMain.on('cabal:quit', (event) => fromApp(event) && app.quit())
 ipcMain.on('cabal:retry', (event) => {
   if (fromApp(event)) win?.loadURL(startUrl())
 })
-ipcMain.on('cabal:quit-ready', () => {
-  quitReady = true
-  app.quit()
+ipcMain.on('cabal:quit-ready', finishQuit)
+ipcMain.handle('cabal:get-update', (event) => (fromApp(event) ? updateReady : null))
+ipcMain.on('cabal:install-update', (event) => {
+  if (!fromApp(event) || !updater || !updateReady) return
+  installing = true
+  // Quit the normal way first so the page can tell friends you went offline; finishQuit then installs and relaunches.
+  if (win && rules.isAppUrl(win.webContents.getURL(), ORIGINS)) app.quit()
+  else finishQuit()
 })
 ipcMain.handle('cabal:get-settings', (event) => (fromApp(event) ? settings : null))
 ipcMain.handle('cabal:set-settings', (event, raw) => (fromApp(event) ? applySettings(rules.settingsPatch(raw)) : null))
@@ -301,13 +309,16 @@ function lockDownSession() {
 
 function startUpdates() {
   if (!app.isPackaged) return
-  let updater
   try {
     updater = require('electron-updater').autoUpdater
   } catch {
     return
   }
   updater.on('error', (error) => console.error('Cabal update check failed:', error?.message ?? error))
+  updater.on('update-downloaded', (info) => {
+    updateReady = { version: String(info?.version ?? '') }
+    win?.webContents.send('cabal:update', updateReady)
+  })
   const check = () => updater.checkForUpdatesAndNotify().catch(() => {})
   check()
   setInterval(check, 6 * 60 * 60 * 1000)
@@ -331,11 +342,16 @@ app.on('before-quit', (event) => {
   if (quitReady || !win || !rules.isAppUrl(win.webContents.getURL(), ORIGINS)) return
   event.preventDefault()
   win.webContents.send('cabal:before-quit')
-  setTimeout(() => {
-    quitReady = true
-    app.quit()
-  }, 1500)
+  setTimeout(finishQuit, 1500)
 })
+
+function finishQuit() {
+  if (quitReady) return
+  quitReady = true
+  quitting = true
+  if (installing && updater) updater.quitAndInstall(false, true)
+  else app.quit()
+}
 
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
