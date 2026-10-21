@@ -34,14 +34,12 @@ jobs:
       - run: npm run check
 
       - name: Point the app at your hosted Cabal
+        # Forks: set the repository variable CABAL_APP_URL. Without it the
+        # address already in desktop/app.json is used.
+        if: ${{ vars.CABAL_APP_URL != '' }}
         env:
           CABAL_APP_URL: ${{ vars.CABAL_APP_URL }}
-        run: |
-          if [ -z "$CABAL_APP_URL" ]; then
-            echo "::error::Set the repository variable CABAL_APP_URL (Settings → Secrets and variables → Actions → Variables)."
-            exit 1
-          fi
-          node -e "const f='app.json',c=JSON.parse(require('fs').readFileSync(f));c.appUrl=process.env.CABAL_APP_URL;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+        run: node -e "const f='app.json',c=JSON.parse(require('fs').readFileSync(f));c.appUrl=process.env.CABAL_APP_URL;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
 
       - name: Match the version to the tag
         if: startsWith(github.ref, 'refs/tags/v')
@@ -59,7 +57,13 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          if [ -z "$CSC_LINK" ] && [ "$RUNNER_OS" = "macOS" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          # Unset secrets arrive as empty strings, which electron-builder reads as a path ("desktop not a file").
+          for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then unset "$v"; fi
+          done
+          if [ -z "${CSC_LINK:-}" ] && [ "$RUNNER_OS" = "macOS" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          # The app lives in desktop/, so electron-builder can't find the repo on its own.
+          node -e "const f='package.json',p=JSON.parse(require('fs').readFileSync(f));p.repository='https://github.com/'+process.env.GITHUB_REPOSITORY;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
           if [ -n "$GITHUB_REF_NAME" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
             npx electron-builder --publish always
           else

@@ -45,6 +45,10 @@
   --sidebar-accent-foreground: oklch(0.2 0.006 260);
   --sidebar-border: oklch(0.9 0.004 260);
   --sidebar-ring: oklch(0.72 0.15 80);
+  /* The city flag: light blue stripes, red six-pointed stars. */
+  --flag: oklch(0.72 0.125 228);
+  --star: oklch(0.585 0.235 25);
+  --star-foreground: oklch(0.99 0 0);
 }
 
 .dark {
@@ -82,9 +86,23 @@
   --sidebar-accent-foreground: oklch(0.96 0.004 260);
   --sidebar-border: oklch(0.25 0.006 260);
   --sidebar-ring: oklch(0.84 0.155 84);
+  --flag: oklch(0.76 0.12 228);
+  --star: oklch(0.64 0.225 25);
+  --star-foreground: oklch(0.99 0 0);
+}
+
+/* Public pages (home, legal) speak Chicago: red for action, flag blue for detail. */
+.chicago {
+  --primary: var(--star);
+  --primary-foreground: var(--star-foreground);
+  --ring: var(--flag);
+  --mark: var(--flag);
 }
 
 @theme inline {
+  --color-flag: var(--flag);
+  --color-star: var(--star);
+  --color-star-foreground: var(--star-foreground);
   --font-sans: 'Geist', 'Geist Fallback', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', ui-monospace, monospace;
   --color-background: var(--background);
@@ -180,6 +198,27 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .typing-dot {
+    animation: none;
+  }
+}
+
+/* The flag's stars land one after another on first paint. */
+@keyframes star-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.6) rotate(-30deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.star-in {
+  animation: star-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation-delay: calc(var(--i, 0) * 110ms + 150ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .star-in {
     animation: none;
   }
 }

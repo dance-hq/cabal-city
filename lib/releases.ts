@@ -5,7 +5,15 @@ export type Download = { label: string; url: string; size: number }
 export type ReleaseInfo =
   | { state: 'unconfigured' }
   | { state: 'none' }
-  | { state: 'ready'; version: string; url: string; prerelease: boolean; mac: Download[]; windows: Download[] }
+  | {
+      state: 'ready'
+      version: string
+      url: string
+      prerelease: boolean
+      mac: Download[]
+      windows: Download[]
+      linux: Download[]
+    }
 
 type GithubAsset = { name: string; browser_download_url: string; size: number }
 type GithubRelease = { tag_name: string; html_url: string; prerelease: boolean; draft: boolean; assets: GithubAsset[] }
@@ -21,7 +29,7 @@ export async function latestRelease(): Promise<ReleaseInfo> {
     })
     if (!res.ok) return { state: 'none' }
     const releases = (await res.json()) as GithubRelease[]
-    const release = releases.find((r) => !r.draft && r.assets.some((a) => /\.(dmg|exe)$/i.test(a.name)))
+    const release = releases.find((r) => !r.draft && r.assets.some((a) => /\.(dmg|exe|AppImage)$/i.test(a.name)))
     if (!release) return { state: 'none' }
     const pick = (test: RegExp, label: string) =>
       release.assets
@@ -34,6 +42,7 @@ export async function latestRelease(): Promise<ReleaseInfo> {
       prerelease: release.prerelease,
       mac: [...pick(/arm64\.dmg$/i, 'Apple Silicon'), ...pick(/x64\.dmg$/i, 'Intel')],
       windows: pick(/\.exe$/i, 'Windows'),
+      linux: [...pick(/x86_64\.AppImage$/i, 'AppImage'), ...pick(/amd64\.deb$/i, '.deb')],
     }
   } catch {
     return { state: 'none' }
