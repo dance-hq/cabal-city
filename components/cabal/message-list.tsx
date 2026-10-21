@@ -1,17 +1,20 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown, Loader2, MoreHorizontal } from 'lucide-react'
+import { ArrowDown, Loader2, Lock, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
 import { MessageText } from './message-text'
+import { LongTextCard } from './long-text'
 import { ReportDialog } from './moderation'
 import { useCabal } from './store'
+import { useE2ee } from './e2ee-provider'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { mentions } from '@/lib/text'
+import { mentions, plainText } from '@/lib/text'
+import { linkLabel } from '@/lib/channel-links'
 import { clock, clock24, dayKey, dayLabel, fullTime } from '@/lib/time'
 import type { Channel, Message } from '@/lib/types'
 
@@ -40,7 +43,8 @@ export function MessageList({
   loadOlder: () => Promise<void>
   firstUnreadAt: string | null
 }) {
-  const { userId, me, profileById, send, discard, showProfile, blocked, isAdmin } = useCabal()
+  const { userId, me, profileById, send, discard, showProfile, blocked, isAdmin, channels } = useCabal()
+  const { session: e2ee, setUnlockOpen } = useE2ee()
   const scroller = useRef<HTMLDivElement>(null)
   const atBottom = useRef(true)
   const prevHeight = useRef(0)
@@ -263,10 +267,19 @@ export function MessageList({
                           <span className="text-muted-foreground italic">message deleted</span>
                         ) : (
                           <span className="text-foreground/90">
-                            <MessageText body={m.body} myUsername={me.username} />
+                            <MessageBody
+                              m={m}
+                              myUsername={me.username}
+                              authorName={mine ? 'You' : name}
+                              onUnlock={() => setUnlockOpen(true)}
+                            />
                           </span>
                         )}
-                        <SendState m={m} onRetry={() => send(channel.id, m.body, m.id)} onDiscard={() => discard(channel.id, m.id)} />
+                        <SendState
+                          m={m}
+                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id)}
+                          onDiscard={() => discard(channel.id, m.id)}
+                        />
                       </div>
                     </>
                   ) : (
@@ -298,6 +311,14 @@ export function MessageList({
                             <time dateTime={m.created_at} title={fullTime(m.created_at)} className="text-[11px] text-muted-foreground">
                               {clock(m.created_at)}
                             </time>
+                            {channel.kind === 'dm' && !m.sealed && !m.pending && !m.failed && !m.deleted_at && (
+                              <span
+                                className="font-mono text-[10.5px] text-muted-foreground"
+                                title="Sent before direct messages were end-to-end encrypted, so it isn’t protected the same way."
+                              >
+                                sent before encryption
+                              </span>
+                            )}
                           </div>
                         )}
                         <div className="text-sm leading-relaxed">
@@ -306,17 +327,26 @@ export function MessageList({
                           ) : m.deleted_at ? (
                             <span className="text-muted-foreground italic">message deleted</span>
                           ) : (
-                            <MessageText body={m.body} myUsername={me.username} />
+                            <MessageBody
+                              m={m}
+                              myUsername={me.username}
+                              authorName={mine ? 'You' : name}
+                              onUnlock={() => setUnlockOpen(true)}
+                            />
                           )}
                         </div>
-                        <SendState m={m} onRetry={() => send(channel.id, m.body, m.id)} onDiscard={() => discard(channel.id, m.id)} />
+                        <SendState
+                          m={m}
+                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id)}
+                          onDiscard={() => discard(channel.id, m.id)}
+                        />
                       </div>
                     </>
                   )}
                   {!m.pending && !m.failed && !m.deleted_at && (
                     <MessageMenu
                       canDelete={mine || (irc && isAdmin)}
-                      canReport={!mine}
+                      canReport={!mine && (!m.sealed || m.e2ee === 'ok')}
                       onDelete={() => remove(m)}
                       onReport={() => setReporting(m)}
                     />
@@ -351,15 +381,72 @@ export function MessageList({
         open={!!reporting}
         onOpenChange={(o) => !o && setReporting(null)}
         title="Report message"
-        excerpt={reporting?.body}
+        excerpt={reporting ? plainText(reporting.body, linkLabel(channels)) : undefined}
+        description={
+          reporting?.sealed
+            ? 'Admins of this community will see your report and this one message. Nothing else from your conversation is shared.'
+            : undefined
+        }
         onSubmit={async (reason) => {
           if (!reporting) return
+          if (reporting.sealed) {
+            // Hands over the key to this one message, so the server can check what it says.
+            const res = await fetch('/api/reports/sealed', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ message: reporting.id, reason, key: await e2ee.reportKey(reporting) }),
+            })
+            if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Couldn’t send the report.')
+            return
+          }
           const { error } = await createClient().rpc('report_message', { p_message: reporting.id, p_reason: reason })
           if (error) throw error
         }}
       />
     </div>
   )
+}
+
+function MessageBody({
+  m,
+  myUsername,
+  authorName,
+  onUnlock,
+}: {
+  m: Message
+  myUsername: string | null
+  authorName: string
+  onUnlock: () => void
+}) {
+  if (m.sealed && m.e2ee === 'locked') {
+    return (
+      <span className="inline-flex flex-wrap items-baseline gap-x-1.5 text-muted-foreground italic">
+        <Lock className="size-3 self-center not-italic" aria-hidden />
+        Encrypted message.
+        <button
+          type="button"
+          onClick={onUnlock}
+          className="rounded not-italic text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Unlock this device
+        </button>
+        to read it.
+      </span>
+    )
+  }
+  if (m.sealed && m.e2ee !== 'ok') {
+    return (
+      <span
+        className="inline-flex items-baseline gap-1.5 text-muted-foreground italic"
+        title="It was sealed for keys this device doesn’t have, for example from before someone started over with new keys."
+      >
+        <Lock className="size-3 self-center not-italic" aria-hidden />
+        {"Can't open this message on this device."}
+      </span>
+    )
+  }
+  if (m.long_text) return <LongTextCard m={m} authorName={authorName} />
+  return <MessageText body={m.body} myUsername={myUsername} />
 }
 
 // "sending…" floats over the row instead (see .pending-note) so the message
@@ -441,6 +528,10 @@ function ConversationStart({ channel, empty }: { channel: Channel; empty: boolea
         <p className="text-sm font-semibold">{other?.display_name}</p>
         <p className="text-sm leading-relaxed text-muted-foreground">
           {empty ? `This is the start of your conversation with ${other?.display_name ?? 'them'}. Say hi.` : 'Start of conversation'}
+        </p>
+        <p className="inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+          <Lock className="size-3" aria-hidden />
+          End-to-end encrypted. Only the two of you can read what you send here.
         </p>
       </div>
     )

@@ -1,17 +1,23 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Bell, BellOff, Hash, MoreHorizontal, Settings2, Users } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, Hash, Link2, MoreHorizontal, Settings2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { Avatar } from './avatar'
+import { copyChannelLink, useLinkableChannels, useOpenLinkedChannel } from './channel-links'
 import { Composer } from './composer'
 import { MessageList } from './message-list'
 import { PeoplePanel, usePeopleIn } from './people-panel'
 import { LockInControl } from './session-bar'
 import { STATUS_LABEL } from './status-dot'
 import { TeamIcon, TeamManageDialog } from './team-dialogs'
+import { TeamWelcome } from './team-welcome'
 import { useCabal } from './store'
+import { useE2ee } from './e2ee-provider'
+import { DmEncryptionNotice, EncryptionBadge, dmSendBlock, usePeerEncryption } from './e2ee-dm'
+import { VerifyDialog } from './e2ee-verify'
 import { useMessages } from '@/hooks/use-messages'
 import { useTyping } from '@/hooks/use-typing'
 import { useMedia } from '@/hooks/use-media'
@@ -23,35 +29,78 @@ import type { Channel } from '@/lib/types'
 // Whether the docked members panel is shown; kept across conversations.
 let panelDockedOpen = true
 
-export function Conversation({ compact }: { compact?: boolean }) {
+// `popoutActions` turns this into a desktop chat window: no back button, no
+// lock-in or profile controls (the main window has those), just these actions.
+export function Conversation({ compact, popoutActions }: { compact?: boolean; popoutActions?: React.ReactNode }) {
   const { active, channels, channelsLoading, open } = useCabal()
   const channel = channels.find((c) => c.id === active)
 
   if (!channel) {
     return (
       <div className="flex flex-1 flex-col">
-        <Header compact={compact} onBack={() => open(null)}>
-          <span className="text-sm text-muted-foreground">{channelsLoading ? 'Loading…' : ''}</span>
+        <Header compact={compact && !popoutActions} onBack={() => open(null)}>
+          <span className="text-sm text-muted-foreground">{channelsLoading || !active ? 'Loading…' : ''}</span>
+          {popoutActions && <div className="ml-auto flex shrink-0 items-center gap-0.5">{popoutActions}</div>}
         </Header>
-        {!channelsLoading && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
-            <p>{"This conversation isn't available. You may have left it, or it was removed."}</p>
-            <button
-              type="button"
-              onClick={() => open(null)}
-              className="rounded text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Back to everyone
-            </button>
-          </div>
-        )}
+        {!channelsLoading && active && <Unavailable channelId={active} />}
       </div>
     )
   }
-  return <OpenConversation key={channel.id} channel={channel} compact={compact} />
+  return <OpenConversation key={channel.id} channel={channel} compact={compact} popoutActions={popoutActions} />
 }
 
-function OpenConversation({ channel, compact }: { channel: Channel; compact?: boolean }) {
+// Someone sent you a link to a team you're not on yet: offer to join it
+// rather than calling it unavailable.
+function Unavailable({ channelId }: { channelId: string }) {
+  const { open } = useCabal()
+  const linkables = useLinkableChannels()
+  const { go, dialog } = useOpenLinkedChannel()
+  const target = linkables.data?.find((c) => c.id === channelId)
+
+  if (linkables.isLoading) return null
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
+      {target?.kind === 'team' && !target.joined ? (
+        <>
+          <TeamIcon visibility={target.team_visibility} className="size-5 text-muted-foreground" />
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-semibold text-balance text-foreground">{target.team_name}</p>
+            <p>
+              {target.member_count ?? 0} {target.member_count === 1 ? 'member' : 'members'} · {"you're not on this team yet"}
+            </p>
+          </div>
+          {target.welcome && (
+            <p className="line-clamp-4 max-w-sm leading-relaxed text-pretty text-foreground/85">{target.welcome}</p>
+          )}
+          <Button onClick={() => go(channelId)}>Join {target.team_name}</Button>
+        </>
+      ) : (
+        <p className="max-w-sm text-pretty">
+          {"This conversation isn't available. It may be an invite-only team you're not on, or it was removed."}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={() => open(null)}
+        className="rounded text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Back to everyone
+      </button>
+      {dialog}
+    </div>
+  )
+}
+
+function OpenConversation({
+  channel,
+  compact,
+  popoutActions,
+}: {
+  channel: Channel
+  compact?: boolean
+  popoutActions?: React.ReactNode
+}) {
+  const popout = !!popoutActions
   const { userId, community, profileById, statusOf, send, markRead, open, showProfile, refreshChannels, blocked } = useCabal()
   const lockIns = useLockIns(community.id)
   const { messages, error, isLoading, retry, loadOlder, hasMore, loadingOlder } = useMessages(channel.id)
@@ -62,6 +111,7 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   const [dockedOpen, setDockedOpen] = useState(panelDockedOpen)
   const [floatingOpen, setFloatingOpen] = useState(false)
   const [managing, setManaging] = useState(false)
+  const [editingWelcome, setEditingWelcome] = useState(false)
   const hasPanel = channel.kind !== 'dm'
   const panelOpen = hasPanel && (docked ? dockedOpen : floatingOpen)
 
@@ -89,6 +139,18 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   const other = channel.kind === 'dm' ? profileById(channel.other_user_id) : undefined
   const otherStatus = channel.other_user_id ? statusOf(channel.other_user_id) : 'offline'
   const isBlocked = !!channel.other_user_id && blocked.has(channel.other_user_id)
+
+  const { status: e2eeStatus } = useE2ee()
+  const peerId = channel.kind === 'dm' ? channel.other_user_id : null
+  const peerEncryption = usePeerEncryption(peerId)
+  const [verifying, setVerifying] = useState(false)
+  const otherName = other?.display_name ?? 'They'
+  const dmBlock =
+    channel.kind !== 'dm'
+      ? null
+      : !peerId
+        ? 'This person isn’t on Cabal any more'
+        : dmSendBlock(e2eeStatus, peerEncryption.data, otherName)
 
   const lastNotice = useMemo(() => messages.findLast((m) => m.kind === 'system')?.id ?? null, [messages])
   const people = usePeopleIn(channel, lastNotice)
@@ -119,12 +181,13 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   return (
     <div className="relative flex min-h-0 flex-1 bg-background">
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header compact={compact} onBack={() => open(null)}>
+        <Header compact={compact && !popout} onBack={() => open(null)}>
           {channel.kind === 'dm' && (
             <button
               type="button"
-              onClick={() => other && showProfile(other.id)}
-              className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-0.5 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => other && !popout && showProfile(other.id)}
+              disabled={popout}
+              className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-0.5 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:hover:bg-transparent"
             >
               <Avatar
                 name={other?.display_name ?? '?'}
@@ -161,6 +224,16 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
             </div>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
+            {channel.kind !== 'dm' && (
+              <IconButton
+                label={`Copy link to ${channel.kind === 'room' ? `#${channel.slug}` : channel.team_name}`}
+                onClick={() =>
+                  copyChannelLink(channel.id, channel.kind === 'room' ? `#${channel.slug}` : (channel.team_name ?? 'this team'))
+                }
+              >
+                <Link2 className="size-4" aria-hidden />
+              </IconButton>
+            )}
             {channel.kind === 'team' &&
               (channel.team_role === 'owner' ? (
                 <IconButton label="Team settings" onClick={() => setManaging(true)}>
@@ -171,6 +244,9 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
                   <MoreHorizontal className="size-4" aria-hidden />
                 </IconButton>
               ))}
+            {channel.kind === 'dm' && e2eeStatus === 'ready' && peerEncryption.data?.key && (
+              <EncryptionBadge peer={peerEncryption.data} onClick={() => setVerifying(true)} />
+            )}
             {muteButton}
             {hasPanel && (
               <IconButton
@@ -182,15 +258,30 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
                 <span className="font-mono text-[11px]">{people.online.length}</span>
               </IconButton>
             )}
-            {channel.kind === 'dm' && other && (
-              <IconButton label={`${other.display_name}'s profile`} onClick={() => showProfile(other.id)}>
-                <MoreHorizontal className="size-4" aria-hidden />
-              </IconButton>
+            {popout ? (
+              popoutActions
+            ) : (
+              <>
+                {channel.kind === 'dm' && other && (
+                  <IconButton label={`${other.display_name}'s profile`} onClick={() => showProfile(other.id)}>
+                    <MoreHorizontal className="size-4" aria-hidden />
+                  </IconButton>
+                )}
+                <span className="mx-1.5 h-4 w-px bg-border" aria-hidden />
+                <LockInControl />
+              </>
             )}
-            <span className="mx-1.5 h-4 w-px bg-border" aria-hidden />
-            <LockInControl />
           </div>
         </Header>
+
+        {channel.kind === 'team' && channel.team_id && (
+          <TeamWelcome
+            channel={channel}
+            notice={lastNotice}
+            editing={editingWelcome}
+            onEditingChange={setEditingWelcome}
+          />
+        )}
 
         <MessageList
           channel={channel}
@@ -221,16 +312,36 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
           )}
         </div>
 
+        {peerId && !isBlocked && (
+          <DmEncryptionNotice
+            peerId={peerId}
+            name={otherName}
+            peer={peerEncryption.data}
+            onVerify={() => setVerifying(true)}
+            onAcknowledged={() => void peerEncryption.mutate()}
+          />
+        )}
+
         <Composer
           channelId={channel.id}
           placeholder={placeholder}
           onSend={(body) => send(channel.id, body)}
           onTyping={ping}
           onStopTyping={stop}
-          disabled={isBlocked}
-          disabledReason="You blocked this person. Unblock them from their profile to message."
+          disabled={isBlocked || !!dmBlock}
+          disabledReason={isBlocked ? 'You blocked this person. Unblock them from their profile to message.' : (dmBlock ?? undefined)}
         />
       </div>
+
+      {peerId && (
+        <VerifyDialog
+          open={verifying}
+          onOpenChange={setVerifying}
+          peerId={peerId}
+          name={otherName}
+          peer={peerEncryption.data}
+        />
+      )}
 
       {panelOpen && !docked && (
         <div className="absolute inset-0 z-10 bg-background/50" onClick={() => setFloatingOpen(false)} aria-hidden />
@@ -238,7 +349,15 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
       {panelOpen && <PeoplePanel channel={channel} {...people} onClose={docked ? undefined : () => setFloatingOpen(false)} />}
 
       {channel.kind === 'team' && channel.team_id && (
-        <TeamManageDialog open={managing} onOpenChange={setManaging} channel={channel} />
+        <TeamManageDialog
+          open={managing}
+          onOpenChange={setManaging}
+          channel={channel}
+          onEditWelcome={() => {
+            setManaging(false)
+            setEditingWelcome(true)
+          }}
+        />
       )}
     </div>
   )

@@ -8,12 +8,15 @@ import { createClient } from '@/lib/supabase/client'
 import { compareByPresence } from '@/lib/presence'
 import { shortDuration } from '@/lib/session'
 import { ago } from '@/lib/time'
+import { plainText } from '@/lib/text'
+import { linkLabel } from '@/lib/channel-links'
 import { useLockIns } from '@/hooks/use-lock-ins'
 import type { Channel, Message, Profile, ShownStatus } from '@/lib/types'
 import { Avatar } from './avatar'
 import { copyInviteLink } from './buddy-list'
 import { LockInControl } from './session-bar'
 import { MESSAGE_COLUMNS, useCabal } from './store'
+import { useE2ee } from './e2ee-provider'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
 
 const RECENT = 6
@@ -140,6 +143,7 @@ function LockedIn({ lockIns, now }: { lockIns: ReturnType<typeof useLockIns>; no
 }
 
 function useLatest(channels: Channel[]) {
+  const { session: e2ee } = useE2ee()
   const key = channels.map((c) => `${c.id}:${c.last_message_at}`).join(',')
   return useSWR(key ? ['home-latest', key] : null, async () => {
     const supabase = createClient()
@@ -153,7 +157,7 @@ function useLatest(channels: Channel[]) {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
-        return [c.id, data as Message | null] as const
+        return [c.id, data ? await e2ee.open(data as Message) : null] as const
       }),
     )
     return new Map(found)
@@ -240,7 +244,11 @@ function Recent({ channels, loading, now }: { channels: Channel[]; loading: bool
                         ) : (
                           <>
                             {!dm || author === 'You' ? `${author ?? 'Someone'}: ` : ''}
-                            {m.body}
+                            {m.sealed && m.e2ee !== 'ok' ? (
+                              <span className="italic">Encrypted message</span>
+                            ) : (
+                              plainText(m.body, linkLabel(all))
+                            )}
                           </>
                         )
                       ) : (

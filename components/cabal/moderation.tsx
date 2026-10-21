@@ -15,12 +15,14 @@ export function ReportDialog({
   onOpenChange,
   title,
   excerpt,
+  description,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   excerpt?: string
+  description?: string
   onSubmit: (reason: string) => Promise<void>
 }) {
   const [reason, setReason] = useState('')
@@ -48,7 +50,7 @@ export function ReportDialog({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              Admins of this community will see your report{excerpt ? ' and a copy of the message' : ''}.
+              {description ?? `Admins of this community will see your report${excerpt ? ' and a copy of the message' : ''}.`}
             </DialogDescription>
           </DialogHeader>
           {excerpt && (

@@ -155,6 +155,7 @@ test('the corner can only ask for a short list of things', () => {
     groupId: GROUP,
     collapsed: true,
   })
+  assert.deepEqual(rules.overlayAction({ type: 'pause-session', extra: 'ignored' }), { type: 'pause-session' })
   assert.equal(rules.overlayAction({ type: 'move', userId: ANA }), null)
   assert.equal(rules.overlayAction({ type: 'create-group', name: '   ' }), null)
   assert.equal(rules.overlayAction({ type: 'create-group', name: 'x', userId: 'bad' }), null)

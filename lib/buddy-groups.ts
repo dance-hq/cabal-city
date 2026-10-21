@@ -71,3 +71,4 @@ export type BuddyAction =
   | { type: 'rename-group'; groupId: string; name: string }
   | { type: 'delete-group'; groupId: string }
   | { type: 'collapse-group'; groupId: string; collapsed: boolean }
+  | { type: 'pause-session' }

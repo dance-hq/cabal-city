@@ -1,4 +1,5 @@
 import type { Identity } from './identity'
+import type { Envelope } from './e2ee/crypto'
 
 export type Availability = 'online' | 'away' | 'dnd' | 'invisible'
 export type ShownStatus = 'online' | 'away' | 'dnd' | 'offline'
@@ -12,6 +13,7 @@ export type Profile = {
   bio: string | null
   status_text: string | null
   identity: Identity | null
+  links: string[] | null
 }
 
 export type Settings = {
@@ -43,6 +45,7 @@ export type TeamRoom = {
   joined: boolean
   last_message_at: string | null
   created_at: string
+  welcome: string | null
 }
 
 export type Channel = {
@@ -71,9 +74,19 @@ export type Message = {
   body: string
   created_at: string
   deleted_at: string | null
+  /** Direct messages: the encrypted text. `body` is empty until this device opens it. */
+  sealed?: Envelope | null
+  /** A long message: `body` is only its preview; the full text is in message_texts. */
+  long_text?: boolean
+  /** Its length in characters. Direct messages carry it inside the encryption, so it's set once opened. */
+  long_chars?: number | null
+  /** Client-only: the full text of a long message this device sent, so it never has to be fetched back. */
+  long_body?: string
   // Client-only: optimistic sends.
   pending?: boolean
   failed?: boolean
+  /** Client-only, sealed messages: opened, waiting for this device to be unlocked, or not openable here. */
+  e2ee?: 'ok' | 'locked' | 'unreadable'
 }
 
 export type PresenceSession = {

@@ -28,35 +28,34 @@
 
       #root {
         height: 100%; display: flex; flex-direction: column; overflow: hidden;
-        background: var(--bg); border: 1px solid var(--line); border-radius: 999px;
-        opacity: 0.72; transition: opacity 0.25s ease;
+        background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
       }
-      #root:hover, #root.open { opacity: 1; }
-      #root.open { border-radius: 14px; }
+      #root.open { border-radius: 10px; }
 
-      /* The pill. Closed, it's the whole window; open, it's the list's title bar. */
+      /* The timer. Closed, it's the whole window; open, it's the list's title bar. */
       #bar {
-        flex-shrink: 0; height: 32px; display: flex; align-items: center; gap: 9px; padding: 0 4px 0 13px;
-        cursor: pointer; font: 500 12.5px/1 var(--mono);
+        flex-shrink: 0; height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 12px;
+        cursor: pointer; font: 600 14px/1 var(--mono);
       }
       #bar.dragging { cursor: grabbing; }
-      .light { position: relative; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--flag); }
-      .light::after {
-        content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--flag);
-        animation: breathe 6s ease-in-out infinite;
-      }
-      @keyframes breathe {
-        0%, 100% { transform: scale(0.8); opacity: 0.1; }
-        50% { transform: scale(2.1); opacity: 0.38; }
-      }
       #toggle {
         flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0; border: 0;
-        background: none; cursor: inherit; text-align: left; font: inherit; white-space: nowrap;
+        background: none; cursor: inherit; text-align: left; font: inherit; white-space: nowrap; color: var(--text);
       }
-      #toggle time { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
-      #toggle .hint { color: var(--muted); font-size: 11px; display: none; }
-      #root.open #toggle .hint { display: inline; }
-      .caret { color: var(--muted); transition: transform 0.2s ease; }
+      #toggle time { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+      #toggle time .sep { opacity: 0.55; }
+      .caret { color: var(--text); opacity: 0.7; transition: transform 0.2s ease; }
+      #bar:hover .caret { opacity: 1; }
+
+      /* Session controls at the top of the open list. */
+      #session { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--line); }
+      #session .since { flex: 1; min-width: 0; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #pause {
+        flex-shrink: 0; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid var(--line);
+        border-radius: 6px; background: rgba(255, 255, 255, 0.04); color: var(--text); cursor: pointer; font-size: 12.5px; font-weight: 500;
+      }
+      #pause:hover { background: var(--hover); border-color: rgba(255, 255, 255, 0.18); }
+      #pause:disabled { opacity: 0.6; cursor: default; }
       #root.open #bar .caret { transform: rotate(180deg); }
       .icon {
         flex-shrink: 0; display: flex; align-items: center; justify-content: center;
@@ -64,6 +63,8 @@
         background: transparent; color: var(--muted);
       }
       .icon:hover { background: var(--hover); color: var(--text); }
+      #bar .icon { border-radius: 5px; color: var(--text); opacity: 0.7; }
+      #bar .icon:hover { opacity: 1; }
 
       #panel { display: none; min-height: 0; flex: 1; flex-direction: column; border-top: 1px solid var(--line); }
       #root.open #panel { display: flex; }
@@ -145,16 +146,14 @@
       #menu button.danger { color: var(--dnd); }
       #menu .check { color: var(--star); }
 
-      @media (prefers-reduced-motion: reduce) { .light::after { animation: none; } .caret { transition: none; } }
+      @media (prefers-reduced-motion: reduce) { .caret { transition: none; } }
     </style>
   </head>
   <body>
     <div id="root">
       <div id="bar" title="Click to see your buddy list. Drag to move.">
-        <span class="light" aria-hidden="true"></span>
-        <button id="toggle" type="button" aria-expanded="false" aria-controls="panel">
-          <time id="elapsed" aria-live="off">0:00</time>
-          <span class="hint">locked in</span>
+        <button id="toggle" type="button" aria-expanded="false" aria-controls="panel" aria-label="Locked in. Show buddy list">
+          <time id="elapsed" aria-live="off">00:00:00</time>
         </button>
         <svg class="caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6" /></svg>
         <button id="open" class="icon" type="button" aria-label="Open Cabal" title="Open Cabal">
@@ -164,6 +163,13 @@
         </button>
       </div>
       <div id="panel" aria-label="Your buddy list">
+        <div id="session">
+          <span id="since" class="since">Locked in</span>
+          <button id="pause" type="button">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+            Pause session
+          </button>
+        </div>
         <div id="list"><div id="content"></div></div>
         <footer id="footer"></footer>
       </div>
@@ -187,18 +193,25 @@
       })()
 
       // --- timer -------------------------------------------------------------------
-      // Seconds, same as inside Cabal, so you can see it moving: 0:42, 1:02:33.
-      function format(ms) {
+      // Always hours:minutes:seconds (00:04:12) so the clock reads like a stopwatch.
+      const pad = (n) => String(n).padStart(2, '0')
+      function parts(ms) {
         const total = Math.max(0, Math.floor(ms / 1000))
-        const hours = Math.floor(total / 3600)
-        const minutes = Math.floor((total % 3600) / 60)
-        const seconds = String(total % 60).padStart(2, '0')
-        return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`
+        return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60].map(pad)
       }
       function tick() {
-        if (startedAt !== null) elapsed.textContent = format(Date.now() - startedAt)
+        if (startedAt === null) return
+        const [h, m, s] = parts(Date.now() - startedAt)
+        elapsed.replaceChildren(h, el('span', { class: 'sep', text: ':' }), m, el('span', { class: 'sep', text: ':' }), s)
+        elapsed.setAttribute('datetime', `PT${Number(h)}H${Number(m)}M${Number(s)}S`)
       }
       setInterval(tick, 1000)
+
+      function showSince() {
+        $('since').textContent = startedAt === null
+          ? 'Locked in'
+          : `Since ${new Date(startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      }
 
       // --- small DOM helpers ----------------------------------------------------------
       function el(tag, props = {}, children = []) {
@@ -422,7 +435,7 @@
       function reportHeight() {
         if (!expanded) return
         const footerHeight = footer.hidden ? 0 : footer.offsetHeight
-        api.setHeight(bar.offsetHeight + 1 + content.scrollHeight + 10 + footerHeight + 2)
+        api.setHeight(bar.offsetHeight + 1 + $('session').offsetHeight + content.scrollHeight + 10 + footerHeight + 2)
       }
       new ResizeObserver(() => reportHeight()).observe(content)
 
@@ -522,12 +535,24 @@
       // Keyboard (Enter/Space on the timer) opens it too; pointer clicks are handled above.
       toggleButton.addEventListener('click', (e) => e.detail === 0 && api.setExpanded(!expanded))
       $('open').addEventListener('click', () => api.open())
+      // Cabal pauses the session; the timer then goes away until you resume in Cabal.
+      $('pause').addEventListener('click', (e) => {
+        e.currentTarget.disabled = true
+        api.act({ type: 'pause-session' })
+      })
 
       api?.onSession((value) => {
         startedAt = value
+        $('pause').disabled = false
+        showSince()
         tick()
       })
       api?.onExpanded((value) => {
+        // Opening the list always shows who's here now, even if it was folded last time.
+        if (value && !expanded && sections.here) {
+          sections.here = false
+          try { localStorage.setItem('cabal.overlay.sections', JSON.stringify(sections)) } catch {}
+        }
         expanded = value
         if (!expanded) { naming = null; closeMenu() }
         render()

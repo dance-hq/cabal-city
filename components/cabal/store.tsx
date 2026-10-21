@@ -11,7 +11,11 @@ import { desktop } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
 import { playChime, showNotification } from '@/lib/notify'
 import { foldPresence, type UserPresence } from '@/lib/presence'
-import { mentions } from '@/lib/text'
+import { listenForPopouts, viewedInPopout } from '@/lib/popout'
+import { mentions, plainText } from '@/lib/text'
+import { charCount, isLong, previewOf, titleOf } from '@/lib/long-text'
+import { linkLabel } from '@/lib/channel-links'
+import { useE2ee } from './e2ee-provider'
 import type {
   Availability,
   Channel,
@@ -66,7 +70,7 @@ type Store = {
   openDm(userId: string): Promise<void>
   markRead(channelId: string): void
   outbox: Record<string, Message[]>
-  send(channelId: string, body: string, retryId?: string): Promise<void>
+  send(channelId: string, body: string, retryId?: string): Promise<boolean>
   discard(channelId: string, id: string): void
   refreshChannels(): void
   refreshMembers(): void
@@ -86,14 +90,33 @@ export function useCabal() {
   return s
 }
 
-export const messagesKey = (channelId: string) => ['messages', channelId] as const
-export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, created_at, deleted_at'
+// Places in the main pane that aren't conversations. They share `active` with
+// channel ids so back buttons, the URL and "reopen where you were" just work.
+export const VIEWS = { opportunities: 'opportunities', build: 'build' } as const
+export type View = (typeof VIEWS)[keyof typeof VIEWS]
+export function isView(id: string | null | undefined): id is View {
+  return id === VIEWS.opportunities || id === VIEWS.build
+}
 
-export function CabalProvider({ boot, children }: { boot: Boot; children: React.ReactNode }) {
+export const messagesKey = (channelId: string) => ['messages', channelId] as const
+export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, long_text, long_chars, created_at, deleted_at'
+
+// Keeps a conversation in time order when an incoming message took a moment to open.
+function insertInOrder(list: Message[], m: Message): Message[] {
+  if (list.some((x) => x.id === m.id)) return list
+  let i = list.length
+  while (i > 0 && list[i - 1].created_at > m.created_at) i--
+  return [...list.slice(0, i), m, ...list.slice(i)]
+}
+
+// `popout` is a desktop chat window showing one conversation. The main window
+// keeps presence, notifications, the badge and "reopen where you were".
+export function CabalProvider({ boot, popout = false, children }: { boot: Boot; popout?: boolean; children: React.ReactNode }) {
   const supabase = createClient()
   const router = useRouter()
   const { mutate } = useSWRConfig()
   const { userId, community } = boot
+  const { session: e2ee } = useE2ee()
 
   const [settings, setSettings] = useState<Settings>(boot.settings)
   const [role, setRole] = useState(boot.role)
@@ -110,7 +133,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   const membersQuery = useSWR(['members', community.id], async () => {
     const { data, error } = await supabase
       .from('community_members')
-      .select('user_id, role, joined_at, profile:profiles(id, username, display_name, avatar_url, company, bio, status_text, identity)')
+      .select('user_id, role, joined_at, profile:profiles(id, username, display_name, avatar_url, company, bio, status_text, identity, links)')
       .eq('community_id', community.id)
       .is('banned_at', null)
     if (error) throw error
@@ -175,6 +198,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   const open = useCallback(
     (id: string | null) => {
       setActive(id)
+      if (popout) return
       const url = new URL(window.location.href)
       url.searchParams.delete('welcome')
       if (id) url.searchParams.set('c', id)
@@ -185,11 +209,12 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         else localStorage.removeItem(lastOpenKey)
       } catch {}
     },
-    [lastOpenKey],
+    [lastOpenKey, popout],
   )
 
   const restored = useRef<string | null>(null)
   useEffect(() => {
+    if (popout) return
     let c = new URLSearchParams(window.location.search).get('c')
     if (!c) {
       try {
@@ -198,13 +223,14 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       restored.current = c
     }
     if (c) setActive(c)
-  }, [lastOpenKey])
+  }, [lastOpenKey, popout])
 
   // A remembered conversation you've since left (or that was deleted) falls back to home.
   useEffect(() => {
     const id = restored.current
     if (!id || !channelsQuery.data) return
     restored.current = null
+    if (isView(id)) return
     if (!channelsQuery.data.some((c) => c.id === id)) open(null)
   }, [channelsQuery.data, open])
 
@@ -249,43 +275,93 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   // --- sending ----------------------------------------------------------------
 
   const send = useCallback(
-    async (channelId: string, body: string, retryId?: string) => {
+    async (channelId: string, text: string, retryId?: string) => {
       const id = retryId ?? crypto.randomUUID()
+      // Too big to read comfortably inline: sent whole, shown as a card that opens in a reader.
+      const long = isLong(text)
+      const body = long ? previewOf(text) : text
+      const longFields = long ? { long_text: true, long_chars: charCount(text), long_body: text } : {}
       const draft: Message = {
         id,
         channel_id: channelId,
         author_id: userId,
         kind: 'user',
         body,
+        ...longFields,
         created_at: new Date().toISOString(),
         deleted_at: null,
         pending: true,
       }
       setOutbox((o) => ({ ...o, [channelId]: [...(o[channelId] ?? []).filter((m) => m.id !== id), draft] }))
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({ id, channel_id: channelId, author_id: userId, body })
-        .select(MESSAGE_COLUMNS)
-        .single()
-      if (error && error.code !== '23505') {
+      const fail = () =>
         setOutbox((o) => ({
           ...o,
           [channelId]: (o[channelId] ?? []).map((m) => (m.id === id ? { ...m, pending: false, failed: true } : m)),
         }))
-        if (error.code === 'P0429') toast.error(error.message)
-        return
+
+      // Direct messages are sealed here, on this device; the server only ever sees the sealed text.
+      const dm = live.current.channels.find((c) => c.id === channelId)?.kind === 'dm'
+      const peer = live.current.channels.find((c) => c.id === channelId)?.other_user_id ?? null
+      const insert = async () => {
+        if (long) {
+          // One call writes the preview and the full text together, or neither.
+          const sealed = dm ? await e2ee.sealLong(channelId, id, peer ?? '', text) : null
+          return supabase
+            .rpc('send_long_message', {
+              p_id: id,
+              p_channel: channelId,
+              p_preview: sealed ? '' : body,
+              p_preview_sealed: sealed?.preview ?? null,
+              p_chars: sealed ? null : charCount(text),
+              p_text: sealed ? null : text,
+              p_text_sealed: sealed?.full ?? null,
+            })
+            .select(MESSAGE_COLUMNS)
+            .single()
+        }
+        const row: Pick<Message, 'id' | 'channel_id' | 'author_id' | 'body' | 'sealed'> = dm
+          ? { id, channel_id: channelId, author_id: userId, body: '', sealed: await e2ee.seal(channelId, id, peer ?? '', body) }
+          : { id, channel_id: channelId, author_id: userId, body }
+        return supabase.from('messages').insert(row).select(MESSAGE_COLUMNS).single()
+      }
+      let result: Awaited<ReturnType<typeof insert>>
+      try {
+        result = await insert()
+        // They reset their keys since we looked: pick up the new one and try once more.
+        if (dm && peer && result.error?.code === 'P0409') {
+          e2ee.forgetPeer(peer)
+          result = await insert()
+        }
+      } catch (err) {
+        fail()
+        toast.error(friendlyError(err))
+        return false
+      }
+      const { data, error } = result
+      if (error && error.code !== '23505') {
+        fail()
+        if (error.code === 'P0429' || error.code === 'P0409' || error.code === '22023') toast.error(error.message)
+        return false
       }
       if (data) {
+        const row = data as Message
+        const sent: Message = { ...row, ...(dm ? { body, e2ee: 'ok' as const } : {}), ...longFields }
         mutate(
           messagesKey(channelId),
-          (cur?: Message[]) => (cur ? (cur.some((m) => m.id === id) ? cur : [...cur, data as Message]) : cur),
+          (cur?: Message[]) => {
+            if (!cur) return cur
+            // Realtime may have delivered it first; keep this device's full copy of a long message.
+            if (long && cur.some((m) => m.id === id)) return cur.map((m) => (m.id === id ? { ...m, ...sent } : m))
+            return insertInOrder(cur, sent)
+          },
           { revalidate: false },
         )
       }
       setOutbox((o) => ({ ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }))
       markRead(channelId)
+      return true
     },
-    [supabase, userId, mutate, markRead],
+    [supabase, userId, mutate, markRead, e2ee],
   )
 
   const discard = useCallback((channelId: string, id: string) => {
@@ -331,7 +407,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
 
   const paused = useRef(false)
   heartbeat.current = async () => {
-    if (paused.current) return
+    if (paused.current || popout) return
     const { error } = await supabase.rpc('presence_heartbeat', {
       p_session: sessionId.current,
       p_community: community.id,
@@ -385,6 +461,8 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   }, [])
 
   useEffect(() => {
+    // Closing a chat window must not mark you offline; the main window owns presence.
+    if (popout) return
     window.addEventListener('pagehide', leave)
     const d = desktop()
     const offPower = d?.onPower((state) => {
@@ -404,17 +482,14 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       offPower?.()
       offQuit?.()
     }
-  }, [leave, mutate, loadPresence])
+  }, [leave, mutate, loadPresence, popout])
 
   // --- realtime ---------------------------------------------------------------
 
   const handleIncoming = useCallback(
-    async (m: Message) => {
-      mutate(
-        messagesKey(m.channel_id),
-        (cur?: Message[]) => (cur ? (cur.some((x) => x.id === m.id) ? cur : [...cur, m]) : cur),
-        { revalidate: false },
-      )
+    async (raw: Message) => {
+      const m = await e2ee.open(raw)
+      mutate(messagesKey(m.channel_id), (cur?: Message[]) => (cur ? insertInOrder(cur, m) : cur), { revalidate: false })
       setOutbox((o) => (o[m.channel_id]?.some((x) => x.id === m.id) ? { ...o, [m.channel_id]: o[m.channel_id].filter((x) => x.id !== m.id) } : o))
 
       let channel = live.current.channels.find((c) => c.id === m.channel_id)
@@ -438,6 +513,10 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       const viewing = onScreen && live.current.visible
       if (onScreen) {
         markRead(m.channel_id)
+      } else if (popout || viewedInPopout(m.channel_id)) {
+        // A chat window is showing it (and marks it read), or this is a chat
+        // window and the main window keeps everything else.
+        return
       } else if (!counted) {
         mutate(
           ['channels', community.id],
@@ -449,7 +528,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         )
       }
 
-      if (m.kind !== 'user' || viewing || channel.muted) return
+      if (m.kind !== 'user' || viewing || channel.muted || popout) return
       const s = live.current.settings
       if (s.availability === 'dnd') return
       const author = live.current.profiles.get(m.author_id ?? '')
@@ -460,14 +539,19 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         const where = channel.kind === 'room' ? `#${channel.slug}` : channel.team_name ?? 'your team'
         showNotification({
           title: isDm ? authorName : `${authorName} in ${where}`,
-          body: m.body,
+          body:
+  m.sealed && m.e2ee !== 'ok'
+  ? 'New encrypted message'
+  : m.long_text
+  ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels))}`
+  : plainText(m.body, linkLabel(live.current.channels)),
           tag: m.channel_id,
           onClick: () => open(m.channel_id),
         })
         if (s.notify_sound) playChime()
       }
     },
-    [mutate, mutateChannels, refreshMembers, userId, markRead, community.id, open],
+    [mutate, mutateChannels, refreshMembers, userId, markRead, community.id, open, e2ee, popout],
   )
 
   // Realtime callbacks read the latest handlers through a ref, so the socket
@@ -488,8 +572,8 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p) =>
           h().handleIncoming(p.new as Message),
         )
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (p) => {
-          const m = p.new as Message
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (p) => {
+          const m = await e2ee.open(p.new as Message)
           mutate(messagesKey(m.channel_id), (cur?: Message[]) => cur?.map((x) => (x.id === m.id ? m : x)), {
             revalidate: false,
           })
@@ -564,7 +648,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       window.removeEventListener('offline', onOffline)
       if (channel) void supabase.removeChannel(channel)
     }
-  }, [supabase, userId, community.id, mutate])
+  }, [supabase, userId, community.id, mutate, e2ee])
 
   // Channel lists can change without a realtime event (added to a team,
   // removed from one). A slow refresh keeps them honest.
@@ -608,11 +692,16 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
 
   const unreadDms = channels.filter((c) => c.kind !== 'room' && !c.muted).reduce((n, c) => n + c.unread, 0)
   useEffect(() => {
+    if (popout) return
     desktop()?.setBadge(unreadDms)
     document.title = unreadDms > 0 ? `(${unreadDms}) Cabal` : 'Cabal'
-  }, [unreadDms])
+  }, [unreadDms, popout])
 
   useEffect(() => desktop()?.onNavigate((target) => open(target)), [open])
+
+  useEffect(() => {
+    if (!popout) listenForPopouts()
+  }, [popout])
 
   // --- value ------------------------------------------------------------------
 
