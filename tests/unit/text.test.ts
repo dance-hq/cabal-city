@@ -39,9 +39,9 @@ describe('tokenize', () => {
 
 describe('mentions', () => {
   it('matches case-insensitively and only whole usernames', () => {
-    expect(mentions('ping @Ada', 'ada')).toBe(true)
-    expect(mentions('ping @adam', 'ada')).toBe(false)
-    expect(mentions('ping @ada', null)).toBe(false)
+    expect(mentions('ping @Ada', { username: 'ada' })).toBe(true)
+    expect(mentions('ping @adam', { username: 'ada' })).toBe(false)
+    expect(mentions('ping @ada', { username: null })).toBe(false)
   })
 })
 

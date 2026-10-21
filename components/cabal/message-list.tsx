@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { mentions, plainText } from '@/lib/text'
 import { linkLabel } from '@/lib/channel-links'
+import { personLabel } from '@/lib/mentions'
 import { clock, dayKey, dayLabel, fullTime, shortClock } from '@/lib/time'
 import type { Channel, Message } from '@/lib/types'
 
@@ -209,7 +210,7 @@ export function MessageList({
           const author = profileById(m.author_id)
           const name = author?.display_name ?? (m.author_id ? 'Former member' : 'Cabal')
           const mine = m.author_id === userId
-          const mentioned = !mine && m.kind === 'user' && mentions(m.body, me.username)
+          const mentioned = !mine && m.kind === 'user' && mentions(m.body, { id: userId, username: me.username })
           const hidden = m.author_id && blocked.has(m.author_id)
 
           return (
@@ -253,12 +254,13 @@ export function MessageList({
                           <button
                             type="button"
                             onClick={() => m.author_id && showProfile(m.author_id)}
+                            title={author?.username ? `@${author.username}` : undefined}
                             className={cn(
-                              'mr-2 rounded font-mono text-[13px] font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ring',
+                              'mr-2 rounded text-[13px] font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ring',
                               mine ? 'text-mark' : 'text-foreground',
                             )}
                           >
-                            {author?.username ?? name}
+                            {name}
                           </button>
                         )}
                         {hidden ? (
@@ -381,7 +383,7 @@ export function MessageList({
         open={!!reporting}
         onOpenChange={(o) => !o && setReporting(null)}
         title="Report message"
-        excerpt={reporting ? plainText(reporting.body, linkLabel(channels)) : undefined}
+        excerpt={reporting ? plainText(reporting.body, linkLabel(channels), personLabel(profileById)) : undefined}
         description={
           reporting?.sealed
             ? 'Admins of this community will see your report and this one message. Nothing else from your conversation is shared.'

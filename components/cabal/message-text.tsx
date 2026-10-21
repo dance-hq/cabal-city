@@ -1,10 +1,11 @@
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
-import { tokenize } from '@/lib/text'
+import { isMentionOf, tokenize, type Token } from '@/lib/text'
+import { personName } from '@/lib/mentions'
 import { ChannelChip, appOrigins } from './channel-links'
+import { useCabal } from './store'
 
 export const MessageText = memo(function MessageText({ body, myUsername }: { body: string; myUsername?: string | null }) {
-  const me = myUsername?.toLowerCase()
   return (
     <span className="break-words whitespace-pre-wrap">
       {tokenize(body, { appOrigins: appOrigins() }).map((t, i) => {
@@ -22,21 +23,38 @@ export const MessageText = memo(function MessageText({ body, myUsername }: { bod
             </a>
           )
         }
-        if (t.type === 'mention') {
-          return (
-            <span
-              key={i}
-              className={cn(
-                'rounded px-0.5 font-medium',
-                t.username.toLowerCase() === me ? 'bg-flag/25 text-foreground' : 'text-mark',
-              )}
-            >
-              {t.value}
-            </span>
-          )
-        }
+        if (t.type === 'mention') return <Mention key={i} token={t} myUsername={myUsername} />
         return <span key={i}>{t.value}</span>
       })}
     </span>
   )
 })
+
+// Stored mentions show the person's current real name; typed @usernames show
+// as typed. Either way, a mention of you is highlighted.
+function Mention({ token, myUsername }: { token: Extract<Token, { type: 'mention' }>; myUsername?: string | null }) {
+  const { userId, members, showProfile } = useCabal()
+  const person = token.userId
+    ? members.find((m) => m.user_id === token.userId)?.profile
+    : token.username
+      ? members.find((m) => m.profile.username?.toLowerCase() === token.username!.toLowerCase())?.profile
+      : undefined
+  const mine = isMentionOf(token, { id: userId, username: myUsername })
+  const label = token.userId ? `@${personName(person)}` : token.value
+  const className = cn(
+    'rounded px-0.5 font-medium',
+    mine ? 'bg-flag/25 text-foreground' : person ? 'text-mark' : 'text-muted-foreground',
+  )
+
+  if (!person) return <span className={className}>{label}</span>
+  return (
+    <button
+      type="button"
+      onClick={() => showProfile(person.id)}
+      title={person.username ? `@${person.username}` : undefined}
+      className={cn(className, 'hover:underline focus-visible:ring-2 focus-visible:ring-ring')}
+    >
+      {label}
+    </button>
+  )
+}

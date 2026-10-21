@@ -10,6 +10,7 @@ import { shortDuration } from '@/lib/session'
 import { ago } from '@/lib/time'
 import { plainText } from '@/lib/text'
 import { linkLabel } from '@/lib/channel-links'
+import { personLabel } from '@/lib/mentions'
 import { useLockIns } from '@/hooks/use-lock-ins'
 import type { Channel, Message, Profile, ShownStatus } from '@/lib/types'
 import { Avatar } from './avatar'
@@ -247,7 +248,7 @@ function Recent({ channels, loading, now }: { channels: Channel[]; loading: bool
                             {m.sealed && m.e2ee !== 'ok' ? (
                               <span className="italic">Encrypted message</span>
                             ) : (
-                              plainText(m.body, linkLabel(all))
+                              plainText(m.body, linkLabel(all), personLabel(profileById))
                             )}
                           </>
                         )
