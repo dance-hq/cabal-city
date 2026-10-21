@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { isOwnAvatarUrl } from '@/lib/avatar-url'
 import type { ShownStatus } from '@/lib/types'
 import { StatusDot } from './status-dot'
 
@@ -25,7 +26,7 @@ export function Avatar({
   const dim = status === 'offline'
   return (
     <span className={cn('relative inline-flex shrink-0', className)} style={{ width: size, height: size }}>
-      {url ? (
+      {url && isOwnAvatarUrl(url) ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={url}
