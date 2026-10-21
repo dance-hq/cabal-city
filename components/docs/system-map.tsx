@@ -1,40 +1,24 @@
 import { ArrowDown, ChevronRight } from 'lucide-react'
-import type { Source } from '@/lib/docs'
+import { MAP, type Source } from '@/lib/docs'
 import { Receipts } from './receipts'
 
 export function SystemMap() {
   return (
     <figure className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-stretch">
-        <Node
-          title="Your computer"
-          body="The desktop app or a browser tab."
-          className="md:w-48 md:flex-none md:self-center"
-        />
-        <div className="grid grid-cols-2 gap-3 md:flex md:flex-1 md:flex-col">
+        <Node title={MAP.client.title} body={MAP.client.body} className="md:w-44 md:flex-none md:self-center" />
+        <div className="grid grid-cols-1 gap-3 md:flex md:flex-1 md:flex-col">
           <div className="flex flex-col md:flex-row md:items-center">
-            <Wire label="pages" />
-            <Node
-              title="cabal.city, on Vercel"
-              body="Sends the pages and runs a few small jobs, like emailing your sign-in code."
-              sources={[{ path: 'app/api/' }]}
-            />
+            <Wire label={MAP.server.wire} />
+            <Node title={MAP.server.title} body={MAP.server.body} sources={MAP.server.sources} />
           </div>
           <div className="flex flex-col md:flex-row md:items-center">
-            <Wire label="your data, live" />
-            <Node
-              title="Supabase"
-              body="The database, sign-in, live updates and photos, guarded by the database’s own rules."
-              sources={[{ path: 'supabase/migrations/' }]}
-            />
+            <Wire label={MAP.database.wire} />
+            <Node title={MAP.database.title} body={MAP.database.body} sources={MAP.database.sources} />
           </div>
         </div>
       </div>
-      <figcaption className="text-sm leading-relaxed text-muted-foreground text-pretty">
-        Your app talks to the database directly. That&apos;s safe because the database checks every request against
-        who you are, not against what the app claims. Resend delivers the sign-in emails and GitHub hosts the desktop
-        downloads.
-      </figcaption>
+      <figcaption className="text-sm leading-relaxed text-muted-foreground text-pretty">{MAP.caption}</figcaption>
     </figure>
   )
 }
@@ -61,7 +45,7 @@ function Node({
 
 function Wire({ label }: { label: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 py-2 text-muted-foreground md:w-32 md:shrink-0 md:items-stretch md:px-2 md:py-0">
+    <div className="flex flex-col items-center gap-1 py-2 text-muted-foreground md:w-36 md:shrink-0 md:items-stretch md:px-2 md:py-0">
       <span className="text-center font-mono text-xs">{label}</span>
       <ArrowDown className="size-4 md:hidden" aria-hidden />
       <span className="hidden items-center md:flex" aria-hidden>

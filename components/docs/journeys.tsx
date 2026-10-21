@@ -1,5 +1,6 @@
 import type { Journey } from '@/lib/docs'
 import { Receipts } from './receipts'
+import { RichText } from './rich-text'
 
 export function Journeys({ journeys }: { journeys: Journey[] }) {
   return (
@@ -19,7 +20,9 @@ export function Journeys({ journeys }: { journeys: Journey[] }) {
                   {i + 1}
                 </span>
                 <div className="flex min-w-0 flex-col gap-2 pt-0.5">
-                  <p className="text-sm leading-relaxed text-pretty">{step.text}</p>
+                  <p className="text-sm leading-relaxed text-pretty">
+                    <RichText text={step.text} />
+                  </p>
                   <Receipts sources={step.sources} />
                 </div>
               </li>
