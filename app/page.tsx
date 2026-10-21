@@ -50,13 +50,14 @@ export default async function Home() {
           </p>
           <div className="flex flex-col gap-3 pt-2">
             <div className="flex flex-wrap gap-3">
-              <Link
+              {/* A plain anchor: next/link ignores a click when the URL already ends in #download. */}
+              <a
                 href="#download"
                 className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <ArrowDownToLine className="size-4" aria-hidden />
                 Get the desktop app
-              </Link>
+              </a>
               <Link
                 href="/login"
                 className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
