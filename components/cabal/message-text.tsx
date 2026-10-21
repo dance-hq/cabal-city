@@ -26,7 +26,7 @@ export const MessageText = memo(function MessageText({ body, myUsername }: { bod
               key={i}
               className={cn(
                 'rounded px-0.5 font-medium',
-                t.username.toLowerCase() === me ? 'bg-primary/25 text-foreground' : 'text-mark',
+                t.username.toLowerCase() === me ? 'bg-flag/25 text-foreground' : 'text-mark',
               )}
             >
               {t.value}

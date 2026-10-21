@@ -29,7 +29,7 @@ export function LegalPage({
   children: React.ReactNode
 }) {
   return (
-    <div className="chicago flex min-h-svh flex-col">
+    <div className="flex min-h-svh flex-col">
       <SiteHeader />
       <div className="h-2 bg-flag" aria-hidden />
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 pt-12 pb-20 md:flex-row md:gap-16 md:pt-16">

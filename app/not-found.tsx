@@ -3,7 +3,7 @@ import { ChicagoStar } from '@/components/marketing/star'
 
 export default function NotFound() {
   return (
-    <main className="chicago flex min-h-svh flex-col items-center justify-center gap-6 px-6 text-center">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-6 px-6 text-center">
       <span className="text-flag">
         <ChicagoStar outline className="size-16" />
       </span>
