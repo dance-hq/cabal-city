@@ -49,6 +49,8 @@
   --sidebar-ring: oklch(0.66 0.13 232);
   /* The city flag: light blue stripes, red six-pointed stars. */
   --flag: oklch(0.72 0.125 228);
+  /* Text on a flag-blue fill (the Lock in button), in both themes. */
+  --flag-foreground: #0d0e10;
   /* The hot core of the locked-in current. */
   --spark: oklch(0.58 0.16 240);
   --star: oklch(0.585 0.235 25);
@@ -101,6 +103,7 @@
 
 @theme inline {
   --color-flag: var(--flag);
+  --color-flag-foreground: var(--flag-foreground);
   --color-star: var(--star);
   --color-star-foreground: var(--star-foreground);
   --color-brand-star: var(--brand-star);

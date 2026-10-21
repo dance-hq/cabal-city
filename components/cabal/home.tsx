@@ -12,6 +12,7 @@ import { useLockIns } from '@/hooks/use-lock-ins'
 import type { Channel, Message, Profile, ShownStatus } from '@/lib/types'
 import { Avatar } from './avatar'
 import { copyInviteLink } from './buddy-list'
+import { LockInControl } from './session-bar'
 import { MESSAGE_COLUMNS, useCabal } from './store'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
 
@@ -51,10 +52,13 @@ export function Home() {
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="app-drag flex h-11 shrink-0 items-center justify-between gap-3 border-b px-5">
         <h1 className="truncate text-sm font-semibold">{community.name}</h1>
-        <p className="shrink-0 font-mono text-[11px] text-muted-foreground">
-          {here.length} here
-          {lockIns.size > 0 ? ` · ${lockIns.size} locked in` : ''}
-        </p>
+        <div className="flex shrink-0 items-center gap-3">
+          <p className="font-mono text-[11px] text-muted-foreground">
+            {here.length} here
+            {lockIns.size > 0 ? ` · ${lockIns.size} locked in` : ''}
+          </p>
+          <LockInControl />
+        </div>
       </header>
 
       <div className="quiet-scroll min-h-0 flex-1 overflow-y-auto">
@@ -97,7 +101,7 @@ function LockedIn({ lockIns, now }: { lockIns: ReturnType<typeof useLockIns>; no
     <Block label={`Locked in · ${rows.length}`}>
       {rows.length === 0 ? (
         <Quiet>
-          Nobody&apos;s locked in right now. When you want to focus, tap Lock in in the sidebar.
+          Nobody&apos;s locked in right now. When you want to focus, tap Lock in at the top right.
         </Quiet>
       ) : (
         <ul className="flex flex-col">

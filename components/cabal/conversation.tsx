@@ -8,6 +8,7 @@ import { Avatar } from './avatar'
 import { Composer } from './composer'
 import { MessageList } from './message-list'
 import { PeoplePanel, usePeopleIn } from './people-panel'
+import { LockInControl } from './session-bar'
 import { STATUS_LABEL } from './status-dot'
 import { TeamIcon, TeamManageDialog } from './team-dialogs'
 import { useCabal } from './store'
@@ -186,6 +187,8 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
                 <MoreHorizontal className="size-4" aria-hidden />
               </IconButton>
             )}
+            <span className="mx-1.5 h-4 w-px bg-border" aria-hidden />
+            <LockInControl />
           </div>
         </Header>
 

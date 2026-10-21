@@ -44,7 +44,7 @@ function Layout() {
     return (
       <div className="flex h-svh flex-col overflow-hidden bg-sidebar">
         <UpdateBar />
-        {active ? <Conversation compact /> : <BuddyList />}
+        {active ? <Conversation compact /> : <BuddyList compact />}
       </div>
     )
   }

@@ -51,7 +51,7 @@ export async function copyInviteLink(communityId: string) {
   }
 }
 
-export function BuddyList() {
+export function BuddyList({ compact }: { compact?: boolean }) {
   const {
     community,
     members,
@@ -198,7 +198,7 @@ export function BuddyList() {
       </header>
       <ConnectionBanner />
       <MeCard />
-      <SessionBar />
+      {compact && <SessionBar />}
       <div className="px-3 pb-2">
         <label className="relative block">
           <span className="sr-only">Search people and channels</span>
