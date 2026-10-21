@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Check, ChevronRight, Hash, Info, Link2, Lock, Plus, Search, Settings, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -52,19 +52,6 @@ export function BuddyList() {
   const [query, setQuery] = useState('')
   const [showOffline, setShowOffline] = useState(true)
   const [creatingTeam, setCreatingTeam] = useState(false)
-  const search = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        search.current?.focus()
-        search.current?.select()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
 
   const dmByUser = useMemo(() => {
     const map = new Map<string, Channel>()
@@ -133,16 +120,12 @@ export function BuddyList() {
           <span className="sr-only">Search people and rooms</span>
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input
-            ref={search}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
             placeholder="Find someone"
-            className="h-8 w-full rounded-md border border-transparent bg-sidebar-accent pr-12 pl-8 text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
+            className="h-8 w-full rounded-md border border-transparent bg-sidebar-accent pr-3 pl-8 text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
           />
-          <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 font-sans text-[10px] text-muted-foreground [font-family:system-ui]">
-            {'⌘K'}
-          </kbd>
         </label>
       </div>
 
