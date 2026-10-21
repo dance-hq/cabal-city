@@ -41,6 +41,7 @@ export function AdminPanel() {
       .from('reports')
       .select('id, reporter_id, reported_user_id, message_excerpt, reason, created_at')
       .eq('community_id', community.id)
+      .eq('on_board', false)
       .is('resolved_at', null)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -158,7 +159,7 @@ export function AdminPanel() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium">Bugs & suggestions · {feedback.data?.length ?? 0}</p>
+        <p className="text-sm font-medium">Bug reports · {feedback.data?.length ?? 0}</p>
         {feedback.data?.length === 0 && <p className="text-xs text-muted-foreground">Nothing new.</p>}
         <ul className="flex flex-col gap-2">
           {feedback.data?.map((f) => {

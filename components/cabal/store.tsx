@@ -66,7 +66,7 @@ type Store = {
   openDm(userId: string): Promise<void>
   markRead(channelId: string): void
   outbox: Record<string, Message[]>
-  send(channelId: string, body: string, retryId?: string): Promise<void>
+  send(channelId: string, body: string, retryId?: string): Promise<boolean>
   discard(channelId: string, id: string): void
   refreshChannels(): void
   refreshMembers(): void
@@ -84,6 +84,14 @@ export function useCabal() {
   const s = useContext(Ctx)
   if (!s) throw new Error('useCabal must be used inside CabalProvider')
   return s
+}
+
+// Places in the main pane that aren't conversations. They share `active` with
+// channel ids so back buttons, the URL and "reopen where you were" just work.
+export const VIEWS = { opportunities: 'opportunities', build: 'build' } as const
+export type View = (typeof VIEWS)[keyof typeof VIEWS]
+export function isView(id: string | null | undefined): id is View {
+  return id === VIEWS.opportunities || id === VIEWS.build
 }
 
 export const messagesKey = (channelId: string) => ['messages', channelId] as const
@@ -205,6 +213,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
     const id = restored.current
     if (!id || !channelsQuery.data) return
     restored.current = null
+    if (isView(id)) return
     if (!channelsQuery.data.some((c) => c.id === id)) open(null)
   }, [channelsQuery.data, open])
 
@@ -273,7 +282,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
           [channelId]: (o[channelId] ?? []).map((m) => (m.id === id ? { ...m, pending: false, failed: true } : m)),
         }))
         if (error.code === 'P0429') toast.error(error.message)
-        return
+        return false
       }
       if (data) {
         mutate(
@@ -284,6 +293,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       }
       setOutbox((o) => ({ ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }))
       markRead(channelId)
+      return true
     },
     [supabase, userId, mutate, markRead],
   )

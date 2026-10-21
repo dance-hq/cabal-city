@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { useCabal } from './store'
+import { VIEWS, useCabal } from './store'
+import { suggestOnBoard } from './build-cabal'
+import { splitSuggestion } from '@/lib/board'
 import { desktop } from '@/lib/desktop'
 import { githubUrl } from '@/lib/config'
 
@@ -44,7 +46,7 @@ function appDetails() {
 }
 
 export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { community } = useCabal()
+  const { community, open: openPlace } = useCabal()
   const [kind, setKind] = useState<Kind>('bug')
   const [text, setText] = useState('')
   const [withDetails, setWithDetails] = useState(true)
@@ -53,6 +55,14 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    // Ideas go on the public board so other people can back them.
+    if (kind === 'idea') {
+      suggestOnBoard(splitSuggestion(text))
+      setText('')
+      onOpenChange(false)
+      openPlace(VIEWS.build)
+      return
+    }
     setBusy(true)
     try {
       const res = await fetch('/api/feedback', {
@@ -67,7 +77,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error ?? 'Couldn’t send that. Try again in a moment.')
-      toast.success(kind === 'bug' ? 'Thanks, the bug report is in.' : 'Thanks, the idea is in.')
+      toast.success('Thanks, the bug report is in.')
       setText('')
       onOpenChange(false)
     } catch (err) {
@@ -84,7 +94,9 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <DialogHeader>
             <DialogTitle>Send feedback</DialogTitle>
             <DialogDescription>
-              Goes straight to the people running Cabal. They can reply to you by email.
+              {kind === 'bug'
+                ? 'Goes straight to the people running Cabal. They can reply to you by email.'
+                : 'Ideas go on Build Cabal, where everyone can back them and talk them through.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -111,7 +123,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <Label htmlFor="feedback-body">{current.prompt}</Label>
             <Textarea
               id="feedback-body"
-              required
+              required={kind === 'bug'}
               autoFocus
               maxLength={2000}
               rows={5}
@@ -121,6 +133,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             />
           </div>
 
+          {kind === 'bug' && (
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="feedback-details">Include app details</Label>
@@ -130,6 +143,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             </div>
             <Switch id="feedback-details" checked={withDetails} onCheckedChange={setWithDetails} />
           </div>
+          )}
 
           <DialogFooter className="items-center sm:justify-between">
             {githubUrl ? (
@@ -148,9 +162,9 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy || !text.trim()}>
+              <Button type="submit" disabled={busy || (kind === 'bug' && !text.trim())}>
                 {busy && <Loader2 className="animate-spin" aria-hidden />}
-                Send
+                {kind === 'bug' ? 'Send' : 'Continue on Build Cabal'}
               </Button>
             </div>
           </DialogFooter>

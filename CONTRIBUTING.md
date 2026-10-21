@@ -7,7 +7,11 @@ Thanks for helping. A few things keep Cabal trustworthy:
 3. **Invisible means invisible.** Don't add anything (typing indicators, read receipts, "last seen") that leaks presence for someone set to invisible.
 4. **Keep the desktop shell small.** New bridge calls go through `src/rules.cjs` checks and need a test.
 
-Before opening a pull request:
+## Build Cabal
+
+Members suggest and back improvements inside the app (sidebar → **Build Cabal**), no GitHub account needed. Maintainers (community admins) link each idea to its GitHub issue or pull request, move it through Requested → Building → Shipped, and write one plain sentence about what changed when it ships. That sentence becomes **Today's ship**. Only post a ship once it's live for members, and never post one just to keep a streak going.
+
+## Before opening a pull request
 
 ```bash
 pnpm typecheck && pnpm test

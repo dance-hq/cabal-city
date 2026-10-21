@@ -2,7 +2,9 @@
 
 import { useEffect } from 'react'
 import { SWRConfig } from 'swr'
-import { CabalProvider, useCabal, type Boot } from './store'
+import { CabalProvider, VIEWS, useCabal, type Boot } from './store'
+import { Opportunities } from './opportunities'
+import { BuildCabal } from './build-cabal'
 import { BuddyList } from './buddy-list'
 import { Conversation } from './conversation'
 import { ProfileDialog } from './profile-dialog'
@@ -46,7 +48,7 @@ function Layout() {
     return (
       <div className="flex h-svh flex-col overflow-hidden bg-sidebar">
         <UpdateBar />
-        {active ? <Conversation compact /> : <BuddyList compact />}
+        {active ? <MainPane active={active} compact /> : <BuddyList compact />}
       </div>
     )
   }
@@ -58,8 +60,14 @@ function Layout() {
         <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar" aria-label="People and channels">
           <BuddyList />
         </aside>
-        <main className="flex min-w-0 flex-1 flex-col">{active ? <Conversation /> : <Home />}</main>
+        <main className="flex min-w-0 flex-1 flex-col">{active ? <MainPane active={active} /> : <Home />}</main>
       </div>
     </div>
   )
+}
+
+function MainPane({ active, compact }: { active: string; compact?: boolean }) {
+  if (active === VIEWS.opportunities) return <Opportunities compact={compact} />
+  if (active === VIEWS.build) return <BuildCabal compact={compact} />
+  return <Conversation compact={compact} />
 }

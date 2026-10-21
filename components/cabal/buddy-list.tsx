@@ -6,11 +6,13 @@ import {
   ChevronRight,
   Compass,
   FolderPlus,
+  Hammer,
   Hash,
   Link2,
   Lock,
   MessageSquareWarning,
   Plus,
+  Radar,
   Search,
   Settings,
   X,
@@ -24,7 +26,7 @@ import { ConnectionBanner } from './connection-banner'
 import { WelcomeCard } from './welcome-card'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
 import { FeedbackDialog } from './feedback-dialog'
-import { useCabal } from './store'
+import { VIEWS, useCabal } from './store'
 import { compareByPresence } from '@/lib/presence'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
@@ -216,6 +218,15 @@ export function BuddyList({ compact }: { compact?: boolean }) {
       <nav className="quiet-scroll min-h-0 flex-1 overflow-y-auto pb-4" aria-label="Conversations">
         <WelcomeCard />
 
+        {!q && (
+          <div className="mt-1 flex flex-col gap-px">
+            <Row selected={active === VIEWS.opportunities} onClick={() => open(VIEWS.opportunities)} unread={0}>
+              <Radar className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate text-[13px]">Opportunities</span>
+            </Row>
+          </div>
+        )}
+
         {invites.length > 0 && (
           <Section label="Team invites">
             {invites.map((inv) => (
@@ -401,8 +412,8 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         )}
       </nav>
 
-      {othersExist && (
-        <div className="shrink-0 border-t px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t px-3 py-2">
+        {othersExist ? (
           <button
             type="button"
             onClick={() => copyInviteLink(community.id)}
@@ -411,8 +422,22 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             <Link2 className="size-3.5" aria-hidden />
             Invite a builder
           </button>
-        </div>
-      )}
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={() => open(VIEWS.build)}
+          aria-current={active === VIEWS.build ? 'page' : undefined}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+            active === VIEWS.build && 'text-foreground',
+          )}
+        >
+          <Hammer className="size-3.5" aria-hidden />
+          Build Cabal
+        </button>
+      </div>
 
       <CreateTeamDialog open={creatingTeam} onOpenChange={setCreatingTeam} />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
