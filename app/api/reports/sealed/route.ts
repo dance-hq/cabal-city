@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { contextOf, fromBase64, isEnvelope, openWithMessageKey } from '@/lib/e2ee/crypto'
+import { unpackPreview } from '@/lib/long-text'
 
 const body = z.object({
   message: z.string().uuid(),
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
   // Read as the reporter, so it's only found if they're in the conversation.
   const { data: m } = await supabase
     .from('messages')
-    .select('id, channel_id, author_id, sealed, deleted_at')
+    .select('id, channel_id, author_id, sealed, long_text, deleted_at')
     .eq('id', message)
     .maybeSingle()
   if (!m || !isEnvelope(m.sealed) || m.deleted_at || m.author_id === user.id) {
@@ -39,6 +40,12 @@ export async function POST(request: NextRequest) {
   let text: string
   try {
     text = await openWithMessageKey(fromBase64(key), contextOf(m, m.sealed), m.sealed)
+    // A long message's sealed part is its preview; the report carries that start of it.
+    if (m.long_text) {
+      const preview = unpackPreview(text)
+      if (!preview) throw new Error('Bad preview')
+      text = preview.preview
+    }
   } catch {
     return NextResponse.json({ error: 'That message couldn’t be checked, so it wasn’t reported.' }, { status: 400 })
   }

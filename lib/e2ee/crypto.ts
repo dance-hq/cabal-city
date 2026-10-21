@@ -131,9 +131,9 @@ function messageAad(ctx: MessageContext) {
 }
 
 // [4-byte length][text][zeros] in 64-byte steps, so "ok" and "see you at six" look the same.
-function pad(text: string): Bytes {
+function pad(text: string, step = 64): Bytes {
   const body = utf8.encode(text)
-  const out = new Uint8Array(Math.ceil((body.length + 4) / 64) * 64)
+  const out = new Uint8Array(Math.ceil((body.length + 4) / step) * step)
   new DataView(out.buffer).setUint32(0, body.length)
   out.set(body, 4)
   return out
@@ -162,6 +162,23 @@ export async function openWithMessageKey(raw: Bytes, ctx: MessageContext, env: E
 
 export async function openMessage(conversation: CryptoKey, ctx: MessageContext, env: Envelope): Promise<string> {
   return openWithMessageKey(await messageKey(conversation, ctx), ctx, env)
+}
+
+// The full text of a long message: same per-message key, its own label, so a
+// preview and a full text can't be swapped for each other. Padded in 4 KB steps.
+function longTextAad(ctx: MessageContext) {
+  return encode(['cabal-dm-long-v1', ctx.channelId, ctx.messageId, ctx.authorId, ctx.sk, ctx.rk].join('|'))
+}
+
+export async function sealLongText(conversation: CryptoKey, ctx: MessageContext, text: string): Promise<Envelope> {
+  const { iv, ct } = await encrypt(await messageKey(conversation, ctx), pad(text, 4096), longTextAad(ctx))
+  return { v: 1, sk: ctx.sk, rk: ctx.rk, iv, ct }
+}
+
+/** Throws if the key is wrong or anything about the text was changed. */
+export async function openLongText(conversation: CryptoKey, ctx: MessageContext, env: Envelope): Promise<string> {
+  if (env.v !== 1 || env.sk !== ctx.sk || env.rk !== ctx.rk) throw new Error('Envelope mismatch')
+  return unpad(await decrypt(await messageKey(conversation, ctx), env.iv, env.ct, longTextAad(ctx)))
 }
 
 export function contextOf(m: { id: string; channel_id: string; author_id: string | null }, env: Envelope): MessageContext {

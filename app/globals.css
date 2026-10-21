@@ -349,6 +349,11 @@
   }
 }
 
+/* A long message's preview fades out instead of ending mid-line. */
+.long-text-fade {
+  mask-image: linear-gradient(to bottom, #000 45%, transparent);
+}
+
 /* The flag's stars land one after another on first paint. */
 @keyframes star-in {
   from {

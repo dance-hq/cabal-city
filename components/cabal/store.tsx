@@ -12,6 +12,7 @@ import { friendlyError } from '@/lib/errors'
 import { playChime, showNotification } from '@/lib/notify'
 import { foldPresence, type UserPresence } from '@/lib/presence'
 import { mentions, plainText } from '@/lib/text'
+import { charCount, isLong, previewOf, titleOf } from '@/lib/long-text'
 import { linkLabel } from '@/lib/channel-links'
 import { useE2ee } from './e2ee-provider'
 import type {
@@ -97,7 +98,7 @@ export function isView(id: string | null | undefined): id is View {
 }
 
 export const messagesKey = (channelId: string) => ['messages', channelId] as const
-export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, created_at, deleted_at'
+export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, long_text, long_chars, created_at, deleted_at'
 
 // Keeps a conversation in time order when an incoming message took a moment to open.
 function insertInOrder(list: Message[], m: Message): Message[] {
@@ -269,14 +270,19 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   // --- sending ----------------------------------------------------------------
 
   const send = useCallback(
-    async (channelId: string, body: string, retryId?: string) => {
+    async (channelId: string, text: string, retryId?: string) => {
       const id = retryId ?? crypto.randomUUID()
+      // Too big to read comfortably inline: sent whole, shown as a card that opens in a reader.
+      const long = isLong(text)
+      const body = long ? previewOf(text) : text
+      const longFields = long ? { long_text: true, long_chars: charCount(text), long_body: text } : {}
       const draft: Message = {
         id,
         channel_id: channelId,
         author_id: userId,
         kind: 'user',
         body,
+        ...longFields,
         created_at: new Date().toISOString(),
         deleted_at: null,
         pending: true,
@@ -292,6 +298,22 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       const dm = live.current.channels.find((c) => c.id === channelId)?.kind === 'dm'
       const peer = live.current.channels.find((c) => c.id === channelId)?.other_user_id ?? null
       const insert = async () => {
+        if (long) {
+          // One call writes the preview and the full text together, or neither.
+          const sealed = dm ? await e2ee.sealLong(channelId, id, peer ?? '', text) : null
+          return supabase
+            .rpc('send_long_message', {
+              p_id: id,
+              p_channel: channelId,
+              p_preview: sealed ? '' : body,
+              p_preview_sealed: sealed?.preview ?? null,
+              p_chars: sealed ? null : charCount(text),
+              p_text: sealed ? null : text,
+              p_text_sealed: sealed?.full ?? null,
+            })
+            .select(MESSAGE_COLUMNS)
+            .single()
+        }
         const row: Pick<Message, 'id' | 'channel_id' | 'author_id' | 'body' | 'sealed'> = dm
           ? { id, channel_id: channelId, author_id: userId, body: '', sealed: await e2ee.seal(channelId, id, peer ?? '', body) }
           : { id, channel_id: channelId, author_id: userId, body }
@@ -317,8 +339,18 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         return false
       }
       if (data) {
-        const sent = dm ? { ...(data as Message), body, e2ee: 'ok' as const } : (data as Message)
-        mutate(messagesKey(channelId), (cur?: Message[]) => (cur ? insertInOrder(cur, sent) : cur), { revalidate: false })
+        const row = data as Message
+        const sent: Message = { ...row, ...(dm ? { body, e2ee: 'ok' as const } : {}), ...longFields }
+        mutate(
+          messagesKey(channelId),
+          (cur?: Message[]) => {
+            if (!cur) return cur
+            // Realtime may have delivered it first; keep this device's full copy of a long message.
+            if (long && cur.some((m) => m.id === id)) return cur.map((m) => (m.id === id ? { ...m, ...sent } : m))
+            return insertInOrder(cur, sent)
+          },
+          { revalidate: false },
+        )
       }
       setOutbox((o) => ({ ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }))
       markRead(channelId)
@@ -496,7 +528,12 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         const where = channel.kind === 'room' ? `#${channel.slug}` : channel.team_name ?? 'your team'
         showNotification({
           title: isDm ? authorName : `${authorName} in ${where}`,
-          body: m.sealed && m.e2ee !== 'ok' ? 'New encrypted message' : plainText(m.body, linkLabel(live.current.channels)),
+          body:
+  m.sealed && m.e2ee !== 'ok'
+  ? 'New encrypted message'
+  : m.long_text
+  ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels))}`
+  : plainText(m.body, linkLabel(live.current.channels)),
           tag: m.channel_id,
           onClick: () => open(m.channel_id),
         })

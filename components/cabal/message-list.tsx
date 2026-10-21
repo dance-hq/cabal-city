@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
 import { MessageText } from './message-text'
+import { LongTextCard } from './long-text'
 import { ReportDialog } from './moderation'
 import { useCabal } from './store'
 import { useE2ee } from './e2ee-provider'
@@ -266,10 +267,19 @@ export function MessageList({
                           <span className="text-muted-foreground italic">message deleted</span>
                         ) : (
                           <span className="text-foreground/90">
-                            <MessageBody m={m} myUsername={me.username} onUnlock={() => setUnlockOpen(true)} />
+                            <MessageBody
+                              m={m}
+                              myUsername={me.username}
+                              authorName={mine ? 'You' : name}
+                              onUnlock={() => setUnlockOpen(true)}
+                            />
                           </span>
                         )}
-                        <SendState m={m} onRetry={() => send(channel.id, m.body, m.id)} onDiscard={() => discard(channel.id, m.id)} />
+                        <SendState
+                          m={m}
+                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id)}
+                          onDiscard={() => discard(channel.id, m.id)}
+                        />
                       </div>
                     </>
                   ) : (
@@ -317,10 +327,19 @@ export function MessageList({
                           ) : m.deleted_at ? (
                             <span className="text-muted-foreground italic">message deleted</span>
                           ) : (
-                            <MessageBody m={m} myUsername={me.username} onUnlock={() => setUnlockOpen(true)} />
+                            <MessageBody
+                              m={m}
+                              myUsername={me.username}
+                              authorName={mine ? 'You' : name}
+                              onUnlock={() => setUnlockOpen(true)}
+                            />
                           )}
                         </div>
-                        <SendState m={m} onRetry={() => send(channel.id, m.body, m.id)} onDiscard={() => discard(channel.id, m.id)} />
+                        <SendState
+                          m={m}
+                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id)}
+                          onDiscard={() => discard(channel.id, m.id)}
+                        />
                       </div>
                     </>
                   )}
@@ -388,7 +407,17 @@ export function MessageList({
   )
 }
 
-function MessageBody({ m, myUsername, onUnlock }: { m: Message; myUsername: string | null; onUnlock: () => void }) {
+function MessageBody({
+  m,
+  myUsername,
+  authorName,
+  onUnlock,
+}: {
+  m: Message
+  myUsername: string | null
+  authorName: string
+  onUnlock: () => void
+}) {
   if (m.sealed && m.e2ee === 'locked') {
     return (
       <span className="inline-flex flex-wrap items-baseline gap-x-1.5 text-muted-foreground italic">
@@ -416,6 +445,7 @@ function MessageBody({ m, myUsername, onUnlock }: { m: Message; myUsername: stri
       </span>
     )
   }
+  if (m.long_text) return <LongTextCard m={m} authorName={authorName} />
   return <MessageText body={m.body} myUsername={myUsername} />
 }
 

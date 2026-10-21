@@ -76,6 +76,12 @@ export type Message = {
   deleted_at: string | null
   /** Direct messages: the encrypted text. `body` is empty until this device opens it. */
   sealed?: Envelope | null
+  /** A long message: `body` is only its preview; the full text is in message_texts. */
+  long_text?: boolean
+  /** Its length in characters. Direct messages carry it inside the encryption, so it's set once opened. */
+  long_chars?: number | null
+  /** Client-only: the full text of a long message this device sent, so it never has to be fetched back. */
+  long_body?: string
   // Client-only: optimistic sends.
   pending?: boolean
   failed?: boolean

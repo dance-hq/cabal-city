@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, Hash } from 'lucide-react'
+import { ArrowUp, FileText, Hash } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MESSAGE_MAX } from '@/lib/config'
 import { cleanBody } from '@/lib/text'
+import { charCount, formatCount, isLong, longBody, LONG_TEXT_MAX } from '@/lib/long-text'
 import { channelName, channelQuery, encodeChannelLinks, matchChannels } from '@/lib/channel-links'
 import { useLinkableChannels } from './channel-links'
 import { TeamIcon } from './team-dialogs'
@@ -49,7 +50,11 @@ export function Composer({
 
   const set = (v: string) => setDrafts((d) => ({ ...d, [channelId]: v }))
   const body = cleanBody(value)
-  const tooLong = body.length > MESSAGE_MAX
+  // Past the inline size the draft is sent whole, exactly as typed, as a long message.
+  const long = isLong(body)
+  const longText = long ? longBody(value) : ''
+  const chars = long ? charCount(longText) : 0
+  const tooLong = chars > LONG_TEXT_MAX
 
   const trigger = caret === null ? null : channelQuery(value.slice(0, caret))
   const suggestions =
@@ -85,8 +90,12 @@ export function Composer({
 
   function submit() {
     if (!body || tooLong || disabled) return
-    const linked = encodeChannelLinks(body, picks.current.get(channelId) ?? new Map(), linkables.data ?? [])
-    onSend(linked.length <= MESSAGE_MAX ? linked : body)
+    if (long) {
+      onSend(longText)
+    } else {
+      const linked = encodeChannelLinks(body, picks.current.get(channelId) ?? new Map(), linkables.data ?? [])
+      onSend(linked.length <= MESSAGE_MAX ? linked : body)
+    }
     picks.current.delete(channelId)
     onStopTyping()
     set('')
@@ -210,11 +219,15 @@ export function Composer({
         </div>
       </div>
       <div className="mt-1 flex h-4 items-center justify-between px-1 font-mono text-[10.5px] text-muted-foreground">
-        <span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · # to link a channel</span>
-        {body.length > MESSAGE_MAX - 400 && (
-          <span className={cn('ml-auto', tooLong && 'text-destructive')}>
-            {body.length}/{MESSAGE_MAX}
+        {long ? (
+          <span className={cn('inline-flex items-center gap-1.5', tooLong && 'text-destructive')} aria-live="polite">
+            <FileText className="size-3" aria-hidden />
+            {tooLong
+              ? `${chars.toLocaleString('en-US')} characters · one message holds up to ${LONG_TEXT_MAX.toLocaleString('en-US')}`
+              : `Long message · ${formatCount(chars, 'character')} · sends whole, opens in a reader`}
           </span>
+        ) : (
+          <span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · # to link a channel</span>
         )}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Message } from '@/lib/types'
+import { packPreview, unpackPreview } from '@/lib/long-text'
 import {
   commitmentOf,
   contextOf,
@@ -15,11 +16,13 @@ import {
   newKeyPair,
   newRecoveryKey,
   openFromDevice,
+  openLongText,
   openMessage,
   openWithRecoveryKey,
   packKeyring,
   parseRecoveryKey,
   sealForDevice,
+  sealLongText,
   sealMessage,
   toBase64,
   unpackKeyring,
@@ -334,13 +337,37 @@ export class E2eeSession {
     return p
   }
 
-  async seal(channelId: string, messageId: string, peerId: string, text: string): Promise<Envelope> {
+  private async sendingKeys(channelId: string, messageId: string, peerId: string) {
     const me = this.vault.keys.find((k) => k.id === this.vault.activeId)
     if (this.status !== 'ready' || !me) throw new E2eeError('Unlock direct messages on this device to send this.')
     const peer = await this.peerKey(peerId)
     if (!peer) throw new E2eeError('They need to open Cabal once before you can message them.')
     const ctx = { channelId, messageId, authorId: this.userId, sk: me.id, rk: peer.id }
-    return sealMessage(await this.conversation(me, peer), ctx, text)
+    return { ctx, conversation: await this.conversation(me, peer) }
+  }
+
+  async seal(channelId: string, messageId: string, peerId: string, text: string): Promise<Envelope> {
+    const { ctx, conversation } = await this.sendingKeys(channelId, messageId, peerId)
+    return sealMessage(conversation, ctx, text)
+  }
+
+  /** A long message: its preview (with the length inside) and its full text, both under this message's key. */
+  async sealLong(channelId: string, messageId: string, peerId: string, text: string) {
+    const { ctx, conversation } = await this.sendingKeys(channelId, messageId, peerId)
+    const [preview, full] = await Promise.all([
+      sealMessage(conversation, ctx, packPreview(text)),
+      sealLongText(conversation, ctx, text),
+    ])
+    return { preview, full }
+  }
+
+  /** Opens the full text of a sealed long message. Throws if it can't be opened here. */
+  async openLong(m: Message, full: unknown): Promise<string> {
+    const env = m.sealed
+    if (!env || !isEnvelope(env) || !isEnvelope(full)) throw new E2eeError('This message can’t be opened on this device.')
+    const keys = await this.keysFor(m, env)
+    if (!keys) throw new E2eeError('This message can’t be opened on this device.')
+    return openLongText(await this.conversation(keys.own, keys.theirs), contextOf(m, env), full)
   }
 
   forgetPeer(peerId: string) {
@@ -366,6 +393,10 @@ export class E2eeSession {
       const keys = await this.keysFor(m, env)
       if (!keys) return { ...m, body: '', e2ee: this.status === 'ready' ? 'unreadable' : 'locked' }
       const body = await openMessage(await this.conversation(keys.own, keys.theirs), contextOf(m, env), env)
+      if (m.long_text) {
+        const p = unpackPreview(body)
+        return p ? { ...m, body: p.preview, long_chars: p.chars, e2ee: 'ok' } : { ...m, body: '', e2ee: 'unreadable' }
+      }
       return { ...m, body, e2ee: 'ok' }
     } catch {
       return { ...m, body: '', e2ee: 'unreadable' }

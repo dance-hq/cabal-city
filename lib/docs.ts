@@ -272,6 +272,15 @@ export const DATA_MODEL: Fact[] = [
     ],
   },
   {
+    label: 'Long messages',
+    value: 'messages.long_text · message_texts',
+    body: 'Anything too big to read inline is sent whole, exactly as typed. The message row keeps a short preview, so conversation lists and Realtime stay light; the full text lives in `message_texts` and is fetched only when someone opens it. `send_long_message()` writes both in one transaction, and a deferred trigger refuses a long message without its text.',
+    sources: [
+      { path: 'supabase/migrations/0019_long_messages.sql', proves: ['create table public.message_texts', 'create constraint trigger messages_long_text_present'] },
+      { path: 'lib/long-text.ts', proves: ['export function isLong'] },
+    ],
+  },
+  {
     label: 'Teams',
     value: 'teams · team_members · team_invites',
     body: 'Public or invite-only, each with its own channel and an optional pinned welcome note.',
@@ -514,9 +523,15 @@ export const PRIMITIVES: Fact[] = [
   },
   {
     label: 'Padding',
-    value: '64-byte buckets',
-    body: 'A 4-byte length prefix, then zeros up to the next multiple of 64 bytes, so “ok” and a full sentence look the same size.',
-    sources: [{ path: E2EE, proves: ['/ 64) * 64'] }],
+    value: '64-byte buckets · 4 KB for long text',
+    body: 'A 4-byte length prefix, then zeros up to the next multiple of 64 bytes, so “ok” and a full sentence look the same size. The full text of a long message is padded in 4 KB steps.',
+    sources: [{ path: E2EE, proves: ['function pad(text: string, step = 64)', 'pad(text, 4096)'] }],
+  },
+  {
+    label: 'Long messages',
+    value: 'preview + full text',
+    body: 'The message carries a sealed preview with the length inside it, so the server never learns the length. The full text is sealed separately under the same per-message key with its own label (`cabal-dm-long-v1`), so the two can’t be swapped.',
+    sources: [{ path: E2EE, proves: ["'cabal-dm-long-v1'"] }, { path: 'lib/long-text.ts', proves: ['export function packPreview'] }],
   },
   {
     label: 'Envelope',
