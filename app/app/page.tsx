@@ -5,7 +5,7 @@ import { getCommunity } from '@/lib/community'
 import { createClient } from '@/lib/supabase/server'
 import type { Profile, Settings } from '@/lib/types'
 
-export const metadata: Metadata = { title: 'Cabal' }
+export const metadata: Metadata = { title: { absolute: 'Cabal' } }
 
 export default async function AppPage() {
   const supabase = await createClient()
