@@ -210,7 +210,7 @@
       function showSince() {
         $('since').textContent = startedAt === null
           ? 'Locked in'
-          : `Since ${new Date(startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+          : `Since ${new Date(startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
       }
 
       // --- small DOM helpers ----------------------------------------------------------

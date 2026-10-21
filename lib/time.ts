@@ -1,9 +1,13 @@
+// Times are always 12-hour ("3:57 PM") in the viewer's own time zone, whatever their locale.
+
 export function clock(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
-export function clock24(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+// "3:57" without AM/PM, for the narrow hover spot beside grouped messages.
+export function shortClock(iso: string) {
+  const d = new Date(iso)
+  return `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 export function dayKey(iso: string) {
@@ -27,7 +31,7 @@ export function dayLabel(iso: string, now = new Date()) {
 }
 
 export function fullTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', hour12: true })
 }
 
 // "now", "5m", "3h", "2d", then a date: how long ago something happened, compactly.
