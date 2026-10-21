@@ -58,7 +58,24 @@ export async function POST(request: NextRequest) {
     .eq('slug', config.communitySlug)
     .maybeSingle()
 
-  const created = await admin.auth.admin.createUser({ email, email_confirm: true })
+  let created = await admin.auth.admin.createUser({ email, email_confirm: true })
+  if (created.error?.code === 'email_exists') {
+    // Cabal confirms every account it creates (email_confirm above). An account that exists but was
+    // never confirmed wasn't finished here: a direct Supabase sign-up, a dashboard invite, or an
+    // interrupted request. It may hold a password someone else chose, so remove it and give this
+    // person a fresh account, like anyone new.
+    const existing = await admin.auth.admin.generateLink({ type: 'magiclink', email })
+    const outside = existing.data?.user && !existing.data.user.email_confirmed_at ? existing.data.user : null
+    if (outside) {
+      const removed = await admin.auth.admin.deleteUser(outside.id)
+      if (removed.error) {
+        console.error('[cabal] removing an unconfirmed account failed', outside.id, removed.error.message)
+        return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
+      }
+      console.warn('[cabal] replaced an unconfirmed account before sending a code', outside.id)
+      created = await admin.auth.admin.createUser({ email, email_confirm: true })
+    }
+  }
   const isNew = !created.error
   if (created.error && created.error.code !== 'email_exists') {
     console.error('[cabal] createUser failed', created.error.message)
@@ -76,6 +93,13 @@ export async function POST(request: NextRequest) {
   const code = link.data?.properties?.email_otp
   if (link.error || !code) {
     console.error('[cabal] generateLink failed', link.error?.message)
+    return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
+  }
+  // Never email a code for an account Cabal didn't confirm: another sign-up got in between the calls
+  // above, or the account vanished and the magic link just signed the email up, unconfirmed. Remove it.
+  if (!link.data.user?.email_confirmed_at) {
+    if (link.data.user?.id) await admin.auth.admin.deleteUser(link.data.user.id)
+    console.error('[cabal] refused a code for an unconfirmed account', link.data.user?.id)
     return NextResponse.json({ error: 'Something went wrong. Try again.' }, { status: 500 })
   }
 
