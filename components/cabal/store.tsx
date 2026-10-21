@@ -11,6 +11,7 @@ import { desktop } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
 import { playChime, showNotification } from '@/lib/notify'
 import { foldPresence, type UserPresence } from '@/lib/presence'
+import { listenForPopouts, viewedInPopout } from '@/lib/popout'
 import { mentions, plainText } from '@/lib/text'
 import { charCount, isLong, previewOf, titleOf } from '@/lib/long-text'
 import { linkLabel } from '@/lib/channel-links'
@@ -108,7 +109,9 @@ function insertInOrder(list: Message[], m: Message): Message[] {
   return [...list.slice(0, i), m, ...list.slice(i)]
 }
 
-export function CabalProvider({ boot, children }: { boot: Boot; children: React.ReactNode }) {
+// `popout` is a desktop chat window showing one conversation. The main window
+// keeps presence, notifications, the badge and "reopen where you were".
+export function CabalProvider({ boot, popout = false, children }: { boot: Boot; popout?: boolean; children: React.ReactNode }) {
   const supabase = createClient()
   const router = useRouter()
   const { mutate } = useSWRConfig()
@@ -195,6 +198,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   const open = useCallback(
     (id: string | null) => {
       setActive(id)
+      if (popout) return
       const url = new URL(window.location.href)
       url.searchParams.delete('welcome')
       if (id) url.searchParams.set('c', id)
@@ -205,11 +209,12 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         else localStorage.removeItem(lastOpenKey)
       } catch {}
     },
-    [lastOpenKey],
+    [lastOpenKey, popout],
   )
 
   const restored = useRef<string | null>(null)
   useEffect(() => {
+    if (popout) return
     let c = new URLSearchParams(window.location.search).get('c')
     if (!c) {
       try {
@@ -218,7 +223,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       restored.current = c
     }
     if (c) setActive(c)
-  }, [lastOpenKey])
+  }, [lastOpenKey, popout])
 
   // A remembered conversation you've since left (or that was deleted) falls back to home.
   useEffect(() => {
@@ -402,7 +407,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
 
   const paused = useRef(false)
   heartbeat.current = async () => {
-    if (paused.current) return
+    if (paused.current || popout) return
     const { error } = await supabase.rpc('presence_heartbeat', {
       p_session: sessionId.current,
       p_community: community.id,
@@ -456,6 +461,8 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
   }, [])
 
   useEffect(() => {
+    // Closing a chat window must not mark you offline; the main window owns presence.
+    if (popout) return
     window.addEventListener('pagehide', leave)
     const d = desktop()
     const offPower = d?.onPower((state) => {
@@ -475,7 +482,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       offPower?.()
       offQuit?.()
     }
-  }, [leave, mutate, loadPresence])
+  }, [leave, mutate, loadPresence, popout])
 
   // --- realtime ---------------------------------------------------------------
 
@@ -506,6 +513,10 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
       const viewing = onScreen && live.current.visible
       if (onScreen) {
         markRead(m.channel_id)
+      } else if (popout || viewedInPopout(m.channel_id)) {
+        // A chat window is showing it (and marks it read), or this is a chat
+        // window and the main window keeps everything else.
+        return
       } else if (!counted) {
         mutate(
           ['channels', community.id],
@@ -517,7 +528,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         )
       }
 
-      if (m.kind !== 'user' || viewing || channel.muted) return
+      if (m.kind !== 'user' || viewing || channel.muted || popout) return
       const s = live.current.settings
       if (s.availability === 'dnd') return
       const author = live.current.profiles.get(m.author_id ?? '')
@@ -540,7 +551,7 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         if (s.notify_sound) playChime()
       }
     },
-    [mutate, mutateChannels, refreshMembers, userId, markRead, community.id, open, e2ee],
+    [mutate, mutateChannels, refreshMembers, userId, markRead, community.id, open, e2ee, popout],
   )
 
   // Realtime callbacks read the latest handlers through a ref, so the socket
@@ -681,11 +692,16 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
 
   const unreadDms = channels.filter((c) => c.kind !== 'room' && !c.muted).reduce((n, c) => n + c.unread, 0)
   useEffect(() => {
+    if (popout) return
     desktop()?.setBadge(unreadDms)
     document.title = unreadDms > 0 ? `(${unreadDms}) Cabal` : 'Cabal'
-  }, [unreadDms])
+  }, [unreadDms, popout])
 
   useEffect(() => desktop()?.onNavigate((target) => open(target)), [open])
+
+  useEffect(() => {
+    if (!popout) listenForPopouts()
+  }, [popout])
 
   // --- value ------------------------------------------------------------------
 

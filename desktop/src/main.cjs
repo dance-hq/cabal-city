@@ -178,6 +178,7 @@ function createWindow() {
     win = null
     // Otherwise the corner timer alone would keep the app from quitting.
     overlay?.destroy()
+    for (const chat of chats.values()) if (!chat.isDestroyed()) chat.destroy()
   })
   win.on('focus', () => {
     win?.flashFrame(false)
@@ -373,6 +374,7 @@ function updateOverlay() {
 // Other apps can claim "always on top" after us (Windows hands it to whoever asked last, and
 // hiding/showing can drop it), so the corner re-asserts it now and then. Never takes focus.
 function keepOverlayOnTop() {
+  keepChatsOnTop()
   if (!overlay || overlay.isDestroyed() || !overlay.isVisible() || drag) return
   overlay.setAlwaysOnTop(true, OVERLAY_LEVEL)
   overlay.moveTop()
@@ -528,10 +530,155 @@ ipcMain.on('cabal:overlay-action', (event, raw) => {
   if (!fromOverlay(event)) return
   const action = rules.overlayAction(raw)
   if (!action) return
+  // Talk right there in a small window instead of pulling the whole Cabal window forward.
+  if (action.type === 'open-dm') return openChat(action.userId)
   if (!win || !rules.isAppUrl(win.webContents.getURL(), ORIGINS)) return action.type === 'pause-session' ? undefined : showWindow()
   if (action.type === 'open-dm') showWindow()
   win.webContents.send('cabal:buddy-action', action)
 })
+
+// --- chat windows ------------------------------------------------------------------
+// Clicking someone in the corner list opens a small chat with them that floats
+// with the corner. It's the Cabal web app's own chat page in the same browser
+// session, so sign-in and encryption keys are the ones the main window uses.
+
+const CHAT_PRELOAD = path.join(__dirname, 'chat-preload.cjs')
+const CHAT_SIZE = { width: 340, height: 480 }
+const MAX_CHATS = 3
+const chats = new Map()
+
+const chatUrl = (userId) => `${APP_URL}/app/chat/${encodeURIComponent(userId)}`
+
+function isChatUrl(url) {
+  if (!rules.isAppUrl(url, ORIGINS)) return false
+  try {
+    return new URL(url).pathname.startsWith('/app/chat/')
+  } catch {
+    return false
+  }
+}
+
+function openInMainWindow(userId) {
+  showWindow()
+  if (win && rules.isAppUrl(win.webContents.getURL(), ORIGINS)) {
+    win.webContents.send('cabal:buddy-action', { type: 'open-dm', userId })
+  }
+}
+
+// Beside the corner, on the side with room, each new chat stepped a little so they don't stack exactly.
+function chatBounds(index) {
+  const point = screen.getCursorScreenPoint()
+  const anchor =
+    overlay && !overlay.isDestroyed() && overlay.isVisible() ? overlay.getBounds() : { ...point, width: 0, height: 0 }
+  const area = areaAround(anchor)
+  const step = 28 * index
+  const gap = 8
+  const onRight = anchor.x + anchor.width / 2 > area.x + area.width / 2
+  const onBottom = anchor.y + anchor.height / 2 > area.y + area.height / 2
+  const x = onRight ? anchor.x - gap - CHAT_SIZE.width - step : anchor.x + anchor.width + gap + step
+  const y = onBottom ? anchor.y + anchor.height - CHAT_SIZE.height - step : anchor.y + step
+  return {
+    x: Math.round(clamp(x, area.x, area.x + area.width - CHAT_SIZE.width)),
+    y: Math.round(clamp(y, area.y, area.y + area.height - CHAT_SIZE.height)),
+    ...CHAT_SIZE,
+  }
+}
+
+function keepChatsOnTop() {
+  for (const chat of chats.values()) {
+    if (!chat.isDestroyed() && chat.isVisible()) chat.setAlwaysOnTop(true, OVERLAY_LEVEL)
+  }
+}
+
+function openChat(userId) {
+  const existing = chats.get(userId)
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore()
+    existing.show()
+    existing.focus()
+    return
+  }
+  if (chats.size >= MAX_CHATS) chats.values().next().value?.close()
+
+  const chat = new BrowserWindow({
+    ...chatBounds(chats.size),
+    minWidth: 280,
+    minHeight: 320,
+    show: false,
+    frame: false,
+    title: 'Cabal',
+    backgroundColor: '#16161a',
+    alwaysOnTop: true,
+    fullscreenable: false,
+    maximizable: false,
+    icon: path.join(BUILD, 'icon.png'),
+    webPreferences: {
+      preload: CHAT_PRELOAD,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true,
+    },
+  })
+  chats.set(userId, chat)
+  // Same rule as the corner: the level goes on after the all-desktops call, which resets it on macOS.
+  chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
+  chat.setAlwaysOnTop(true, OVERLAY_LEVEL)
+  chat.once('ready-to-show', () => {
+    chat.show()
+    chat.focus()
+  })
+  chat.on('closed', () => {
+    if (chats.get(userId) === chat) chats.delete(userId)
+  })
+
+  // If the chat page can't open here (offline, signed out, or a web app from
+  // before chat windows), fall back to the conversation in the main window.
+  let gaveUp = false
+  const giveUp = () => {
+    if (gaveUp || chat.isDestroyed()) return
+    gaveUp = true
+    chat.destroy()
+    openInMainWindow(userId)
+  }
+
+  const contents = chat.webContents
+  contents.setWindowOpenHandler(({ url }) => {
+    if (rules.canOpenExternally(url)) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  contents.on('will-navigate', (event, url) => {
+    if (rules.isAppUrl(url, ORIGINS)) return
+    event.preventDefault()
+    if (rules.canOpenExternally(url)) shell.openExternal(url)
+  })
+  contents.on('will-attach-webview', (event) => event.preventDefault())
+  contents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
+    if (isMainFrame && code !== -3) giveUp()
+  })
+  contents.on('did-navigate', (_event, url, status) => {
+    if (status >= 400 || !isChatUrl(url)) giveUp()
+  })
+
+  chat.loadURL(chatUrl(userId))
+}
+
+function chatOf(event) {
+  if (!rules.isAppUrl(event.senderFrame?.url ?? '', ORIGINS)) return null
+  for (const [userId, chat] of chats) {
+    if (!chat.isDestroyed() && chat.webContents === event.sender) return { userId, chat }
+  }
+  return null
+}
+
+ipcMain.on('cabal:chat-close', (event) => chatOf(event)?.chat.close())
+ipcMain.on('cabal:chat-open-in-cabal', (event) => {
+  const found = chatOf(event)
+  if (!found) return
+  found.chat.close()
+  openInMainWindow(found.userId)
+})
+
 // --- pinning to the taskbar / Dock -----------------------------------------------
 
 let pinState = rules.normalizePinState(readJson('pin.json'))

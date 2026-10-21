@@ -29,21 +29,24 @@ import type { Channel } from '@/lib/types'
 // Whether the docked members panel is shown; kept across conversations.
 let panelDockedOpen = true
 
-export function Conversation({ compact }: { compact?: boolean }) {
+// `popoutActions` turns this into a desktop chat window: no back button, no
+// lock-in or profile controls (the main window has those), just these actions.
+export function Conversation({ compact, popoutActions }: { compact?: boolean; popoutActions?: React.ReactNode }) {
   const { active, channels, channelsLoading, open } = useCabal()
   const channel = channels.find((c) => c.id === active)
 
   if (!channel) {
     return (
       <div className="flex flex-1 flex-col">
-        <Header compact={compact} onBack={() => open(null)}>
-          <span className="text-sm text-muted-foreground">{channelsLoading ? 'Loading…' : ''}</span>
+        <Header compact={compact && !popoutActions} onBack={() => open(null)}>
+          <span className="text-sm text-muted-foreground">{channelsLoading || !active ? 'Loading…' : ''}</span>
+          {popoutActions && <div className="ml-auto flex shrink-0 items-center gap-0.5">{popoutActions}</div>}
         </Header>
         {!channelsLoading && active && <Unavailable channelId={active} />}
       </div>
     )
   }
-  return <OpenConversation key={channel.id} channel={channel} compact={compact} />
+  return <OpenConversation key={channel.id} channel={channel} compact={compact} popoutActions={popoutActions} />
 }
 
 // Someone sent you a link to a team you're not on yet: offer to join it
@@ -88,7 +91,16 @@ function Unavailable({ channelId }: { channelId: string }) {
   )
 }
 
-function OpenConversation({ channel, compact }: { channel: Channel; compact?: boolean }) {
+function OpenConversation({
+  channel,
+  compact,
+  popoutActions,
+}: {
+  channel: Channel
+  compact?: boolean
+  popoutActions?: React.ReactNode
+}) {
+  const popout = !!popoutActions
   const { userId, community, profileById, statusOf, send, markRead, open, showProfile, refreshChannels, blocked } = useCabal()
   const lockIns = useLockIns(community.id)
   const { messages, error, isLoading, retry, loadOlder, hasMore, loadingOlder } = useMessages(channel.id)
@@ -169,12 +181,13 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   return (
     <div className="relative flex min-h-0 flex-1 bg-background">
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header compact={compact} onBack={() => open(null)}>
+        <Header compact={compact && !popout} onBack={() => open(null)}>
           {channel.kind === 'dm' && (
             <button
               type="button"
-              onClick={() => other && showProfile(other.id)}
-              className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-0.5 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => other && !popout && showProfile(other.id)}
+              disabled={popout}
+              className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-0.5 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:hover:bg-transparent"
             >
               <Avatar
                 name={other?.display_name ?? '?'}
@@ -245,13 +258,19 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
                 <span className="font-mono text-[11px]">{people.online.length}</span>
               </IconButton>
             )}
-            {channel.kind === 'dm' && other && (
-              <IconButton label={`${other.display_name}'s profile`} onClick={() => showProfile(other.id)}>
-                <MoreHorizontal className="size-4" aria-hidden />
-              </IconButton>
+            {popout ? (
+              popoutActions
+            ) : (
+              <>
+                {channel.kind === 'dm' && other && (
+                  <IconButton label={`${other.display_name}'s profile`} onClick={() => showProfile(other.id)}>
+                    <MoreHorizontal className="size-4" aria-hidden />
+                  </IconButton>
+                )}
+                <span className="mx-1.5 h-4 w-px bg-border" aria-hidden />
+                <LockInControl />
+              </>
             )}
-            <span className="mx-1.5 h-4 w-px bg-border" aria-hidden />
-            <LockInControl />
           </div>
         </Header>
 
