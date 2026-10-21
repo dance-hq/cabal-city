@@ -43,6 +43,7 @@ export type TeamRoom = {
   joined: boolean
   last_message_at: string | null
   created_at: string
+  welcome: string | null
 }
 
 export type Channel = {

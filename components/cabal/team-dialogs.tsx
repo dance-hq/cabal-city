@@ -154,6 +154,11 @@ export function BrowseTeamsDialog({
                 <TeamIcon visibility={r.visibility} className="size-4 shrink-0 text-muted-foreground" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium">{r.name}</span>
+                  {r.welcome && (
+                    <span className="line-clamp-2 text-xs leading-relaxed text-pretty text-foreground/80">
+                      {r.welcome.replace(/\s+/g, ' ')}
+                    </span>
+                  )}
                   <span className="truncate text-xs text-muted-foreground">
                     {r.member_count} {r.member_count === 1 ? 'member' : 'members'} · {activeLabel(r.last_message_at)}
                     {r.visibility === 'private' && ' · invite-only'}
@@ -273,10 +278,12 @@ export function TeamManageDialog({
   open,
   onOpenChange,
   channel,
+  onEditWelcome,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   channel: Channel
+  onEditWelcome?: () => void
 }) {
   const { community, userId, members, profileById, refreshChannels, open: openChannel } = useCabal()
   const teamId = channel.team_id!
@@ -376,6 +383,21 @@ export function TeamManageDialog({
               </Button>
             </div>
           </form>
+        )}
+
+        {isOwner && onEditWelcome && (
+          <div className="flex items-start justify-between gap-4 rounded-md border px-3 py-2.5">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">Welcome note</span>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Pinned at the top of the team and shown in the Teams list. Say what you&apos;re building and how people
+                can help.
+              </p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={onEditWelcome}>
+              Edit
+            </Button>
+          </div>
         )}
 
         {isOwner && (

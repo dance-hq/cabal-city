@@ -11,6 +11,7 @@ import { PeoplePanel, usePeopleIn } from './people-panel'
 import { LockInControl } from './session-bar'
 import { STATUS_LABEL } from './status-dot'
 import { TeamIcon, TeamManageDialog } from './team-dialogs'
+import { TeamWelcome } from './team-welcome'
 import { useCabal } from './store'
 import { useMessages } from '@/hooks/use-messages'
 import { useTyping } from '@/hooks/use-typing'
@@ -62,6 +63,7 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
   const [dockedOpen, setDockedOpen] = useState(panelDockedOpen)
   const [floatingOpen, setFloatingOpen] = useState(false)
   const [managing, setManaging] = useState(false)
+  const [editingWelcome, setEditingWelcome] = useState(false)
   const hasPanel = channel.kind !== 'dm'
   const panelOpen = hasPanel && (docked ? dockedOpen : floatingOpen)
 
@@ -192,6 +194,15 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
           </div>
         </Header>
 
+        {channel.kind === 'team' && channel.team_id && (
+          <TeamWelcome
+            channel={channel}
+            notice={lastNotice}
+            editing={editingWelcome}
+            onEditingChange={setEditingWelcome}
+          />
+        )}
+
         <MessageList
           channel={channel}
           messages={messages}
@@ -238,7 +249,15 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
       {panelOpen && <PeoplePanel channel={channel} {...people} onClose={docked ? undefined : () => setFloatingOpen(false)} />}
 
       {channel.kind === 'team' && channel.team_id && (
-        <TeamManageDialog open={managing} onOpenChange={setManaging} channel={channel} />
+        <TeamManageDialog
+          open={managing}
+          onOpenChange={setManaging}
+          channel={channel}
+          onEditWelcome={() => {
+            setManaging(false)
+            setEditingWelcome(true)
+          }}
+        />
       )}
     </div>
   )
