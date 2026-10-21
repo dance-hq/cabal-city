@@ -2,7 +2,7 @@
   "name": "cabal-desktop",
   "productName": "Cabal",
   "version": "0.1.0",
-  "description": "A buddy list and chat rooms for your local builder community.",
+  "description": "Messages, rooms and who's online for your local builder community.",
   "license": "MIT",
   "author": "Cabal contributors",
   "main": "src/main.cjs",

@@ -36,7 +36,7 @@ export function Conversation({ compact }: { compact?: boolean }) {
               onClick={() => open(null)}
               className="rounded text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Back to your buddy list
+              Back to everyone
             </button>
           </div>
         )}
@@ -282,7 +282,7 @@ function Header({ children, compact, onBack }: { children: React.ReactNode; comp
   return (
     <header className="app-drag flex h-11 shrink-0 items-center gap-1 border-b pr-2 pl-2">
       {compact && (
-        <IconButton label="Back to buddy list" onClick={onBack}>
+        <IconButton label="Back to everyone" onClick={onBack}>
           <ArrowLeft className="size-4" aria-hidden />
         </IconButton>
       )}

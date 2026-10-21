@@ -315,7 +315,7 @@ function AppSettings() {
           <Toggle
             id="d-top"
             label="Keep the window on top"
-            hint="Off by default. Handy for a small buddy list at the edge of your screen."
+            hint="Off by default. Handy for keeping who's online at the edge of your screen."
             checked={desk.alwaysOnTop}
             onChange={(v) => patch({ alwaysOnTop: v })}
           />
