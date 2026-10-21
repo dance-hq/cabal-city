@@ -157,12 +157,21 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
       running_since: tenMinutesAgo,
       last_beat: tenMinutesAgo,
     })
+    // Coming back picks it up on its own; the quiet stretch isn't counted.
     const quiet = await grace.db.rpc('my_lock_in')
-    expect(quiet.data?.paused_at).toBeTruthy()
+    expect(quiet.data?.paused_at).toBeNull()
     expect(quiet.data?.worked_seconds).toBe(60)
+    expect(quiet.data?.away_seconds).toBeGreaterThanOrEqual(530)
+
+    // A pause you press yourself waits for you to Resume.
+    await grace.db.rpc('pause_lock_in')
+    const mine = await grace.db.rpc('my_lock_in')
+    expect(mine.data?.paused_by).toBe('you')
+
+    // Over 3 hours paused, it closes itself.
     await admin
       .from('work_sessions')
-      .update({ paused_at: new Date(Date.now() - 13 * 3600_000).toISOString() })
+      .update({ paused_at: new Date(Date.now() - 4 * 3600_000).toISOString() })
       .eq('user_id', grace.id)
       .is('ended_at', null)
     const stale = await grace.db.rpc('my_lock_in')

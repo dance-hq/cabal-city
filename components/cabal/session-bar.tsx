@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { Pause, Play, Target } from 'lucide-react'
+import { Pause, Play, Target, X } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import { describeSession, FOCUS_MAX, formatSession } from '@/lib/session'
+import { describeSession, FOCUS_MAX, formatSession, shortDuration } from '@/lib/session'
 import { useCabal } from './store'
 import { useElapsed, useWorkSession } from './work-session'
 
@@ -51,7 +51,7 @@ export function SessionBar() {
 }
 
 function Running({ onEdit }: { onEdit: () => void }) {
-  const { startedAt, focus, shared, pause, end } = useWorkSession()
+  const { startedAt, focus, shared, awayMs, dismissAway, pause, end } = useWorkSession()
   const elapsed = useElapsed(startedAt)
   const busy = useBusy()
   return (
@@ -76,27 +76,44 @@ function Running({ onEdit }: { onEdit: () => void }) {
         </TextAction>
       </div>
       <FocusLine focus={focus} shared={shared} onEdit={onEdit} />
+      {awayMs !== null && (
+        <p role="status" className="flex min-w-0 items-center gap-1 pl-[17px] text-[11.5px] leading-relaxed text-muted-foreground">
+          <span className="truncate">Picked up after {shortDuration(awayMs)} away · not counted</span>
+          <button
+            type="button"
+            onClick={dismissAway}
+            aria-label="Dismiss"
+            className="flex size-4 shrink-0 items-center justify-center rounded hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="size-3" aria-hidden />
+          </button>
+        </p>
+      )}
     </div>
   )
 }
 
 function Paused({ onEdit }: { onEdit: () => void }) {
-  const { workedMs, focus, shared, resume, end } = useWorkSession()
+  const { workedMs, focus, shared, pausedBy, resume, end } = useWorkSession()
   const busy = useBusy()
+  // 'away' only shows for a moment while Cabal checks back in and picks it up.
+  const waking = pausedBy === 'away'
   return (
     <div className="flex flex-col gap-0.5 rounded-md border border-dashed py-1.5 pr-1 pl-2.5">
       <div className="flex items-center gap-2.5">
         <span className="size-[7px] shrink-0 rounded-full border border-muted-foreground" aria-hidden />
         <p className="flex min-w-0 flex-1 items-baseline gap-2 text-xs text-muted-foreground">
-          <span>Paused at</span>
+          <span>{waking ? 'Picking back up' : 'Paused at'}</span>
           <span className="font-mono tabular-nums" aria-label={describeSession(workedMs)}>
             {formatSession(workedMs)}
           </span>
         </p>
-        <TextAction disabled={busy.on} onClick={() => busy.run(resume)} strong>
-          <Play className="size-3" aria-hidden />
-          Resume
-        </TextAction>
+        {!waking && (
+          <TextAction disabled={busy.on} onClick={() => busy.run(resume)} strong>
+            <Play className="size-3" aria-hidden />
+            Resume
+          </TextAction>
+        )}
         <TextAction disabled={busy.on} onClick={() => busy.run(end)}>
           End
         </TextAction>
