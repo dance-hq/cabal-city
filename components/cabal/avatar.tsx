@@ -22,7 +22,7 @@ export function Avatar({
   url?: string | null
   size?: number
   status?: ShownStatus
-  // Draws the live current around the avatar (see .locked-in in globals.css).
+  // Draws the gold ring around the avatar (see .locked-in in globals.css).
   lockedIn?: boolean
   className?: string
 }) {

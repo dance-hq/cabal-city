@@ -590,7 +590,7 @@ function PersonRow({
           </span>
           {sub && (
             <span className={cn('flex min-w-0 items-center gap-1 text-[11.5px] leading-tight text-muted-foreground', status === 'offline' && 'opacity-70')}>
-              {lockedIn && <span className="size-1.5 shrink-0 rounded-full bg-flag" aria-hidden />}
+              {lockedIn && <span className="size-1.5 shrink-0 rounded-full bg-gold" aria-hidden />}
               <span className="truncate">{sub}</span>
             </span>
           )}
