@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, Hammer, MessageSquare, Plus } from 'lucide-react'
+import { ArrowUpRight, Bug, Hammer, MessageSquare, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { githubUrl } from '@/lib/config'
 import { ago } from '@/lib/time'
@@ -12,6 +12,7 @@ import { PageHeader, Segmented } from './page-header'
 import { IdeaDetail } from './idea-detail'
 import { ShipDialog } from './ship-dialog'
 import { SuggestDialog } from './suggest-dialog'
+import { FeedbackDialog } from './feedback-dialog'
 import { useCabal } from './store'
 
 // The old feedback box hands ideas over to the board, text and all.
@@ -29,6 +30,7 @@ export function BuildCabal({ compact }: { compact?: boolean }) {
   const [tab, setTab] = useState<BoardTab>('popular')
   const [openIdea, setOpenIdea] = useState<string | null>(null)
   const [suggesting, setSuggesting] = useState<Draft | null>(null)
+  const [reporting, setReporting] = useState(false)
 
   useEffect(() => {
     const take = () => {
@@ -53,6 +55,15 @@ export function BuildCabal({ compact }: { compact?: boolean }) {
         onBack={() => (openIdea ? setOpenIdea(null) : open(null))}
         backLabel={openIdea ? 'All ideas' : 'Back to everyone'}
       >
+        <button
+          type="button"
+          onClick={() => setReporting(true)}
+          className="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Bug className="size-3.5" aria-hidden />
+          <span className="hidden sm:inline">Report a bug</span>
+          <span className="sr-only sm:hidden">Report a bug</span>
+        </button>
         <button
           type="button"
           onClick={() => setSuggesting({ title: '', body: '' })}
@@ -128,6 +139,7 @@ export function BuildCabal({ compact }: { compact?: boolean }) {
         </div>
       </div>
 
+      <FeedbackDialog open={reporting} onOpenChange={setReporting} />
       <SuggestDialog
         draft={suggesting}
         onClose={() => setSuggesting(null)}

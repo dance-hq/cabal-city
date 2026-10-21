@@ -10,7 +10,6 @@ import {
   Hash,
   Link2,
   Lock,
-  MessageSquareWarning,
   Plus,
   Radar,
   Search,
@@ -25,7 +24,6 @@ import { SessionBar } from './session-bar'
 import { ConnectionBanner } from './connection-banner'
 import { WelcomeCard } from './welcome-card'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
-import { FeedbackDialog } from './feedback-dialog'
 import { VIEWS, useCabal } from './store'
 import { compareByPresence } from '@/lib/presence'
 import { createClient } from '@/lib/supabase/client'
@@ -92,7 +90,6 @@ export function BuddyList({ compact }: { compact?: boolean }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const [creatingTeam, setCreatingTeam] = useState(false)
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [browsingTeams, setBrowsingTeams] = useState(false)
   const [naming, setNaming] = useState<Naming | null>(null)
   const buddyGroups = useBuddyGroups()
@@ -233,15 +230,6 @@ export function BuddyList({ compact }: { compact?: boolean }) {
               <Search className="size-4" aria-hidden />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setFeedbackOpen(true)}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Report a bug or suggest something"
-            title="Report a bug or suggest something"
-          >
-            <MessageSquareWarning className="size-4" aria-hidden />
-          </button>
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
@@ -481,7 +469,6 @@ export function BuddyList({ compact }: { compact?: boolean }) {
       </div>
 
       <CreateTeamDialog open={creatingTeam} onOpenChange={setCreatingTeam} />
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
       <BrowseTeamsDialog open={browsingTeams} onOpenChange={setBrowsingTeams} onCreate={() => setCreatingTeam(true)} />
       <GroupNameDialog naming={naming} onClose={() => setNaming(null)} onSubmit={saveName} />
     </div>
