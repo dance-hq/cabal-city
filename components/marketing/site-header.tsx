@@ -10,6 +10,9 @@ export function SiteHeader() {
         <CabalWordmark className="h-7" />
       </Link>
       <nav aria-label="Site" className="flex items-center gap-5 text-sm text-muted-foreground">
+        <Link href="/how-it-works" className="hidden hover:text-foreground md:inline">
+          How it works
+        </Link>
         {/* A plain anchor: next/link ignores a click when the URL already ends in #download. */}
         <a href="/#download" className="hidden hover:text-foreground sm:inline">
           Download

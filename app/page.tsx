@@ -105,17 +105,25 @@ export default async function Home() {
                   Built in the open.
                 </h2>
                 <p className="leading-relaxed text-muted-foreground text-pretty">
-                  Cabal is open source and MIT licensed. Read the code, suggest a change, or help shape what it
-                  becomes.
+                  Cabal is open source and MIT licensed. See how it works in plain words, read the code, suggest a
+                  change, or help shape what it becomes.
                 </p>
               </div>
-              <a
-                href={githubUrl}
-                className="inline-flex h-11 shrink-0 items-center gap-2 self-start rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring md:self-auto"
-              >
-                <GithubIcon className="size-4" aria-hidden />
-                View on GitHub
-              </a>
+              <div className="flex shrink-0 flex-wrap gap-3 self-start md:self-auto">
+                <Link
+                  href="/how-it-works"
+                  className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  How Cabal works
+                </Link>
+                <a
+                  href={githubUrl}
+                  className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <GithubIcon className="size-4" aria-hidden />
+                  View on GitHub
+                </a>
+              </div>
             </section>
           )}
         </div>

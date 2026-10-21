@@ -4,6 +4,7 @@ import { githubUrl } from '@/lib/config'
 import { ChicagoStar } from './star'
 
 const LINKS = [
+  { href: '/how-it-works', label: 'How it works' },
   { href: '/privacy', label: 'Privacy' },
   { href: '/terms', label: 'Terms' },
   { href: '/guidelines', label: 'Community guidelines' },
@@ -20,7 +21,7 @@ export function SiteFooter() {
           </p>
           <p className="font-mono text-xs">Made in Chicago · MIT licensed · No ads, no tracking</p>
         </div>
-        <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2">
+        <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
           {LINKS.map((l) => (
             <Link key={l.href} href={l.href} className="hover:text-foreground">
               {l.label}

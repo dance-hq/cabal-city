@@ -23,6 +23,8 @@ Join it at **[www.cabal.city](https://www.cabal.city)**, or get the [desktop app
 
 Every rule about who can read or post what lives in Postgres (`supabase/migrations`). The browser only ever uses the public anon key, so a modified client can't read a team it isn't on or a DM it isn't in. See [docs/architecture.md](./docs/architecture.md).
 
+The plain-language version for members, with a link to the code behind every claim, is [cabal.city/how-it-works](https://www.cabal.city/how-it-works). Its text lives in `lib/how-it-works.ts`, and `tests/unit/how-it-works.test.ts` fails when the code it describes changes, so update both together.
+
 ## Run it
 
 You need Node 24, pnpm, and a Supabase project.
