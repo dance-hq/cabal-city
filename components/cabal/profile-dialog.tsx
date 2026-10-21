@@ -108,7 +108,7 @@ export function ProfileDialog() {
                           refreshBlocks()
                           refreshChannels()
                           toast.message(isBlocked ? `Unblocked ${profile.display_name}` : `Blocked ${profile.display_name}`, {
-                            description: isBlocked ? undefined : "They can't message you, and their room messages are hidden for you.",
+                            description: isBlocked ? undefined : "They can't message you, and their channel messages are hidden for you.",
                           })
                         }
                       }}

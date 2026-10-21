@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Bell, BellOff, Hash, MoreHorizontal, Users } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, Hash, MoreHorizontal, Settings2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
@@ -155,11 +155,16 @@ function OpenConversation({ channel, compact }: { channel: Channel; compact?: bo
                 <span className="font-mono text-[11px]">{here.length}</span>
               </IconButton>
             )}
-            {channel.kind === 'team' && (
-              <IconButton label="Team members" onClick={() => setManaging(true)}>
-                <Users className="size-4" aria-hidden />
-              </IconButton>
-            )}
+            {channel.kind === 'team' &&
+              (channel.team_role === 'owner' ? (
+                <IconButton label="Team settings" onClick={() => setManaging(true)}>
+                  <Settings2 className="size-4" aria-hidden />
+                </IconButton>
+              ) : (
+                <IconButton label="Team members" onClick={() => setManaging(true)}>
+                  <Users className="size-4" aria-hidden />
+                </IconButton>
+              ))}
             {muteButton}
             {channel.kind === 'dm' && other && (
               <IconButton label={`${other.display_name}'s profile`} onClick={() => showProfile(other.id)}>

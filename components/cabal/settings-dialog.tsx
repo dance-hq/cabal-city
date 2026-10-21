@@ -229,7 +229,7 @@ function NotificationSettings() {
       <Toggle
         id="n-mentions"
         label="Mentions"
-        hint="When someone writes your @username in a room or team. Rooms are otherwise quiet."
+        hint="When someone writes your @username in a channel or team. Channels are otherwise quiet."
         checked={settings.notify_mentions}
         onChange={(v) => updateSettings({ notify_mentions: v })}
       />

@@ -404,6 +404,8 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
         counted = true
       }
       if (m.kind === 'system' && channel.kind === 'room') refreshMembers()
+      // A team note can mean it was renamed or made public/invite-only; pick that up for everyone in it.
+      if (m.kind === 'system' && channel.kind === 'team' && !counted) void mutateChannels()
       if (m.author_id === userId) return
 
       const viewing = live.current.active === m.channel_id && live.current.visible

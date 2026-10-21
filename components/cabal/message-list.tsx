@@ -469,7 +469,7 @@ function ConversationStart({ channel, empty }: { channel: Channel; empty: boolea
       <p className="text-sm font-semibold">{channel.team_name}</p>
       <p className="text-sm leading-relaxed text-muted-foreground">
         {channel.team_visibility === 'public'
-          ? 'Open team room. Anyone in the community can join, read along and say hi.'
+          ? 'Public team. Anyone in the community can join, read along and say hi.'
           : 'Invite-only. Nobody else in the community can see or read it.'}
       </p>
     </div>

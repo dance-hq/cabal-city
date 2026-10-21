@@ -61,7 +61,7 @@ export function DeleteAccount() {
         <DialogContent className="sm:max-w-md">
           <DialogTitle>Delete your account?</DialogTitle>
           <DialogDescription className="leading-relaxed">
-            Your profile, photo and every message you wrote, in rooms, teams and DMs, are deleted for good. Teams you
+            Your profile, photo and every message you wrote, in channels, teams and DMs, are deleted for good. Teams you
             own pass to the next longest-standing member. Other people&apos;s messages stay where they are.
           </DialogDescription>
           <form onSubmit={submit} className="flex flex-col gap-4">

@@ -9,7 +9,7 @@ const _geist = Geist({ subsets: ['latin'] })
 const _geistMono = Geist_Mono({ subsets: ['latin'] })
 
 const description =
-  "Cabal is an open-source instant messenger for people building things in Chicago. See who's around, send a DM, or drop into a room."
+  "Cabal is an open-source instant messenger for people building things in Chicago. See who's around, send a DM, or drop into a channel."
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

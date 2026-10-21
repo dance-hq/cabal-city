@@ -148,7 +148,7 @@ export function BuddyList() {
       <SessionBar />
       <div className="px-3 pb-2">
         <label className="relative block">
-          <span className="sr-only">Search people and rooms</span>
+          <span className="sr-only">Search people and channels</span>
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input
             value={query}
@@ -194,7 +194,7 @@ export function BuddyList() {
         )}
 
         {visibleRooms.length > 0 && (
-          <Section label="Rooms">
+          <Section label="Channels">
             {visibleRooms.map((r) => {
               const here = [...presence.values()].filter((p) => p.rooms.has(r.id)).length
               return (
@@ -221,7 +221,7 @@ export function BuddyList() {
               type="button"
               onClick={() => setCreatingTeam(true)}
               className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Start a team room"
+              aria-label="Start a team"
             >
               <Plus className="size-3.5" aria-hidden />
             </button>
@@ -243,7 +243,7 @@ export function BuddyList() {
             >
               <Compass className="size-3.5 shrink-0" aria-hidden />
               <span className="flex-1">
-                {teams.length === 0 && joinable === 0 ? 'Find or start a team room' : 'Browse team rooms'}
+                {teams.length === 0 && joinable === 0 ? 'Find or start a team' : 'Browse teams'}
               </span>
               {joinable > 0 && (
                 <span className="font-mono text-[11px]" aria-label={`${joinable} to join`}>
