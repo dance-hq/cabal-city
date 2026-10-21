@@ -9,7 +9,7 @@ const PAGES = [
   { href: '/guidelines', label: 'Guidelines' },
 ]
 
-export const LEGAL_UPDATED = 'October 20, 2026'
+export const LEGAL_UPDATED = 'October 21, 2026'
 
 // The address people can write to about their data or their account.
 export function contactEmail() {
