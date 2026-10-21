@@ -12,6 +12,7 @@ import { friendlyError } from '@/lib/errors'
 import { playChime, showNotification } from '@/lib/notify'
 import { foldPresence, type UserPresence } from '@/lib/presence'
 import { listenForPopouts, viewedInPopout } from '@/lib/popout'
+import { personLabel } from '@/lib/mentions'
 import { mentions, plainText } from '@/lib/text'
 import { charCount, isLong, previewOf, titleOf } from '@/lib/long-text'
 import { linkLabel } from '@/lib/channel-links'
@@ -534,7 +535,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       const author = live.current.profiles.get(m.author_id ?? '')
       const authorName = author?.display_name ?? 'Someone'
       const isDm = channel.kind === 'dm'
-      const isMention = !isDm && mentions(m.body, live.current.me.username)
+      const isMention = !isDm && mentions(m.body, { id: userId, username: live.current.me.username })
+      const people = personLabel((id) => live.current.profiles.get(id))
       if ((isDm && s.notify_dms) || (isMention && s.notify_mentions)) {
         const where = channel.kind === 'room' ? `#${channel.slug}` : channel.team_name ?? 'your team'
         showNotification({
@@ -543,8 +545,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   m.sealed && m.e2ee !== 'ok'
   ? 'New encrypted message'
   : m.long_text
-  ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels))}`
-  : plainText(m.body, linkLabel(live.current.channels)),
+  ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels), people)}`
+  : plainText(m.body, linkLabel(live.current.channels), people),
           tag: m.channel_id,
           onClick: () => open(m.channel_id),
         })

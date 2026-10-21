@@ -1,14 +1,20 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUp, FileText, Hash } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { ShownStatus } from '@/lib/types'
 import { MESSAGE_MAX } from '@/lib/config'
 import { cleanBody } from '@/lib/text'
 import { charCount, formatCount, isLong, longBody, LONG_TEXT_MAX } from '@/lib/long-text'
-import { channelName, channelQuery, encodeChannelLinks, matchChannels } from '@/lib/channel-links'
+import { channelName, channelQuery, encodeChannelLinks, matchChannels, type LinkableChannel } from '@/lib/channel-links'
+import { encodeMentions, matchPeople, mentionQuery, personName, type Mentionable } from '@/lib/mentions'
 import { useLinkableChannels } from './channel-links'
 import { TeamIcon } from './team-dialogs'
+import { Avatar } from './avatar'
+import { useCabal } from './store'
+
+type Suggestion = { kind: 'channel'; id: string; c: LinkableChannel } | { kind: 'person'; id: string; p: Mentionable }
 
 export function Composer({
   channelId,
@@ -27,15 +33,20 @@ export function Composer({
   disabled?: boolean
   disabledReason?: string
 }) {
+  const { userId, members, channels, statusOf } = useCabal()
   const [drafts, setDrafts] = useState<Record<string, string>>({})
-  // Channels picked from the # list, per draft, so a pick wins over a same-named team.
+  // Channels and people picked from the lists, per draft, so a pick wins over a same-named one.
   const picks = useRef(new Map<string, Map<string, string>>())
+  const personPicks = useRef(new Map<string, Map<string, string>>())
   const value = drafts[channelId] ?? ''
   const ref = useRef<HTMLTextAreaElement>(null)
   const linkables = useLinkableChannels()
   const [caret, setCaret] = useState<number | null>(null)
   const [highlight, setHighlight] = useState(0)
   const [dismissedAt, setDismissedAt] = useState<number | null>(null)
+
+  const people = useMemo(() => members.map((m) => m.profile), [members])
+  const otherId = channels.find((c) => c.id === channelId)?.other_user_id ?? null
 
   useEffect(() => {
     ref.current?.focus()
@@ -56,27 +67,46 @@ export function Composer({
   const chars = long ? charCount(longText) : 0
   const tooLong = chars > LONG_TEXT_MAX
 
-  const trigger = caret === null ? null : channelQuery(value.slice(0, caret))
-  const suggestions =
-    trigger && trigger.start !== dismissedAt && linkables.data ? matchChannels(linkables.data, trigger.query, channelId) : []
+  const before = caret === null ? null : value.slice(0, caret)
+  const channelTrigger = before === null ? null : channelQuery(before)
+  const personTrigger = before === null ? null : mentionQuery(before)
+  const trigger = channelTrigger ?? personTrigger
+  const suggestions: Suggestion[] =
+    !trigger || trigger.start === dismissedAt
+      ? []
+      : channelTrigger
+        ? linkables.data
+          ? matchChannels(linkables.data, channelTrigger.query, channelId).map((c) => ({ kind: 'channel', id: c.id, c }))
+          : []
+        : matchPeople(people, personTrigger!.query, { excludeId: userId, firstId: otherId, statusOf }).map((p) => ({
+            kind: 'person',
+            id: p.id,
+            p,
+          }))
   const listOpen = suggestions.length > 0
   const active = Math.min(highlight, suggestions.length - 1)
-  const listId = `composer-${channelId}-channels`
+  const listId = `composer-${channelId}-suggestions`
+  const listLabel = channelTrigger ? 'Link a channel' : 'Mention someone'
 
   function trackCaret() {
     const el = ref.current
     setCaret(el && el.selectionStart === el.selectionEnd ? el.selectionStart : null)
   }
 
+  function remember(store: Map<string, Map<string, string>>, name: string, id: string) {
+    let draftPicks = store.get(channelId)
+    if (!draftPicks) store.set(channelId, (draftPicks = new Map()))
+    draftPicks.set(name, id)
+  }
+
   function pick(index: number) {
-    const c = suggestions[index]
-    if (!trigger || !c || caret === null) return
-    const name = channelName(c)
-    const next = `${value.slice(0, trigger.start)}#${name} ${value.slice(caret)}`
+    const s = suggestions[index]
+    if (!trigger || !s || caret === null) return
+    const mark = s.kind === 'channel' ? '#' : '@'
+    const name = s.kind === 'channel' ? channelName(s.c) : personName(s.p)
+    const next = `${value.slice(0, trigger.start)}${mark}${name} ${value.slice(caret)}`
     const at = trigger.start + name.length + 2
-    let draftPicks = picks.current.get(channelId)
-    if (!draftPicks) picks.current.set(channelId, (draftPicks = new Map()))
-    draftPicks.set(name, c.id)
+    remember(s.kind === 'channel' ? picks.current : personPicks.current, name, s.id)
     set(next)
     setCaret(at)
     setHighlight(0)
@@ -93,10 +123,12 @@ export function Composer({
     if (long) {
       onSend(longText)
     } else {
-      const linked = encodeChannelLinks(body, picks.current.get(channelId) ?? new Map(), linkables.data ?? [])
+      const withPeople = encodeMentions(body, personPicks.current.get(channelId) ?? new Map(), people)
+      const linked = encodeChannelLinks(withPeople, picks.current.get(channelId) ?? new Map(), linkables.data ?? [])
       onSend(linked.length <= MESSAGE_MAX ? linked : body)
     }
     picks.current.delete(channelId)
+    personPicks.current.delete(channelId)
     onStopTyping()
     set('')
   }
@@ -108,16 +140,16 @@ export function Composer({
           <ul
             id={listId}
             role="listbox"
-            aria-label="Link a channel"
+            aria-label={listLabel}
             className="absolute right-0 bottom-full left-0 z-20 mb-1.5 flex max-h-64 flex-col overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
           >
             <li role="presentation" className="px-2 pt-1 pb-1.5 font-mono text-[10.5px] tracking-wide text-muted-foreground uppercase">
-              Link a channel
+              {listLabel}
             </li>
-            {suggestions.map((c, i) => (
+            {suggestions.map((s, i) => (
               <li
-                key={c.id}
-                id={`${listId}-${c.id}`}
+                key={s.id}
+                id={`${listId}-${s.id}`}
                 role="option"
                 aria-selected={i === active}
                 onMouseDown={(e) => {
@@ -130,21 +162,7 @@ export function Composer({
                   i === active && 'bg-accent text-accent-foreground',
                 )}
               >
-                {c.kind === 'room' ? (
-                  <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                ) : (
-                  <TeamIcon visibility={c.team_visibility} className="size-3.5 shrink-0 text-muted-foreground" />
-                )}
-                <span className={cn('truncate', c.kind === 'room' && 'font-mono text-[13px]')}>{channelName(c)}</span>
-                <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                  {c.kind === 'room'
-                    ? 'room'
-                    : c.joined
-                      ? c.team_visibility === 'private'
-                        ? 'your team · invite-only'
-                        : 'your team'
-                      : `${c.member_count ?? 0} ${c.member_count === 1 ? 'member' : 'members'}`}
-                </span>
+                {s.kind === 'person' ? <PersonOption p={s.p} status={statusOf(s.p.id)} /> : <ChannelOption c={s.c} />}
               </li>
             ))}
           </ul>
@@ -227,9 +245,42 @@ export function Composer({
               : `Long message · ${formatCount(chars, 'character')} · sends whole, opens in a reader`}
           </span>
         ) : (
-          <span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · # to link a channel</span>
+          <span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · @ to mention · # to link a channel</span>
         )}
       </div>
     </div>
+  )
+}
+
+function PersonOption({ p, status }: { p: Mentionable; status: ShownStatus }) {
+  const name = personName(p)
+  return (
+    <>
+      <Avatar name={name} url={p.avatar_url} size={22} status={status} />
+      <span className="truncate">{name}</span>
+      {p.username && <span className="ml-auto shrink-0 truncate font-mono text-xs text-muted-foreground">@{p.username}</span>}
+    </>
+  )
+}
+
+function ChannelOption({ c }: { c: LinkableChannel }) {
+  return (
+    <>
+      {c.kind === 'room' ? (
+        <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      ) : (
+        <TeamIcon visibility={c.team_visibility} className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+      <span className={cn('truncate', c.kind === 'room' && 'font-mono text-[13px]')}>{channelName(c)}</span>
+      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+        {c.kind === 'room'
+          ? 'room'
+          : c.joined
+            ? c.team_visibility === 'private'
+              ? 'your team · invite-only'
+              : 'your team'
+            : `${c.member_count ?? 0} ${c.member_count === 1 ? 'member' : 'members'}`}
+      </span>
+    </>
   )
 }
