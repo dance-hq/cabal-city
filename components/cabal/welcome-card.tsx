@@ -53,7 +53,7 @@ export function WelcomeCard() {
           .
         </li>
         <li>Click anyone&apos;s name to message them.</li>
-        <li>Set a status so people know what you&apos;re on. Then leave this open and get back to work.</li>
+        <li>When you want to focus, Lock in and say what you&apos;re building. It&apos;s optional, and you can stop any time.</li>
       </ul>
     </aside>
   )

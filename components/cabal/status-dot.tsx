@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import type { ShownStatus } from '@/lib/types'
 
 export const STATUS_LABEL: Record<ShownStatus | 'invisible', string> = {
-  online: 'Online',
+  online: 'Available',
   away: 'Away',
   dnd: 'Do not disturb',
   offline: 'Offline',

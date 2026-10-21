@@ -40,9 +40,9 @@
         cursor: pointer; font: 500 12.5px/1 var(--mono);
       }
       #bar.dragging { cursor: grabbing; }
-      .light { position: relative; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--star); }
+      .light { position: relative; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--flag); }
       .light::after {
-        content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--star);
+        content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--flag);
         animation: breathe 6s ease-in-out infinite;
       }
       @keyframes breathe {
@@ -153,8 +153,8 @@
       <div id="bar" title="Click to see your buddy list. Drag to move.">
         <span class="light" aria-hidden="true"></span>
         <button id="toggle" type="button" aria-expanded="false" aria-controls="panel">
-          <time id="elapsed" aria-live="off">0m</time>
-          <span class="hint">in session</span>
+          <time id="elapsed" aria-live="off">0:00</time>
+          <span class="hint">locked in</span>
         </button>
         <svg class="caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6" /></svg>
         <button id="open" class="icon" type="button" aria-label="Open Cabal" title="Open Cabal">
@@ -187,16 +187,18 @@
       })()
 
       // --- timer -------------------------------------------------------------------
-      // Whole minutes, same as inside Cabal: present, not ticking at you.
+      // Seconds, same as inside Cabal, so you can see it moving: 0:42, 1:02:33.
       function format(ms) {
-        const minutes = Math.max(0, Math.floor(ms / 60000))
-        const hours = Math.floor(minutes / 60)
-        return hours ? `${hours}h ${String(minutes % 60).padStart(2, '0')}m` : `${minutes}m`
+        const total = Math.max(0, Math.floor(ms / 1000))
+        const hours = Math.floor(total / 3600)
+        const minutes = Math.floor((total % 3600) / 60)
+        const seconds = String(total % 60).padStart(2, '0')
+        return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`
       }
       function tick() {
         if (startedAt !== null) elapsed.textContent = format(Date.now() - startedAt)
       }
-      setInterval(tick, 5000)
+      setInterval(tick, 1000)
 
       // --- small DOM helpers ----------------------------------------------------------
       function el(tag, props = {}, children = []) {

@@ -29,3 +29,16 @@ export function dayLabel(iso: string, now = new Date()) {
 export function fullTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
+
+// "now", "5m", "3h", "2d", then a date: how long ago something happened, compactly.
+export function ago(iso: string, now = Date.now()) {
+  const seconds = Math.max(0, (now - Date.parse(iso)) / 1000)
+  if (seconds < 60) return 'now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d`
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}

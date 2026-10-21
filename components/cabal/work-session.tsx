@@ -2,21 +2,23 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { useSWRConfig } from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { desktop } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
-import { formatSession } from '@/lib/session'
+import { describeSession, NO_LOCK_IN, readLockIn, type LockInState } from '@/lib/session'
+import { lockInsKey } from '@/hooks/use-lock-ins'
+import { useCabal } from './store'
 
-// loading: checking for a running session. welcome: the calm start screen.
-// app: Cabal itself, with or without a session running.
-export type SessionPhase = 'loading' | 'welcome' | 'app'
-
-type WorkSession = {
-  phase: SessionPhase
-  startedAt: number | null
-  start(): Promise<boolean>
+// Locking in is separate from being in Cabal: opening the app never starts
+// or asks for a session, and closing it pauses one instead of counting on.
+type WorkSession = LockInState & {
+  ready: boolean
+  lockIn(focus: string, shared: boolean): Promise<boolean>
+  edit(focus: string, shared: boolean): Promise<boolean>
+  pause(): Promise<void>
+  resume(): Promise<void>
   end(): Promise<void>
-  skip(): void
 }
 
 const Ctx = createContext<WorkSession | null>(null)
@@ -27,47 +29,78 @@ export function useWorkSession() {
   return s
 }
 
+const BEAT_MS = 60_000
+
 export function WorkSessionProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), [])
-  const [phase, setPhase] = useState<SessionPhase>('loading')
-  const [startedAt, setStartedAt] = useState<number | null>(null)
-  const running = useRef<number | null>(null)
-  running.current = startedAt
+  const { community } = useCabal()
+  const { mutate } = useSWRConfig()
+  const [ready, setReady] = useState(false)
+  const [state, setState] = useState<LockInState>(NO_LOCK_IN)
+  const live = useRef(state)
+  live.current = state
+
+  const apply = useCallback(
+    (raw: unknown) => {
+      setState(readLockIn(raw))
+      void mutate(lockInsKey(community.id))
+    },
+    [mutate, community.id],
+  )
+
+  const call = useCallback(
+    async (fn: string, args?: Record<string, unknown>) => {
+      const { data, error } = await supabase.rpc(fn, args)
+      if (error) {
+        toast.error(friendlyError(error))
+        return { ok: false as const }
+      }
+      apply(data)
+      return { ok: true as const }
+    },
+    [supabase, apply],
+  )
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      const { data, error } = await supabase.rpc('current_work_session')
+    supabase.rpc('my_lock_in').then(({ data, error }) => {
       if (cancelled) return
-      if (error) {
-        // Never lock someone out of Cabal because the session check failed.
-        setPhase('app')
-        return
-      }
-      let start = typeof data === 'string' ? Date.parse(data) : null
-      const launchedAt = desktop()?.launchedAt
-      if (start !== null && launchedAt && start < launchedAt) {
-        // Still open from before the desktop app last quit (or crashed): that sitting is over.
-        await supabase.rpc('end_work_session')
-        start = null
-      }
-      if (cancelled) return
-      setStartedAt(start)
-      setPhase(start === null ? 'welcome' : 'app')
-    })()
+      if (!error) setState(readLockIn(data))
+      setReady(true)
+    })
     return () => {
       cancelled = true
     }
   }, [supabase])
 
+  // While running, check in about once a minute. If Cabal went quiet (sleep,
+  // crash, closed tab) the server pauses the session where it stopped.
+  const running = state.status === 'running'
+  useEffect(() => {
+    if (!running) return
+    const beat = () =>
+      supabase.rpc('lock_in_beat').then(({ data, error }) => {
+        if (!error) setState(readLockIn(data))
+      })
+    const t = setInterval(beat, BEAT_MS)
+    const onVisible = () => document.visibilityState === 'visible' && beat()
+    document.addEventListener('visibilitychange', onVisible)
+    const offPower = desktop()?.onPower((s) => s === 'resume' && beat())
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', onVisible)
+      offPower?.()
+    }
+  }, [running, supabase])
+
   // The desktop app draws the corner timer from this.
   useEffect(() => {
-    desktop()?.setSession?.(startedAt)
-  }, [startedAt])
+    desktop()?.setSession?.(state.status === 'running' ? state.startedAt : null)
+  }, [state.status, state.startedAt])
   useEffect(() => () => desktop()?.setSession?.(null), [])
 
-  // Quitting the desktop app ends the session. Fired with keepalive so it
-  // still goes out while the app closes.
+  // Quitting the desktop app pauses the session, so the hours it's closed
+  // don't count. The app waits for this (briefly) before it quits.
   const token = useRef<string | null>(null)
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => (token.current = data.session?.access_token ?? null))
@@ -77,9 +110,9 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
     return () => sub.subscription.unsubscribe()
   }, [supabase])
   useEffect(() => {
-    const off = desktop()?.onBeforeQuit(() => {
-      if (running.current === null || !token.current) return
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/end_work_session`, {
+    const off = desktop()?.onBeforeQuit(async () => {
+      if (live.current.status !== 'running' || !token.current) return
+      const pause = fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/pause_lock_in`, {
         method: 'POST',
         keepalive: true,
         headers: {
@@ -89,45 +122,47 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
         },
         body: '{}',
       }).catch(() => {})
+      await Promise.race([pause, new Promise((r) => setTimeout(r, 1500))])
     })
     return () => off?.()
   }, [])
 
-  const start = useCallback(async () => {
-    const { data, error } = await supabase.rpc('start_work_session')
-    if (error || typeof data !== 'string') {
-      toast.error(error ? friendlyError(error) : "Couldn't start your session. Try again.")
-      return false
-    }
-    setStartedAt(Date.parse(data))
-    setPhase('app')
-    return true
-  }, [supabase])
+  const lockIn = useCallback(
+    async (focus: string, shared: boolean) => (await call('lock_in', { p_focus: focus, p_shared: shared })).ok,
+    [call],
+  )
+  const edit = useCallback(
+    async (focus: string, shared: boolean) => (await call('edit_lock_in', { p_focus: focus, p_shared: shared })).ok,
+    [call],
+  )
+  const pause = useCallback(async () => void (await call('pause_lock_in')), [call])
+  const resume = useCallback(async () => void (await call('resume_lock_in')), [call])
 
   const end = useCallback(async () => {
-    const began = running.current
-    const { error } = await supabase.rpc('end_work_session')
+    const { data, error } = await supabase.rpc('end_work_session')
     if (error) {
       toast.error(friendlyError(error))
       return
     }
-    setStartedAt(null)
-    if (began !== null) toast(`Session done: ${formatSession(Date.now() - began)}. Nice work.`)
-  }, [supabase])
+    setState(NO_LOCK_IN)
+    void mutate(lockInsKey(community.id))
+    if (typeof data === 'number') toast(`Locked in for ${describeSession(data * 1000)}.`)
+  }, [supabase, mutate, community.id])
 
-  const skip = useCallback(() => setPhase('app'), [])
-
-  const value = useMemo(() => ({ phase, startedAt, start, end, skip }), [phase, startedAt, start, end, skip])
+  const value = useMemo(
+    () => ({ ...state, ready, lockIn, edit, pause, resume, end }),
+    [state, ready, lockIn, edit, pause, resume, end],
+  )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
-// Re-renders about every ten seconds, enough for a minutes clock.
+// Ticks every second while the timer runs.
 export function useElapsed(startedAt: number | null) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (startedAt === null) return
     setNow(Date.now())
-    const t = setInterval(() => setNow(Date.now()), 10_000)
+    const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [startedAt])
   return startedAt === null ? 0 : now - startedAt

@@ -31,6 +31,7 @@ import { friendlyError } from '@/lib/errors'
 import { STATUS_LABEL } from './status-dot'
 import { GroupMenu, GroupNameDialog, PERSON_DRAG_TYPE, PersonMenu, type Naming } from './buddy-group-ui'
 import { useBuddyGroups } from '@/hooks/use-buddy-groups'
+import { useLockIns, type LockedIn } from '@/hooks/use-lock-ins'
 import { arrangeBuddies, type BuddyGroup } from '@/lib/buddy-groups'
 import type { Channel, ShownStatus } from '@/lib/types'
 
@@ -76,6 +77,7 @@ export function BuddyList() {
   const [naming, setNaming] = useState<Naming | null>(null)
   const buddyGroups = useBuddyGroups()
   const teamRooms = useTeamRooms(community.id)
+  const lockIns = useLockIns(community.id)
   const joinable = teamRooms.data?.filter((r) => !r.joined).length ?? 0
 
   const dmByUser = useMemo(() => {
@@ -117,6 +119,7 @@ export function BuddyList() {
         avatarUrl={p.profile.avatar_url}
         status={p.status}
         statusText={p.profile.status_text}
+        lockedIn={p.status === 'offline' ? undefined : lockIns.get(p.user_id)}
         unread={dmByUser.get(p.user_id)?.unread ?? 0}
         selected={!!active && dmByUser.get(p.user_id)?.id === active}
         onOpen={() => openDm(p.user_id)}
@@ -165,7 +168,14 @@ export function BuddyList() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="app-drag flex h-11 shrink-0 items-center justify-between gap-2 pr-2 pl-3">
-        <span className="truncate font-mono text-xs font-medium text-muted-foreground">{community.name}</span>
+        <button
+          type="button"
+          onClick={() => open(null)}
+          title="Home"
+          className="-ml-1 truncate rounded px-1 font-mono text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {community.name}
+        </button>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -521,6 +531,7 @@ function PersonRow({
   avatarUrl,
   status,
   statusText,
+  lockedIn,
   unread,
   selected,
   onOpen,
@@ -531,12 +542,15 @@ function PersonRow({
   avatarUrl: string | null
   status: ShownStatus
   statusText: string | null
+  lockedIn?: LockedIn
   unread: number
   selected: boolean
   onOpen: () => void
   menu: React.ReactNode
 }) {
-  const sub = statusText || (status === 'away' || status === 'dnd' ? STATUS_LABEL[status] : null)
+  const sub = lockedIn
+    ? `Locked in${lockedIn.focus ? ` · ${lockedIn.focus}` : ''}`
+    : statusText || (status === 'away' || status === 'dnd' ? STATUS_LABEL[status] : null)
   return (
     <div
       draggable
@@ -553,7 +567,7 @@ function PersonRow({
         type="button"
         onClick={onOpen}
         aria-current={selected ? 'page' : undefined}
-        aria-label={`Message ${name}, ${STATUS_LABEL[status]}${statusText ? `, ${statusText}` : ''}${unread ? `, ${unread} unread` : ''}`}
+        aria-label={`Message ${name}, ${STATUS_LABEL[status]}${sub && sub !== STATUS_LABEL[status] ? `, ${sub}` : ''}${unread ? `, ${unread} unread` : ''}`}
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         <Avatar name={name} url={avatarUrl} size={28} status={status} />
@@ -568,8 +582,9 @@ function PersonRow({
             {name}
           </span>
           {sub && (
-            <span className={cn('truncate text-[11.5px] leading-tight text-muted-foreground', status === 'offline' && 'opacity-70')}>
-              {sub}
+            <span className={cn('flex min-w-0 items-center gap-1 text-[11.5px] leading-tight text-muted-foreground', status === 'offline' && 'opacity-70')}>
+              {lockedIn && <span className="size-1.5 shrink-0 rounded-full bg-flag" aria-hidden />}
+              <span className="truncate">{sub}</span>
             </span>
           )}
         </span>
