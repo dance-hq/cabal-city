@@ -237,6 +237,59 @@
   animation: breathe 6s ease-in-out infinite;
 }
 
+/* A new message opens its own space (height and fade together) so the
+   conversation glides up instead of jumping. The inner box is widened by the
+   row's -mx-2 so its hover background isn't clipped. */
+@keyframes message-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+@keyframes message-rise {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: none;
+  }
+}
+.message-enter {
+  display: grid;
+  animation: message-open 380ms cubic-bezier(0.22, 0.8, 0.28, 1) both;
+}
+.message-enter > div {
+  min-height: 0;
+  overflow: hidden;
+  margin-inline: -0.5rem;
+  padding-inline: 0.5rem;
+  animation: message-rise 380ms cubic-bezier(0.22, 0.8, 0.28, 1) both;
+}
+
+/* Only shows if sending takes a noticeable moment. */
+@keyframes pending-note-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.pending-note {
+  animation: pending-note-in 400ms ease 1.2s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-enter,
+  .message-enter > div {
+    animation: none;
+  }
+}
+
 /* The welcome screen settles in line by line. */
 @keyframes calm-in {
   from {
