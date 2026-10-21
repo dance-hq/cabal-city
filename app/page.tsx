@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowDownToLine, ArrowUpRight } from 'lucide-react'
 import { getCommunity } from '@/lib/community'
@@ -11,8 +12,14 @@ import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import { SiteHeader } from '@/components/marketing/site-header'
+import { SITE_DESCRIPTION } from '@/lib/site'
 
 export const revalidate = 60
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+  openGraph: { type: 'website', siteName: 'cabal.city', description: SITE_DESCRIPTION, locale: 'en_US', url: '/' },
+}
 
 export default async function Home() {
   const community = await getCommunity()

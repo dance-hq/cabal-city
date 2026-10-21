@@ -7,6 +7,8 @@ export const BRAND = {
   paper: '#FCFAF6',
   cityOnInk: '#8B8D93',
   cityOnPaper: '#6B6E75',
+  // The Chicago flag's light blue (the site's light-mode --flag).
+  flag: '#36B3E2',
   tagline: 'Build your own cabal.',
 } as const
 

@@ -2,22 +2,19 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from '@/components/ui/sonner'
-import { SITE_URL } from '@/lib/site'
+import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from '@/lib/site'
 import './globals.css'
 
 const _geist = Geist({ subsets: ['latin'] })
 const _geistMono = Geist_Mono({ subsets: ['latin'] })
 
-const description =
-  "Cabal is an open-source instant messenger for people building things in Chicago. See who's around, send a DM, or drop into a channel."
-
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "Cabal: Chicago builders, it's time to lock in", template: '%s · Cabal' },
-  description,
+  title: { default: SITE_TITLE, template: '%s · Cabal' },
+  description: SITE_DESCRIPTION,
   applicationName: 'Cabal',
-  openGraph: { type: 'website', siteName: 'cabal.city', description, locale: 'en_US' },
-  twitter: { card: 'summary_large_image', description },
+  openGraph: { type: 'website', siteName: 'cabal.city', description: SITE_DESCRIPTION, locale: 'en_US' },
+  twitter: { card: 'summary_large_image', description: SITE_DESCRIPTION },
   icons: {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }, { url: '/icon-32.png', sizes: '32x32' }],
     apple: '/apple-icon.png',
