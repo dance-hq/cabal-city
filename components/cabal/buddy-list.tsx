@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Check,
   ChevronRight,
@@ -72,7 +72,25 @@ export function BuddyList({ compact }: { compact?: boolean }) {
     refreshChannels,
   } = useCabal()
   const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
   const [showOffline, setShowOffline] = useState(false)
+
+  function closeSearch() {
+    setQuery('')
+    setSearching(false)
+  }
+
+  // Search stays tucked behind an icon; Ctrl/Cmd+K opens it from anywhere.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearching(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const [creatingTeam, setCreatingTeam] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [browsingTeams, setBrowsingTeams] = useState(false)
@@ -170,15 +188,51 @@ export function BuddyList({ compact }: { compact?: boolean }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="app-drag flex h-11 shrink-0 items-center justify-between gap-2 pr-2 pl-3">
-        <button
-          type="button"
-          onClick={() => open(null)}
-          title="Home"
-          className="-ml-1 truncate rounded px-1 font-mono text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {community.name}
-        </button>
-        <div className="flex items-center gap-0.5">
+        {searching ? (
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">Search people and channels</span>
+            <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && closeSearch()}
+              onBlur={() => !query.trim() && closeSearch()}
+              placeholder="Search"
+              className="h-7 w-full rounded-md border border-transparent bg-sidebar-accent pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring"
+            />
+          </label>
+        ) : (
+          <button
+            type="button"
+            onClick={() => open(null)}
+            title="Home"
+            className="-ml-1 truncate rounded px-1 font-mono text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {community.name}
+          </button>
+        )}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {searching ? (
+            <button
+              type="button"
+              onClick={closeSearch}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Close search"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSearching(true)}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Search people and channels"
+              title="Search (Ctrl+K)"
+            >
+              <Search className="size-4" aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setFeedbackOpen(true)}
@@ -201,19 +255,6 @@ export function BuddyList({ compact }: { compact?: boolean }) {
       <ConnectionBanner />
       <MeCard />
       {compact && <SessionBar />}
-      <div className="px-3 pb-2">
-        <label className="relative block">
-          <span className="sr-only">Search people and channels</span>
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-            placeholder="Find someone"
-            className="h-8 w-full rounded-md border border-transparent bg-sidebar-accent pr-3 pl-8 text-sm outline-none placeholder:text-muted-foreground focus:border-ring"
-          />
-        </label>
-      </div>
 
       <nav className="quiet-scroll min-h-0 flex-1 overflow-y-auto pb-4" aria-label="Conversations">
         <WelcomeCard />
