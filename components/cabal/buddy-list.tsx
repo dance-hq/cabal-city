@@ -43,9 +43,10 @@ export async function copyInviteLink(communityId: string) {
   const link = `${window.location.origin}/join/${data}`
   try {
     await navigator.clipboard.writeText(link)
-    toast.success('Invite link copied', { description: link })
+    toast.success('Invite link copied', { description: link, closeButton: true, duration: 3000 })
   } catch {
-    toast.message('Invite link', { description: link })
+    // Clipboard blocked: the link has to be copied by hand, so it stays until dismissed.
+    toast.message('Invite link', { description: link, closeButton: true, duration: Infinity })
   }
 }
 
