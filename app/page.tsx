@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowDownToLine, ArrowUpRight } from 'lucide-react'
 import { getCommunity } from '@/lib/community'
@@ -11,8 +12,14 @@ import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import { SiteHeader } from '@/components/marketing/site-header'
+import { SITE_DESCRIPTION } from '@/lib/site'
 
 export const revalidate = 60
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+  openGraph: { type: 'website', siteName: 'cabal.city', description: SITE_DESCRIPTION, locale: 'en_US', url: '/' },
+}
 
 export default async function Home() {
   const community = await getCommunity()
@@ -38,18 +45,19 @@ export default async function Home() {
             Chicago builders, it&apos;s time to lock in.
           </h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
-            Cabal is an open-source messenger for people building things in Chicago. See who&apos;s heads-down,
-            send a DM, or drop into a room and ship together.
+            Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
+            see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
           <div className="flex flex-col gap-3 pt-2">
             <div className="flex flex-wrap gap-3">
-              <Link
+              {/* A plain anchor: next/link ignores a click when the URL already ends in #download. */}
+              <a
                 href="#download"
                 className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <ArrowDownToLine className="size-4" aria-hidden />
                 Get the desktop app
-              </Link>
+              </a>
               <Link
                 href="/login"
                 className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"

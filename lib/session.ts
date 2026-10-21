@@ -36,17 +36,31 @@ export type LockInState = {
   workedMs: number
   focus: string | null
   shared: boolean
+  // 'away' = Cabal was closed or asleep; it picks back up on its own.
+  pausedBy: 'you' | 'away' | null
 }
 
-export const NO_LOCK_IN: LockInState = { status: 'none', startedAt: null, workedMs: 0, focus: null, shared: false }
+export const NO_LOCK_IN: LockInState = {
+  status: 'none',
+  startedAt: null,
+  workedMs: 0,
+  focus: null,
+  shared: false,
+  pausedBy: null,
+}
+
+// Gaps shorter than this aren't worth mentioning when a session picks back up.
+export const AWAY_NOTE_MIN_MS = 60_000
 
 type RawLockIn = {
   running_since: string | null
   worked_seconds: number
   paused_at: string | null
+  paused_by?: 'you' | 'away' | null
   focus: string | null
   shared: boolean
   now: string
+  away_seconds?: number
 }
 
 // Reads the server's answer, correcting for this computer's clock being off.
@@ -55,7 +69,16 @@ export function readLockIn(raw: unknown, localNow = Date.now()): LockInState {
   const r = raw as RawLockIn
   const workedMs = Math.max(0, (r.worked_seconds ?? 0) * 1000)
   const base = { focus: r.focus ?? null, shared: !!r.shared, workedMs }
-  if (r.paused_at || !r.running_since) return { ...base, status: 'paused', startedAt: null }
+  if (r.paused_at || !r.running_since) {
+    return { ...base, status: 'paused', startedAt: null, pausedBy: r.paused_by === 'you' ? 'you' : 'away' }
+  }
   const skew = localNow - Date.parse(r.now)
-  return { ...base, status: 'running', startedAt: Date.parse(r.running_since) + skew - workedMs }
+  return { ...base, status: 'running', startedAt: Date.parse(r.running_since) + skew - workedMs, pausedBy: null }
+}
+
+// How long Cabal was away, when the server just picked the session back up.
+export function readAwayMs(raw: unknown): number | null {
+  if (!raw || typeof raw !== 'object') return null
+  const seconds = (raw as RawLockIn).away_seconds
+  return typeof seconds === 'number' && seconds * 1000 >= AWAY_NOTE_MIN_MS ? seconds * 1000 : null
 }

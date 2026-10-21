@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeSession, formatSession, readLockIn, shortDuration } from '@/lib/session'
+import { describeSession, formatSession, readAwayMs, readLockIn, shortDuration } from '@/lib/session'
 import { ago } from '@/lib/time'
 
 describe('lock-in timer', () => {
@@ -58,6 +58,20 @@ describe('reading a lock-in from the server', () => {
     expect(s.status).toBe('paused')
     expect(s.startedAt).toBeNull()
     expect(formatSession(s.workedMs)).toBe('23:14')
+  })
+
+  it('tells your own pause apart from Cabal being away', () => {
+    const base = { running_since: null, worked_seconds: 60, paused_at: '2026-10-21T14:00:00Z', focus: null, shared: false, now: '2026-10-21T15:00:00Z' }
+    expect(readLockIn({ ...base, paused_by: 'you' }, now).pausedBy).toBe('you')
+    expect(readLockIn({ ...base, paused_by: 'away' }, now).pausedBy).toBe('away')
+    expect(readLockIn({ ...base, paused_by: null }, now).pausedBy).toBe('away')
+  })
+
+  it('only mentions an away gap worth noticing', () => {
+    expect(readAwayMs({ away_seconds: 2520 })).toBe(2_520_000)
+    expect(readAwayMs({ away_seconds: 20 })).toBeNull()
+    expect(readAwayMs({ worked_seconds: 5 })).toBeNull()
+    expect(readAwayMs(null)).toBeNull()
   })
 })
 
