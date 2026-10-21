@@ -220,14 +220,14 @@
   width: var(--light, 10px);
   height: var(--light, 10px);
   border-radius: 9999px;
-  background: var(--primary);
+  background: var(--light-color, var(--primary));
 }
 .breathing-light::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--primary);
+  background: var(--light-color, var(--primary));
   animation: breathe 6s ease-in-out infinite;
 }
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useCabal } from './store'
 import { useBuddyGroups } from '@/hooks/use-buddy-groups'
+import { useLockIns } from '@/hooks/use-lock-ins'
 import { arrangeBuddies, type BuddyAction, type OverlayBuddies, type OverlayPerson } from '@/lib/buddy-groups'
 import { desktop } from '@/lib/desktop'
 
@@ -15,8 +16,9 @@ export function DesktopBuddies() {
 }
 
 function Sync() {
-  const { members, userId, statusOf, channels, openDm } = useCabal()
+  const { members, userId, statusOf, channels, openDm, community } = useCabal()
   const buddy = useBuddyGroups()
+  const lockIns = useLockIns(community.id)
 
   const list = useMemo<OverlayBuddies>(() => {
     const unread = new Map<string, number>()
@@ -28,7 +30,9 @@ function Sync() {
         user_id: m.user_id,
         name: m.profile.display_name || m.profile.username || 'Someone',
         status: statusOf(m.user_id),
-        note: m.profile.status_text,
+        note: lockIns.has(m.user_id)
+          ? `Locked in${lockIns.get(m.user_id)!.focus ? ` · ${lockIns.get(m.user_id)!.focus}` : ''}`
+          : m.profile.status_text,
       }))
     const arranged = arrangeBuddies(people, buddy.groups, buddy.placements)
     const shown = (p: (typeof people)[number]): OverlayPerson => ({
@@ -50,7 +54,7 @@ function Sync() {
       here: arranged.here.map(shown),
       offline: arranged.offline.map(shown),
     }
-  }, [members, userId, statusOf, channels, buddy.groups, buddy.placements])
+  }, [members, userId, statusOf, channels, buddy.groups, buddy.placements, lockIns])
 
   const sent = useRef('')
   useEffect(() => {

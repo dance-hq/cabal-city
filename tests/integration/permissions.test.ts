@@ -148,12 +148,49 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     const again = await grace.db.rpc('end_work_session')
     expect(again.data).toBeNull()
 
-    // A session left running for over 12 hours is treated as over.
+    // A session whose app went quiet pauses where it stopped; one left paused
+    // for over 12 hours is over.
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60_000).toISOString()
+    await admin.from('work_sessions').insert({
+      user_id: grace.id,
+      started_at: tenMinutesAgo,
+      running_since: tenMinutesAgo,
+      last_beat: tenMinutesAgo,
+    })
+    const quiet = await grace.db.rpc('my_lock_in')
+    expect(quiet.data?.paused_at).toBeTruthy()
+    expect(quiet.data?.worked_seconds).toBe(60)
     await admin
       .from('work_sessions')
-      .insert({ user_id: grace.id, started_at: new Date(Date.now() - 13 * 3600_000).toISOString() })
-    const stale = await grace.db.rpc('current_work_session')
+      .update({ paused_at: new Date(Date.now() - 13 * 3600_000).toISOString() })
+      .eq('user_id', grace.id)
+      .is('ended_at', null)
+    const stale = await grace.db.rpc('my_lock_in')
     expect(stale.data).toBeNull()
+  })
+
+  it('pauses, resumes and shares a lock-in only with the community', async () => {
+    const started = await grace.db.rpc('lock_in', { p_focus: '  the eval harness ', p_shared: true })
+    expect(started.error).toBeNull()
+    expect(started.data?.focus).toBe('the eval harness')
+
+    const seen = await ada.db.rpc('community_lock_ins', { p_community: communityId })
+    expect(seen.data?.map((r: { user_id: string; focus: string }) => [r.user_id, r.focus])).toContainEqual([
+      grace.id,
+      'the eval harness',
+    ])
+    const outsiderView = await outsider.db.rpc('community_lock_ins', { p_community: communityId })
+    expect(outsiderView.error).not.toBeNull()
+
+    const paused = await grace.db.rpc('pause_lock_in')
+    expect(paused.data?.paused_at).toBeTruthy()
+    const hidden = await ada.db.rpc('community_lock_ins', { p_community: communityId })
+    expect(hidden.data?.some((r: { user_id: string }) => r.user_id === grace.id)).toBe(false)
+
+    const resumed = await grace.db.rpc('resume_lock_in')
+    expect(resumed.data?.paused_at).toBeNull()
+    const ended = await grace.db.rpc('end_work_session')
+    expect(typeof ended.data).toBe('number')
   })
 
   it('hides the invite code column from direct reads', async () => {

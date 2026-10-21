@@ -170,19 +170,43 @@ export function CabalProvider({ boot, children }: { boot: Boot; children: React.
 
   // --- navigation -------------------------------------------------------------
 
-  const open = useCallback((id: string | null) => {
-    setActive(id)
-    const url = new URL(window.location.href)
-    url.searchParams.delete('welcome')
-    if (id) url.searchParams.set('c', id)
-    else url.searchParams.delete('c')
-    window.history.replaceState(null, '', url)
-  }, [])
+  // Reopening Cabal puts you back in the conversation you last had open.
+  const lastOpenKey = `cabal:last-open:${userId}`
+  const open = useCallback(
+    (id: string | null) => {
+      setActive(id)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('welcome')
+      if (id) url.searchParams.set('c', id)
+      else url.searchParams.delete('c')
+      window.history.replaceState(null, '', url)
+      try {
+        if (id) localStorage.setItem(lastOpenKey, id)
+        else localStorage.removeItem(lastOpenKey)
+      } catch {}
+    },
+    [lastOpenKey],
+  )
 
+  const restored = useRef<string | null>(null)
   useEffect(() => {
-    const c = new URLSearchParams(window.location.search).get('c')
+    let c = new URLSearchParams(window.location.search).get('c')
+    if (!c) {
+      try {
+        c = localStorage.getItem(lastOpenKey)
+      } catch {}
+      restored.current = c
+    }
     if (c) setActive(c)
-  }, [])
+  }, [lastOpenKey])
+
+  // A remembered conversation you've since left (or that was deleted) falls back to home.
+  useEffect(() => {
+    const id = restored.current
+    if (!id || !channelsQuery.data) return
+    restored.current = null
+    if (!channelsQuery.data.some((c) => c.id === id)) open(null)
+  }, [channelsQuery.data, open])
 
   const openDm = useCallback(
     async (otherId: string) => {

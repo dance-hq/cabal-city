@@ -19,7 +19,7 @@ import { friendlyError } from '@/lib/errors'
 import type { Availability } from '@/lib/types'
 
 const CHOICES: { value: Availability; hint: string }[] = [
-  { value: 'online', hint: 'Around and reachable' },
+  { value: 'online', hint: 'Open to conversations' },
   { value: 'away', hint: 'Stepped away for a bit' },
   { value: 'dnd', hint: 'Here, but notifications are muted' },
   { value: 'invisible', hint: 'Connected, shown as offline' },

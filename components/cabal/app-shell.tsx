@@ -8,11 +8,10 @@ import { Conversation } from './conversation'
 import { ProfileDialog } from './profile-dialog'
 import { SettingsDialog } from './settings-dialog'
 import { UpdateBar } from './update-bar'
-import { SessionWelcome } from './session-welcome'
-import { WorkSessionProvider, useWorkSession } from './work-session'
+import { WorkSessionProvider } from './work-session'
+import { Home } from './home'
 import { DesktopBuddies } from './desktop-buddies'
 import { useMedia } from '@/hooks/use-media'
-import { CabalMark } from '@/components/brand/logo'
 
 export function AppShell({ boot }: { boot: Boot }) {
   return (
@@ -31,7 +30,6 @@ export function AppShell({ boot }: { boot: Boot }) {
 
 function Layout() {
   const { active, open } = useCabal()
-  const { phase } = useWorkSession()
   const compact = useMedia('(max-width: 719px)')
 
   useEffect(() => {
@@ -41,8 +39,6 @@ function Layout() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [compact, active, open])
-
-  if (phase !== 'app') return <SessionWelcome />
 
   if (compact) {
     return (
@@ -60,21 +56,7 @@ function Layout() {
         <aside className="flex w-72 shrink-0 flex-col border-r bg-sidebar" aria-label="People and channels">
           <BuddyList />
         </aside>
-        <main className="flex min-w-0 flex-1 flex-col">{active ? <Conversation /> : <NothingOpen />}</main>
-      </div>
-    </div>
-  )
-}
-
-function NothingOpen() {
-  return (
-    <div className="flex flex-1 flex-col">
-      <div className="app-drag h-11 shrink-0 border-b" />
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
-        <CabalMark className="size-8 opacity-80" />
-        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground text-pretty">
-          Pick a name to start a conversation, or drop into a channel. Or just leave Cabal open and get back to work.
-        </p>
+        <main className="flex min-w-0 flex-1 flex-col">{active ? <Conversation /> : <Home />}</main>
       </div>
     </div>
   )
