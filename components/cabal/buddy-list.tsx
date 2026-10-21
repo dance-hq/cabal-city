@@ -5,8 +5,8 @@ import {
   Check,
   ChevronRight,
   Compass,
+  FolderPlus,
   Hash,
-  Info,
   Link2,
   Lock,
   MessageSquareWarning,
@@ -29,6 +29,9 @@ import { compareByPresence } from '@/lib/presence'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { STATUS_LABEL } from './status-dot'
+import { GroupMenu, GroupNameDialog, PERSON_DRAG_TYPE, PersonMenu, type Naming } from './buddy-group-ui'
+import { useBuddyGroups } from '@/hooks/use-buddy-groups'
+import { arrangeBuddies, type BuddyGroup } from '@/lib/buddy-groups'
 import type { Channel, ShownStatus } from '@/lib/types'
 
 export async function copyInviteLink(communityId: string) {
@@ -69,6 +72,8 @@ export function BuddyList() {
   const [creatingTeam, setCreatingTeam] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [browsingTeams, setBrowsingTeams] = useState(false)
+  const [naming, setNaming] = useState<Naming | null>(null)
+  const buddyGroups = useBuddyGroups()
   const teamRooms = useTeamRooms(community.id)
   const joinable = teamRooms.data?.filter((r) => !r.joined).length ?? 0
 
@@ -92,14 +97,51 @@ export function BuddyList() {
         m.profile.username?.toLowerCase().includes(q) ||
         m.profile.company?.toLowerCase().includes(q),
     )
-    .sort((a, b) => {
-      const ua = dmByUser.get(a.user_id)?.unread ?? 0
-      const ub = dmByUser.get(b.user_id)?.unread ?? 0
-      if ((ua > 0) !== (ub > 0) && a.status === b.status) return ub - ua
-      return compareByPresence(a, b)
-    })
-  const here = people.filter((p) => p.status !== 'offline')
-  const away = people.filter((p) => p.status === 'offline')
+  const arranged = arrangeBuddies(people, buddyGroups.groups, buddyGroups.placements, (a, b) => {
+    const ua = dmByUser.get(a.user_id)?.unread ?? 0
+    const ub = dmByUser.get(b.user_id)?.unread ?? 0
+    if ((ua > 0) !== (ub > 0) && a.status === b.status) return ub - ua
+    return compareByPresence(a, b)
+  })
+  const here = arranged.here
+  const away = arranged.offline
+  const groupOf = new Map(buddyGroups.placements.map((p) => [p.member_id, p.group_id]))
+
+  function personRow(p: (typeof people)[number]) {
+    return (
+      <PersonRow
+        key={p.user_id}
+        userId={p.user_id}
+        name={p.name}
+        avatarUrl={p.profile.avatar_url}
+        status={p.status}
+        statusText={p.profile.status_text}
+        unread={dmByUser.get(p.user_id)?.unread ?? 0}
+        selected={!!active && dmByUser.get(p.user_id)?.id === active}
+        onOpen={() => openDm(p.user_id)}
+        menu={
+          <PersonMenu
+            name={p.name}
+            groups={buddyGroups.groups}
+            currentGroup={groupOf.get(p.user_id) ?? null}
+            onProfile={() => showProfile(p.user_id)}
+            onMove={(groupId) => buddyGroups.moveTo(p.user_id, groupId)}
+            onNewGroup={() => setNaming({ kind: 'create', memberId: p.user_id, memberName: p.name })}
+          />
+        }
+      />
+    )
+  }
+
+  async function saveName(n: Naming, name: string) {
+    if (n.kind === 'create') await buddyGroups.createGroup(name, n.memberId)
+    else await buddyGroups.renameGroup(n.groupId, name)
+  }
+
+  function deleteGroup(g: BuddyGroup) {
+    buddyGroups.deleteGroup(g.id)
+    toast.message(`Deleted ${g.name}`, { description: 'Everyone in it is back in Here now.' })
+  }
   const visibleRooms = rooms.filter((r) => !q || r.slug?.includes(q))
   const visibleTeams = teams.filter((t) => !q || t.team_name?.toLowerCase().includes(q))
   const othersExist = members.some((m) => m.user_id !== userId)
@@ -254,21 +296,54 @@ export function BuddyList() {
           )}
         </Section>
 
-        <Section label={`Here now · ${here.length}`}>
+        {arranged.groups.map(({ group: g, online, total }) => {
+          if (q && online.length === 0) return null
+          const expanded = !g.collapsed || !!q
+          return (
+            <Section
+              key={g.id}
+              label={`${g.name} · ${online.length}/${total}`}
+              collapsible
+              expanded={expanded}
+              onToggle={() => buddyGroups.setCollapsed(g.id, !g.collapsed)}
+              onDropPerson={(id) => groupOf.get(id) !== g.id && buddyGroups.moveTo(id, g.id)}
+              action={
+                <GroupMenu
+                  name={g.name}
+                  onRename={() => setNaming({ kind: 'rename', groupId: g.id, name: g.name })}
+                  onDelete={() => deleteGroup(g)}
+                />
+              }
+            >
+              {expanded && online.map(personRow)}
+              {expanded && !q && online.length === 0 && (
+                <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
+                  {total === 0 ? 'Drag someone here, or use ··· on their name.' : 'Nobody in this group is around.'}
+                </p>
+              )}
+            </Section>
+          )
+        })}
+
+        <Section
+          label={`Here now · ${here.length}`}
+          onDropPerson={(id) => groupOf.has(id) && buddyGroups.moveTo(id, null)}
+          action={
+            othersExist && (
+              <button
+                type="button"
+                onClick={() => setNaming({ kind: 'create', memberId: null })}
+                className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="New group"
+                title="New group"
+              >
+                <FolderPlus className="size-3.5" aria-hidden />
+              </button>
+            )
+          }
+        >
           {membersLoading && <PeopleSkeleton />}
-          {here.map((p) => (
-            <PersonRow
-              key={p.user_id}
-              name={p.name}
-              avatarUrl={p.profile.avatar_url}
-              status={p.status}
-              statusText={p.profile.status_text}
-              unread={dmByUser.get(p.user_id)?.unread ?? 0}
-              selected={!!active && dmByUser.get(p.user_id)?.id === active}
-              onOpen={() => openDm(p.user_id)}
-              onInfo={() => showProfile(p.user_id)}
-            />
-          ))}
+          {here.map(personRow)}
           {!membersLoading && here.length === 0 && othersExist && !q && (
             <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">Nobody else is around right now.</p>
           )}
@@ -281,20 +356,7 @@ export function BuddyList() {
             expanded={showOffline || !!q}
             onToggle={() => setShowOffline((v) => !v)}
           >
-            {(showOffline || q) &&
-              away.map((p) => (
-                <PersonRow
-                  key={p.user_id}
-                  name={p.name}
-                  avatarUrl={p.profile.avatar_url}
-                  status="offline"
-                  statusText={p.profile.status_text}
-                  unread={dmByUser.get(p.user_id)?.unread ?? 0}
-                  selected={!!active && dmByUser.get(p.user_id)?.id === active}
-                  onOpen={() => openDm(p.user_id)}
-                  onInfo={() => showProfile(p.user_id)}
-                />
-              ))}
+            {(showOffline || q) && away.map(personRow)}
           </Section>
         )}
 
@@ -337,6 +399,7 @@ export function BuddyList() {
       <CreateTeamDialog open={creatingTeam} onOpenChange={setCreatingTeam} />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
       <BrowseTeamsDialog open={browsingTeams} onOpenChange={setBrowsingTeams} onCreate={() => setCreatingTeam(true)} />
+      <GroupNameDialog naming={naming} onClose={() => setNaming(null)} onSubmit={saveName} />
     </div>
   )
 }
@@ -348,6 +411,7 @@ function Section({
   collapsible,
   expanded,
   onToggle,
+  onDropPerson,
 }: {
   label: string
   action?: React.ReactNode
@@ -355,10 +419,34 @@ function Section({
   collapsible?: boolean
   expanded?: boolean
   onToggle?: () => void
+  onDropPerson?: (userId: string) => void
 }) {
+  const [dropping, setDropping] = useState(false)
+  const accepts = (e: React.DragEvent) => !!onDropPerson && e.dataTransfer.types.includes(PERSON_DRAG_TYPE)
   return (
-    <section className="mt-3 flex flex-col gap-px first:mt-1">
-      <div className="flex h-6 items-center justify-between pr-3 pl-4">
+    <section
+      className={cn(
+        'mt-3 flex flex-col gap-px rounded-md transition-colors first:mt-1',
+        dropping && 'bg-sidebar-accent/60 ring-1 ring-ring/40',
+      )}
+      onDragOver={(e) => {
+        if (!accepts(e)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setDropping(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
+      }}
+      onDrop={(e) => {
+        setDropping(false)
+        if (!accepts(e)) return
+        e.preventDefault()
+        const id = e.dataTransfer.getData(PERSON_DRAG_TYPE)
+        if (id) onDropPerson?.(id)
+      }}
+    >
+      <div className="group flex h-6 items-center justify-between pr-3 pl-4">
         {collapsible ? (
           <button
             type="button"
@@ -427,6 +515,7 @@ function UnreadBadge({ count, quiet }: { count: number; quiet?: boolean }) {
 }
 
 function PersonRow({
+  userId,
   name,
   avatarUrl,
   status,
@@ -434,8 +523,9 @@ function PersonRow({
   unread,
   selected,
   onOpen,
-  onInfo,
+  menu,
 }: {
+  userId: string
   name: string
   avatarUrl: string | null
   status: ShownStatus
@@ -443,11 +533,16 @@ function PersonRow({
   unread: number
   selected: boolean
   onOpen: () => void
-  onInfo: () => void
+  menu: React.ReactNode
 }) {
   const sub = statusText || (status === 'away' || status === 'dnd' ? STATUS_LABEL[status] : null)
   return (
     <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(PERSON_DRAG_TYPE, userId)
+        e.dataTransfer.effectAllowed = 'move'
+      }}
       className={cn(
         'group mx-2 flex items-center rounded-md transition-colors hover:bg-sidebar-accent',
         selected && 'bg-sidebar-accent',
@@ -479,14 +574,7 @@ function PersonRow({
         </span>
         {unread > 0 && <UnreadBadge count={unread} />}
       </button>
-      <button
-        type="button"
-        onClick={onInfo}
-        className="mr-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label={`View ${name}'s profile`}
-      >
-        <Info className="size-3.5" aria-hidden />
-      </button>
+      {menu}
     </div>
   )
 }

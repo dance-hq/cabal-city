@@ -10,6 +10,7 @@ import { SettingsDialog } from './settings-dialog'
 import { UpdateBar } from './update-bar'
 import { SessionWelcome } from './session-welcome'
 import { WorkSessionProvider, useWorkSession } from './work-session'
+import { DesktopBuddies } from './desktop-buddies'
 import { useMedia } from '@/hooks/use-media'
 import { CabalMark } from '@/components/brand/logo'
 
@@ -21,6 +22,7 @@ export function AppShell({ boot }: { boot: Boot }) {
           <Layout />
           <ProfileDialog />
           <SettingsDialog />
+          <DesktopBuddies />
         </WorkSessionProvider>
       </CabalProvider>
     </SWRConfig>
