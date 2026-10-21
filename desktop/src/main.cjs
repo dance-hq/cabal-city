@@ -503,7 +503,7 @@ ipcMain.on('cabal:overlay-action', (event, raw) => {
   if (!fromOverlay(event)) return
   const action = rules.overlayAction(raw)
   if (!action) return
-  if (!win || !rules.isAppUrl(win.webContents.getURL(), ORIGINS)) return showWindow()
+  if (!win || !rules.isAppUrl(win.webContents.getURL(), ORIGINS)) return action.type === 'pause-session' ? undefined : showWindow()
   if (action.type === 'open-dm') showWindow()
   win.webContents.send('cabal:buddy-action', action)
 })

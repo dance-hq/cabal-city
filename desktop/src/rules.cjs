@@ -318,6 +318,8 @@ function overlayAction(raw) {
       const groupId = id(raw.groupId)
       return groupId && typeof raw.collapsed === 'boolean' ? { type: 'collapse-group', groupId, collapsed: raw.collapsed } : null
     }
+    case 'pause-session':
+      return { type: 'pause-session' }
     default:
       return null
   }

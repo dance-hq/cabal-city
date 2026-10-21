@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useCabal } from './store'
+import { useWorkSession } from './work-session'
 import { useBuddyGroups } from '@/hooks/use-buddy-groups'
 import { useLockIns } from '@/hooks/use-lock-ins'
 import { arrangeBuddies, type BuddyAction, type OverlayBuddies, type OverlayPerson } from '@/lib/buddy-groups'
@@ -19,6 +20,7 @@ function Sync() {
   const { members, userId, statusOf, channels, openDm, community } = useCabal()
   const buddy = useBuddyGroups()
   const lockIns = useLockIns(community.id)
+  const session = useWorkSession()
 
   const list = useMemo<OverlayBuddies>(() => {
     const unread = new Map<string, number>()
@@ -96,6 +98,9 @@ function Sync() {
         return
       case 'collapse-group':
         if (isGroup(action.groupId)) buddy.setCollapsed(action.groupId, action.collapsed)
+        return
+      case 'pause-session':
+        if (session.status === 'running') void session.pause()
         return
     }
   }
