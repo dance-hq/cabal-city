@@ -10,7 +10,7 @@ const STARS = [
 // The city flag, stretched edge to edge, with room left for a fifth star.
 export function ChicagoFlag() {
   return (
-    <figure className="flex w-full flex-col" aria-labelledby="flag-caption">
+    <figure className="flex w-full flex-col" aria-label="The stars of the Chicago city flag, with room for a fifth">
       <div className="h-5 bg-flag md:h-8" aria-hidden />
       <div className="mx-auto w-full max-w-5xl px-6 py-8 md:py-12">
         <ol className="grid grid-cols-5 gap-2 md:gap-6">
@@ -37,9 +37,6 @@ export function ChicagoFlag() {
         </ol>
       </div>
       <div className="h-5 bg-flag md:h-8" aria-hidden />
-      <figcaption id="flag-caption" className="mx-auto w-full max-w-5xl px-6 pt-3 font-mono text-xs text-muted-foreground">
-        Four stars on the city flag. Chicago has been arguing about a fifth for decades.
-      </figcaption>
     </figure>
   )
 }
