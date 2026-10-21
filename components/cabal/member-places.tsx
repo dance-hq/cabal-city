@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import { Hash, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
@@ -13,115 +13,89 @@ import type { TeamVisibility } from '@/lib/types'
 type Place = {
   kind: 'team' | 'room'
   channel_id: string | null
-  slug: string | null
   team_id: string | null
   team_name: string | null
   visibility: TeamVisibility | null
   role: 'owner' | 'member' | 'admin' | null
   joined: boolean
-  posts: number | null
-  last_posted_at: string | null
 }
 
-function usePlaces(communityId: string, personId: string) {
+type Team = Place & { kind: 'team'; team_id: string }
+
+// member_places also returns the rooms someone has posted in; a profile only
+// shows their teams.
+function useTeams(communityId: string, personId: string) {
   return useSWR(['member-places', communityId, personId], async () => {
     const { data, error } = await createClient().rpc('member_places', { p_community: communityId, p_user: personId })
     if (error) throw error
-    return ((data ?? []) as Place[]).sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === 'team' ? -1 : 1
-      if (a.kind === 'team') {
+    return ((data ?? []) as Place[])
+      .filter((p): p is Team => p.kind === 'team' && p.team_id !== null)
+      .sort((a, b) => {
         if ((a.role === 'owner') !== (b.role === 'owner')) return a.role === 'owner' ? -1 : 1
         return (a.team_name ?? '').localeCompare(b.team_name ?? '')
-      }
-      return (b.posts ?? 0) - (a.posts ?? 0)
-    })
+      })
   })
 }
 
-// The teams someone is on and the channels they talk in, on their profile card.
-// Picking one takes you there (joining a public team first if you're not on it).
+// The teams someone is on, on their profile card. Picking one takes you there
+// (joining a public team first if you're not on it).
 export function MemberPlaces({ personId, self, onNavigate }: { personId: string; self: boolean; onNavigate: () => void }) {
   const { community, open, refreshChannels } = useCabal()
-  const places = usePlaces(community.id, personId)
+  const teams = useTeams(community.id, personId)
   const [busy, setBusy] = useState<string | null>(null)
 
-  async function go(p: Place) {
-    if (p.kind === 'room' || p.joined) {
-      if (!p.channel_id) return
+  async function go(t: Team) {
+    if (t.joined) {
+      if (!t.channel_id) return
       onNavigate()
-      open(p.channel_id)
+      open(t.channel_id)
       return
     }
-    setBusy(p.team_id)
-    const { error } = await createClient().rpc('join_team', { p_team: p.team_id })
+    setBusy(t.team_id)
+    const { error } = await createClient().rpc('join_team', { p_team: t.team_id })
     if (error) {
       setBusy(null)
       toast.error(friendlyError(error))
-      void places.mutate()
+      void teams.mutate()
       return
     }
-    await openTeam(community.id, p.team_id!, open, refreshChannels)
+    await openTeam(community.id, t.team_id, open, refreshChannels)
     setBusy(null)
     onNavigate()
   }
 
-  if (places.error) return <p className="text-xs text-muted-foreground">{"Couldn't load their channels."}</p>
-  if (!places.data) return null
+  if (teams.error) return <p className="text-xs text-muted-foreground">{"Couldn't load their teams."}</p>
+  if (!teams.data) return null
+  if (teams.data.length === 0 && !self) return null
 
   return (
-    <section className="flex w-full flex-col gap-1" aria-labelledby={`places-${personId}`}>
-      <h3 id={`places-${personId}`} className="font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase">
-        Channels &amp; teams
+    <section className="flex w-full flex-col gap-1" aria-labelledby={`teams-${personId}`}>
+      <h3 id={`teams-${personId}`} className="font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase">
+        Teams
       </h3>
-      {places.data.length === 0 ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {self ? "You're not on a team and haven't posted lately." : "Not on a team and hasn't posted lately."}
-        </p>
+      {teams.data.length === 0 ? (
+        <p className="text-sm leading-relaxed text-muted-foreground">{"You're not on a team yet."}</p>
       ) : (
         <ul className="-mx-2 flex flex-col">
-          {places.data.map((p) => {
-            const label = p.kind === 'team' ? (p.team_name ?? 'Team') : (p.slug ?? '')
-            const tag = p.role === 'admin' ? 'Admin' : p.role === 'owner' ? 'Owner' : null
-            const meta =
-              p.kind === 'team'
-                ? p.joined
-                  ? null
-                  : 'Join'
-                : p.posts
-                  ? `${p.posts} ${p.posts === 1 ? 'message' : 'messages'}`
-                  : null
-            const spoken = [
-              p.kind === 'team' ? `${label} team` : `#${label}`,
-              tag,
-              meta === 'Join' ? 'you can join' : meta,
-            ]
-              .filter(Boolean)
-              .join(', ')
+          {teams.data.map((t) => {
+            const label = t.team_name ?? 'Team'
+            const tag = t.role === 'admin' ? 'Admin' : t.role === 'owner' ? 'Owner' : null
+            const spoken = [`${label} team`, tag, t.joined ? null : 'you can join'].filter(Boolean).join(', ')
             return (
-              <li key={p.kind === 'team' ? `t-${p.team_id}` : `r-${p.channel_id}`}>
+              <li key={t.team_id}>
                 <button
                   type="button"
-                  onClick={() => go(p)}
+                  onClick={() => go(t)}
                   disabled={busy !== null}
                   aria-label={spoken}
                   className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
                 >
-                  {p.kind === 'team' ? (
-                    <TeamIcon visibility={p.visibility} className="size-3.5 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  )}
-                  <span className={p.kind === 'room' ? 'min-w-0 flex-1 truncate font-mono text-[13px]' : 'min-w-0 flex-1 truncate'}>
-                    {label}
-                  </span>
-                  {busy === p.team_id && p.kind === 'team' ? (
+                  <TeamIcon visibility={t.visibility} className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {busy === t.team_id ? (
                     <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
                   ) : (
-                    meta && (
-                      <span className={meta === 'Join' ? 'shrink-0 text-xs font-medium text-flag' : 'shrink-0 text-xs text-muted-foreground'}>
-                        {meta}
-                      </span>
-                    )
+                    !t.joined && <span className="shrink-0 text-xs font-medium text-flag">Join</span>
                   )}
                   {tag && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">{tag}</span>}
                 </button>
