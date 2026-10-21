@@ -61,7 +61,7 @@ export function RecoveryKeyDialog() {
             {madeRecovery ? 'Your direct messages are end-to-end encrypted' : 'Your recovery key'}
           </DialogTitle>
           <DialogDescription className="leading-relaxed text-pretty">
-            Only your devices can read them: not the admins, and not the people who run Cabal. If you ever lose every
+            Only your devices can read your direct messages: not the admins, and not the people who run Cabal. If you ever lose every
             device you’re signed in on, this key is the only way back into your messages.
           </DialogDescription>
         </DialogHeader>
