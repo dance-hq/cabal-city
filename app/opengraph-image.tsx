@@ -1,41 +1,46 @@
 import { ImageResponse } from 'next/og'
+import { LOCKUP } from '@/components/brand/wordmark-paths'
+import { BRAND } from '@/lib/brand'
 
-export const alt = "Cabal: Chicago's builders, one buddy list away"
+export const alt = 'cabal.city: Build your own cabal.'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-const STAR = Array.from({ length: 12 }, (_, i) => {
-  const r = i % 2 === 0 ? 50 : 23
-  const a = ((-90 + i * 30) * Math.PI) / 180
-  return `${(50 + r * Math.cos(a)).toFixed(2)},${(50 + r * Math.sin(a)).toFixed(2)}`
-}).join(' ')
-
-const INK = '#16171a'
-const PAPER = '#f2f3f5'
-const BLUE = '#41b6e6'
-const RED = '#e4002b'
+const LOGO_WIDTH = 860
+const LOGO_HEIGHT = Math.round((LOGO_WIDTH * LOCKUP.height) / LOCKUP.width)
 
 export default function OpengraphImage() {
   return new ImageResponse(
     (
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: INK, color: PAPER }}>
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '64px 72px 40px', gap: 20 }}>
-          <div style={{ display: 'flex', fontSize: 30, fontFamily: 'monospace', opacity: 0.75 }}>cabal · Chicago</div>
-          <div style={{ display: 'flex', fontSize: 76, fontWeight: 700, lineHeight: 1.02, letterSpacing: -2, maxWidth: 980 }}>
-            Chicago&apos;s builders, one buddy list away.
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 'auto' }}>
-          <div style={{ height: 36, background: BLUE }} />
-          <div style={{ display: 'flex', justifyContent: 'space-around', padding: '28px 120px' }}>
-            {[0, 1, 2, 3].map((i) => (
-              <svg key={i} width="110" height="110" viewBox="0 0 100 100">
-                <polygon points={STAR} fill={RED} />
-              </svg>
-            ))}
-          </div>
-          <div style={{ height: 36, background: BLUE }} />
-          <div style={{ height: 24 }} />
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 44,
+          background: BRAND.ink,
+        }}
+      >
+        <svg width={LOGO_WIDTH} height={LOGO_HEIGHT} viewBox={`0 0 ${LOCKUP.width} ${LOCKUP.height}`}>
+          <polygon points={LOCKUP.star} fill={BRAND.star} />
+          <path d={LOCKUP.cabal} fill={BRAND.paper} />
+          <path d={LOCKUP.city} fill={BRAND.cityOnInk} />
+        </svg>
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 38,
+            fontFamily: 'monospace',
+            letterSpacing: 8,
+            color: BRAND.paper,
+            opacity: 0.82,
+            paddingLeft: 120,
+          }}
+        >
+          {BRAND.tagline}
         </div>
       </div>
     ),

@@ -49,6 +49,9 @@
   --flag: oklch(0.72 0.125 228);
   --star: oklch(0.585 0.235 25);
   --star-foreground: oklch(0.99 0 0);
+  /* The logo's exact colors (lib/brand.ts), the same in both themes. */
+  --brand-star: #f22a33;
+  --brand-ink: #0d0e10;
 }
 
 .dark {
@@ -87,7 +90,7 @@
   --sidebar-border: oklch(0.25 0.006 260);
   --sidebar-ring: oklch(0.84 0.155 84);
   --flag: oklch(0.76 0.12 228);
-  --star: oklch(0.64 0.225 25);
+  --star: var(--brand-star);
   --star-foreground: oklch(0.99 0 0);
 }
 
@@ -103,6 +106,8 @@
   --color-flag: var(--flag);
   --color-star: var(--star);
   --color-star-foreground: var(--star-foreground);
+  --color-brand-star: var(--brand-star);
+  --color-brand-ink: var(--brand-ink);
   --font-sans: 'Geist', 'Geist Fallback', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', ui-monospace, monospace;
   --color-background: var(--background);

@@ -6,8 +6,8 @@ import { githubUrl } from '@/lib/config'
 export function SiteHeader() {
   return (
     <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
-      <Link href="/" aria-label="Cabal home" className="rounded-md focus-visible:ring-2 focus-visible:ring-ring">
-        <CabalWordmark />
+      <Link href="/" aria-label="cabal.city home" className="rounded-md focus-visible:ring-2 focus-visible:ring-ring">
+        <CabalWordmark className="h-7" />
       </Link>
       <nav aria-label="Site" className="flex items-center gap-5 text-sm text-muted-foreground">
         <Link href="/#download" className="hidden hover:text-foreground sm:inline">

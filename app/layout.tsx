@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: { default: "Cabal: Chicago's builders, one buddy list away", template: '%s · Cabal' },
   description,
   applicationName: 'Cabal',
-  openGraph: { type: 'website', siteName: 'Cabal', description, locale: 'en_US' },
+  openGraph: { type: 'website', siteName: 'cabal.city', description, locale: 'en_US' },
   twitter: { card: 'summary_large_image', description },
   icons: {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }, { url: '/icon-32.png', sizes: '32x32' }],
