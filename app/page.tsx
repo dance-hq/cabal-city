@@ -19,7 +19,7 @@ export default async function Home() {
   const [release, online] = await Promise.all([latestRelease(), community ? onlineCount(community.id) : null])
 
   return (
-    <div className="chicago flex min-h-svh flex-col">
+    <div className="flex min-h-svh flex-col">
       <SiteHeader />
       <Suspense>
         <DeletedNotice />

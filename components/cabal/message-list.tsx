@@ -221,7 +221,7 @@ export function MessageList({
               {showUnread && (
                 <div className="my-2 flex items-center gap-3" role="separator" aria-label="New messages">
                   <div className="h-px flex-1 bg-primary/60" />
-                  <span className="font-mono text-[10.5px] tracking-wider text-mark uppercase">New</span>
+                  <span className="font-mono text-[10.5px] tracking-wider text-primary uppercase">New</span>
                 </div>
               )}
               {m.kind === 'system' ? (
@@ -231,7 +231,7 @@ export function MessageList({
                   className={cn(
                     'group relative -mx-2 flex rounded-md px-2 transition-opacity duration-500 ease-out hover:bg-accent/50',
                     irc ? 'gap-3 py-0.5' : grouped ? 'gap-3 py-0.5' : 'mt-2.5 gap-3 py-0.5',
-                    mentioned && 'bg-primary/10 hover:bg-primary/15',
+                    mentioned && 'bg-flag/10 hover:bg-flag/15',
                     m.pending && 'opacity-70',
                   )}
                 >

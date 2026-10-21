@@ -5,19 +5,20 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Cabal palette: graphite neutrals, one marigold accent (the "door is open"
-  light), plus two tiny status signals (online green, do-not-disturb rose).
+  cabal.city palette, from the Chicago flag in the logo: ink neutrals, star
+  red for actions, flag blue for detail and focus, plus the online green and
+  do-not-disturb status signals.
 */
 
 :root {
   --background: oklch(0.985 0.002 260);
-  --foreground: oklch(0.2 0.006 260);
+  --foreground: oklch(0.18 0.006 265);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.006 260);
+  --card-foreground: oklch(0.18 0.006 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.006 260);
-  --primary: oklch(0.8 0.155 82);
-  --primary-foreground: oklch(0.22 0.03 80);
+  --popover-foreground: oklch(0.18 0.006 265);
+  --primary: oklch(0.585 0.235 25);
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.955 0.003 260);
   --secondary-foreground: oklch(0.25 0.006 260);
   --muted: oklch(0.955 0.003 260);
@@ -27,24 +28,25 @@
   --destructive: oklch(0.58 0.2 15);
   --border: oklch(0.9 0.004 260);
   --input: oklch(0.88 0.004 260);
-  --ring: oklch(0.72 0.15 80);
-  --mark: oklch(0.55 0.13 75);
+  --ring: oklch(0.66 0.13 232);
+  /* Flag blue deep enough to read as small text on white. */
+  --mark: oklch(0.5 0.12 238);
   --online: oklch(0.62 0.16 150);
   --dnd: oklch(0.6 0.19 15);
-  --chart-1: oklch(0.8 0.155 82);
+  --chart-1: oklch(0.585 0.235 25);
   --chart-2: oklch(0.62 0.16 150);
   --chart-3: oklch(0.6 0.19 15);
   --chart-4: oklch(0.47 0.01 260);
   --chart-5: oklch(0.2 0.006 260);
   --radius: 0.5rem;
   --sidebar: oklch(0.97 0.003 260);
-  --sidebar-foreground: oklch(0.2 0.006 260);
-  --sidebar-primary: oklch(0.8 0.155 82);
-  --sidebar-primary-foreground: oklch(0.22 0.03 80);
+  --sidebar-foreground: oklch(0.18 0.006 265);
+  --sidebar-primary: oklch(0.585 0.235 25);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
   --sidebar-accent: oklch(0.93 0.004 260);
-  --sidebar-accent-foreground: oklch(0.2 0.006 260);
+  --sidebar-accent-foreground: oklch(0.18 0.006 265);
   --sidebar-border: oklch(0.9 0.004 260);
-  --sidebar-ring: oklch(0.72 0.15 80);
+  --sidebar-ring: oklch(0.66 0.13 232);
   /* The city flag: light blue stripes, red six-pointed stars. */
   --flag: oklch(0.72 0.125 228);
   --star: oklch(0.585 0.235 25);
@@ -61,8 +63,8 @@
   --card-foreground: oklch(0.94 0.004 260);
   --popover: oklch(0.215 0.006 260);
   --popover-foreground: oklch(0.94 0.004 260);
-  --primary: oklch(0.84 0.155 84);
-  --primary-foreground: oklch(0.2 0.03 80);
+  --primary: oklch(0.6 0.23 25);
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.245 0.006 260);
   --secondary-foreground: oklch(0.94 0.004 260);
   --muted: oklch(0.235 0.006 260);
@@ -72,34 +74,26 @@
   --destructive: oklch(0.66 0.19 18);
   --border: oklch(0.28 0.006 260);
   --input: oklch(0.31 0.006 260);
-  --ring: oklch(0.84 0.155 84);
-  --mark: oklch(0.84 0.155 84);
+  --ring: oklch(0.76 0.12 228);
+  --mark: oklch(0.78 0.11 228);
   --online: oklch(0.76 0.16 150);
   --dnd: oklch(0.68 0.18 18);
-  --chart-1: oklch(0.84 0.155 84);
+  --chart-1: oklch(0.6 0.23 25);
   --chart-2: oklch(0.76 0.16 150);
   --chart-3: oklch(0.68 0.18 18);
   --chart-4: oklch(0.69 0.01 260);
   --chart-5: oklch(0.94 0.004 260);
   --sidebar: oklch(0.155 0.005 260);
   --sidebar-foreground: oklch(0.94 0.004 260);
-  --sidebar-primary: oklch(0.84 0.155 84);
-  --sidebar-primary-foreground: oklch(0.2 0.03 80);
+  --sidebar-primary: oklch(0.6 0.23 25);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
   --sidebar-accent: oklch(0.235 0.006 260);
   --sidebar-accent-foreground: oklch(0.96 0.004 260);
   --sidebar-border: oklch(0.25 0.006 260);
-  --sidebar-ring: oklch(0.84 0.155 84);
+  --sidebar-ring: oklch(0.76 0.12 228);
   --flag: oklch(0.76 0.12 228);
   --star: var(--brand-star);
   --star-foreground: oklch(0.99 0 0);
-}
-
-/* Public pages (home, legal) speak Chicago: red for action, flag blue for detail. */
-.chicago {
-  --primary: var(--star);
-  --primary-foreground: var(--star-foreground);
-  --ring: var(--flag);
-  --mark: var(--flag);
 }
 
 @theme inline {
@@ -161,7 +155,7 @@
     @apply bg-background text-foreground font-sans;
   }
   ::selection {
-    background: color-mix(in oklch, var(--primary) 45%, transparent);
+    background: color-mix(in oklch, var(--flag) 40%, transparent);
   }
 }
 
