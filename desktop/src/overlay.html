@@ -548,6 +548,11 @@
         tick()
       })
       api?.onExpanded((value) => {
+        // Opening the list always shows who's here now, even if it was folded last time.
+        if (value && !expanded && sections.here) {
+          sections.here = false
+          try { localStorage.setItem('cabal.overlay.sections', JSON.stringify(sections)) } catch {}
+        }
         expanded = value
         if (!expanded) { naming = null; closeMenu() }
         render()
