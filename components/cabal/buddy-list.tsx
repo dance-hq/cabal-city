@@ -249,7 +249,9 @@ export function BuddyList() {
         {visibleRooms.length > 0 && (
           <Section label="Channels">
             {visibleRooms.map((r) => {
-              const here = [...presence.values()].filter((p) => p.rooms.has(r.id)).length
+              // Other people only: counting yourself made a bare "1" that read as unread.
+              const here = [...presence].filter(([id, p]) => id !== userId && p.rooms.has(r.id)).length
+              const hereLabel = `${here} ${here === 1 ? 'person' : 'people'} here now`
               return (
                 <Row key={r.id} selected={active === r.id} onClick={() => open(r.id)} unread={r.unread} quiet muted={r.muted}>
                   <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -257,7 +259,12 @@ export function BuddyList() {
                     {r.slug}
                   </span>
                   {here > 0 && (
-                    <span className="ml-auto font-mono text-[11px] text-muted-foreground" aria-label={`${here} here now`}>
+                    <span
+                      className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground"
+                      title={hereLabel}
+                      aria-label={hereLabel}
+                    >
+                      <span className="size-1.5 rounded-full bg-online" aria-hidden />
                       {here}
                     </span>
                   )}

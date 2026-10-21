@@ -306,7 +306,7 @@ function HereNow({ people }: { people: Person[] }) {
 }
 
 function Channels() {
-  const { channels, presence, open, community } = useCabal()
+  const { channels, presence, open, community, userId } = useCabal()
   const teamRooms = useTeamRooms(community.id)
   const [browsing, setBrowsing] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -317,7 +317,7 @@ function Channels() {
     <Block label="Channels">
       <ul className="flex flex-col">
         {rooms.map((r) => {
-          const count = [...presence.values()].filter((p) => p.rooms.has(r.id)).length
+          const count = [...presence].filter(([id, p]) => id !== userId && p.rooms.has(r.id)).length
           return (
             <li key={r.id}>
               <button
