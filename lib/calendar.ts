@@ -91,10 +91,30 @@ export function groupByDay(events: CalendarEvent[], now = Date.now()) {
   return groups
 }
 
+// Where a visitor followed the link from, so organizers can see Cabal in their
+// RSVP / analytics sources (Luma, Eventbrite, Partiful, GA all read utm_*).
+export type LinkPlace = 'calendar' | 'calendar_file' | 'share'
+
+// Tags the link on the way out; the saved link stays as the organizer typed it.
+// If the organizer already set their own utm_source, their tags are left alone.
+export function trackedUrl(url: string, from: LinkPlace): string {
+  let link: URL
+  try {
+    link = new URL(url)
+  } catch {
+    return url
+  }
+  if (link.protocol !== 'https:' && link.protocol !== 'http:') return url
+  if (link.searchParams.has('utm_source')) return url
+  link.searchParams.set('utm_source', 'cabal')
+  link.searchParams.set('utm_medium', from)
+  return link.toString()
+}
+
 export function shareText(e: CalendarEvent, now = Date.now()): string {
   const { lead, date } = dayLabel(dayKey(e.starts_at, e.time_zone), e.time_zone, now)
   const when = `${lead ? `${lead}, ` : ''}${date}, ${timeRange(e)}`
-  return `${e.title}: ${when} at ${e.venue}.${e.url ? ` ${e.url}` : ''}`
+  return `${e.title}: ${when} at ${e.venue}.${e.url ? ` ${trackedUrl(e.url, 'share')}` : ''}`
 }
 
 // Form fields (wall-clock in the community's zone) → values for the RPC.
@@ -120,7 +140,8 @@ function icsText(s: string): string {
 }
 
 export function toIcs(e: CalendarEvent, origin: string): string {
-  const description = [e.summary, e.host ? `Hosted by ${e.host}` : null, e.url].filter(Boolean).join('\n')
+  const url = e.url ? trackedUrl(e.url, 'calendar_file') : null
+  const description = [e.summary, e.host ? `Hosted by ${e.host}` : null, url].filter(Boolean).join('\n')
   const host = (() => {
     try {
       return new URL(origin).hostname
@@ -140,7 +161,7 @@ export function toIcs(e: CalendarEvent, origin: string): string {
     `SUMMARY:${icsText(e.title)}`,
     `LOCATION:${icsText(e.venue)}`,
     description ? `DESCRIPTION:${icsText(description)}` : null,
-    e.url ? `URL:${e.url}` : null,
+    url ? `URL:${url}` : null,
     'END:VEVENT',
     'END:VCALENDAR',
   ]
