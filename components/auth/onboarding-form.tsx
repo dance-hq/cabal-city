@@ -89,7 +89,6 @@ export function OnboardingForm({
             autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ada Lovelace"
             className="h-10"
           />
         </div>
