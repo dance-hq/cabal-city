@@ -25,6 +25,12 @@ export const metadata: Metadata = {
 const PLATFORM_BUTTON =
   'group flex flex-col items-start gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:flex-row sm:items-center sm:gap-3 sm:pr-4'
 
+const OPEN_SOURCE =
+  'rounded-sm font-medium text-foreground underline decoration-primary decoration-2 underline-offset-[5px] transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+
+const GITHUB_BUTTON =
+  'inline-flex h-10 items-center gap-2 rounded-lg border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+
 const SECONDARY_LINK =
   'group inline-flex items-center gap-1.5 rounded text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
@@ -61,7 +67,15 @@ export default async function Home() {
             Chicago builders, it&apos;s time to lock in.
           </h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
-            Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
+            Cabal is an{' '}
+            {githubUrl ? (
+              <a href={githubUrl} className={`${OPEN_SOURCE} hover:decoration-foreground`}>
+                open-source
+              </a>
+            ) : (
+              <span className={OPEN_SOURCE}>open-source</span>
+            )}{' '}
+            home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
           <div className="flex flex-col gap-5 pt-4">
@@ -86,7 +100,13 @@ export default async function Home() {
                 </a>
               ))}
             </nav>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              {githubUrl && (
+                <a href={githubUrl} className={GITHUB_BUTTON}>
+                  <GithubIcon className="size-4" />
+                  View on GitHub
+                </a>
+              )}
               <Link href="/login" className={`${SECONDARY_LINK} text-foreground`}>
                 Or open Cabal in your browser
                 <ArrowUpRight
@@ -94,17 +114,6 @@ export default async function Home() {
                   aria-hidden
                 />
               </Link>
-              {githubUrl && (
-                <>
-                  <span aria-hidden className="hidden text-muted-foreground/50 sm:inline">
-                    ·
-                  </span>
-                  <a href={githubUrl} className={`${SECONDARY_LINK} text-muted-foreground hover:text-foreground`}>
-                    <GithubIcon className="size-4" />
-                    View on GitHub
-                  </a>
-                </>
-              )}
             </div>
           </div>
         </section>
