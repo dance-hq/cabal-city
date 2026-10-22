@@ -397,10 +397,10 @@ export const FRESHNESS: Freshness[] = [
   {
     what: 'Who’s locked in',
     how: 'Broadcast on `lock-ins:<community>` says “look again”, then `community_lock_ins()`; SWR poll as a fallback',
-    when: 'Instant, or 30s',
+    when: 'Instant, or 10s',
     sources: [
       { path: 'components/cabal/work-session.tsx', proves: ['lock-ins:${community.id}'] },
-      { path: 'hooks/use-lock-ins.ts', proves: ['refreshInterval: 30_000'] },
+      { path: 'hooks/use-lock-ins.ts', proves: ['refreshInterval: 10_000'] },
     ],
   },
   {
