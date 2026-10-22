@@ -87,6 +87,8 @@ let retryTimer = null
 let pendingLink = rules.findDeepLink(process.argv)
 let unread = 0
 let sessionStartedAt = null
+// Time worked so far while the session is paused (null = not paused).
+let sessionPausedMs = null
 let overlay = null
 let overlayReady = false
 let overlayTimer = null
@@ -237,9 +239,16 @@ let drag = null
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), Math.max(lo, hi))
 const areaAround = (b) => screen.getDisplayNearestPoint({ x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }).workArea
 
-// Shown for the whole session, including while Cabal itself is open or maximized.
+// Shown for the whole session, including while Cabal itself is open or maximized,
+// and while it's paused, so it's right there to resume.
 function overlayWanted() {
-  return sessionStartedAt !== null && settings.sessionOverlay
+  return (sessionStartedAt !== null || sessionPausedMs !== null) && settings.sessionOverlay
+}
+
+function overlaySession() {
+  if (sessionStartedAt !== null) return { status: 'running', startedAt: sessionStartedAt }
+  if (sessionPausedMs !== null) return { status: 'paused', workedMs: sessionPausedMs }
+  return null
 }
 
 function overlayTargetBounds() {
@@ -295,7 +304,7 @@ function endDrag() {
 function sendOverlayState() {
   if (!overlay || !overlayReady) return
   const contents = overlay.webContents
-  contents.send('cabal:overlay-session', sessionStartedAt)
+  contents.send('cabal:overlay-session', overlaySession())
   contents.send('cabal:overlay-expanded', overlayExpanded)
   contents.send('cabal:overlay-buddies', buddies)
 }
@@ -495,6 +504,13 @@ ipcMain.on('cabal:install-update', (event) => {
 ipcMain.on('cabal:session', (event, startedAt) => {
   if (!fromApp(event)) return
   sessionStartedAt = rules.sessionStart(startedAt, Date.now())
+  sessionPausedMs = null
+  scheduleOverlay()
+})
+ipcMain.on('cabal:session-paused', (event, workedMs) => {
+  if (!fromApp(event)) return
+  sessionPausedMs = rules.pausedWork(workedMs)
+  sessionStartedAt = null
   scheduleOverlay()
 })
 // The Cabal window's buddy list, passed on to the corner.
@@ -532,7 +548,9 @@ ipcMain.on('cabal:overlay-action', (event, raw) => {
   if (!action) return
   // Talk right there in a small window instead of pulling the whole Cabal window forward.
   if (action.type === 'open-dm') return openChat(action.userId)
-  if (!win || !rules.isAppUrl(win.webContents.getURL(), ORIGINS)) return action.type === 'pause-session' ? undefined : showWindow()
+  if (!win || !rules.isAppUrl(win.webContents.getURL(), ORIGINS)) {
+    return action.type === 'pause-session' || action.type === 'resume-session' ? undefined : showWindow()
+  }
   if (action.type === 'open-dm') showWindow()
   win.webContents.send('cabal:buddy-action', action)
 })

@@ -166,10 +166,14 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
     }
   }, [running, awaitingWake, supabase, take])
 
-  // The desktop app draws the corner timer from this.
+  // The desktop app draws the corner timer from this. Paused, it keeps the
+  // corner up with the time frozen so it can be resumed from there (desktop
+  // apps without setPausedSession just hide it).
   useEffect(() => {
-    desktop()?.setSession?.(state.status === 'running' ? state.startedAt : null)
-  }, [state.status, state.startedAt])
+    const d = desktop()
+    if (state.status === 'paused' && d?.setPausedSession) d.setPausedSession(state.workedMs)
+    else d?.setSession?.(state.status === 'running' ? state.startedAt : null)
+  }, [state.status, state.startedAt, state.workedMs])
   useEffect(() => () => desktop()?.setSession?.(null), [])
 
   // Quitting the desktop app stops the clock, so the time it's closed doesn't

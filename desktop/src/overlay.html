@@ -44,6 +44,8 @@
       }
       #toggle time { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
       #toggle time .sep { opacity: 0.55; }
+      #root.paused #toggle time { color: var(--muted); }
+      #pause svg[hidden] { display: none; }
       .caret { color: var(--text); opacity: 0.7; transition: transform 0.2s ease; }
       #bar:hover .caret { opacity: 1; }
 
@@ -166,8 +168,9 @@
         <div id="session">
           <span id="since" class="since">Locked in</span>
           <button id="pause" type="button">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
-            Pause session
+            <svg id="pause-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+            <svg id="resume-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z" /></svg>
+            <span id="pause-label">Pause session</span>
           </button>
         </div>
         <div id="list"><div id="content"></div></div>
@@ -182,7 +185,7 @@
       const content = $('content'), footer = $('footer'), menuEl = $('menu')
       const DRAG_TYPE = 'text/x-cabal-person'
 
-      let startedAt = null
+      let session = null // { status: 'running', startedAt } | { status: 'paused', workedMs }
       let expanded = false
       let list = null
       let naming = null // { kind: 'create', userId, forName } | { kind: 'rename', groupId, name }
@@ -200,17 +203,25 @@
         return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60].map(pad)
       }
       function tick() {
-        if (startedAt === null) return
-        const [h, m, s] = parts(Date.now() - startedAt)
+        if (!session) return
+        const [h, m, s] = parts(session.status === 'running' ? Date.now() - session.startedAt : session.workedMs)
         elapsed.replaceChildren(h, el('span', { class: 'sep', text: ':' }), m, el('span', { class: 'sep', text: ':' }), s)
         elapsed.setAttribute('datetime', `PT${Number(h)}H${Number(m)}M${Number(s)}S`)
       }
       setInterval(tick, 1000)
 
-      function showSince() {
-        $('since').textContent = startedAt === null
-          ? 'Locked in'
-          : `Since ${new Date(startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+      function showSession() {
+        const paused = session?.status === 'paused'
+        root.classList.toggle('paused', paused)
+        $('since').textContent = paused
+          ? 'Paused'
+          : session
+            ? `Since ${new Date(session.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+            : 'Locked in'
+        $('pause-label').textContent = paused ? 'Resume session' : 'Pause session'
+        $('pause-icon').toggleAttribute('hidden', paused)
+        $('resume-icon').toggleAttribute('hidden', !paused)
+        toggleButton.setAttribute('aria-label', `${paused ? 'Paused' : 'Locked in'}. Show buddy list`)
       }
 
       // --- small DOM helpers ----------------------------------------------------------
@@ -535,16 +546,17 @@
       // Keyboard (Enter/Space on the timer) opens it too; pointer clicks are handled above.
       toggleButton.addEventListener('click', (e) => e.detail === 0 && api.setExpanded(!expanded))
       $('open').addEventListener('click', () => api.open())
-      // Cabal pauses the session; the timer then goes away until you resume in Cabal.
+      // Cabal pauses or resumes the session; the corner stays put either way.
       $('pause').addEventListener('click', (e) => {
+        if (!session) return
         e.currentTarget.disabled = true
-        api.act({ type: 'pause-session' })
+        api.act({ type: session.status === 'paused' ? 'resume-session' : 'pause-session' })
       })
 
       api?.onSession((value) => {
-        startedAt = value
+        session = value
         $('pause').disabled = false
-        showSince()
+        showSession()
         tick()
       })
       api?.onExpanded((value) => {

@@ -102,6 +102,9 @@ function Sync() {
       case 'pause-session':
         if (session.status === 'running') void session.pause()
         return
+      case 'resume-session':
+        if (session.status === 'paused') void session.resume()
+        return
     }
   }
 
