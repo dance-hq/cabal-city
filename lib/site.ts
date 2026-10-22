@@ -6,8 +6,8 @@ export const SITE_URL =
 
 // What search results and link previews say about the homepage. The title
 // says what Cabal is (the share image carries the headline).
-export const SITE_TITLE = 'Cabal · Open-source messenger for Chicago builders'
+export const SITE_TITLE = 'Cabal · Open source messenger for Chicago builders'
 export const SITE_DESCRIPTION =
-  'Cabal is an open-source home for Chicago’s builders. Find people working on interesting things, see who’s around, and jump into conversations or rooms to build alongside them.'
+  'Cabal is an open source home for Chicago’s builders. Find people working on interesting things, see who’s around, and jump into conversations or rooms to build alongside them.'
 export const SHARE_ALT =
   "cabal.city: Chicago builders, it’s time to lock in. The Chicago flag's four red stars, with an empty fifth."

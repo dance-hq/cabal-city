@@ -54,7 +54,7 @@ export default async function OpengraphImage() {
                 color: BRAND.cityOnPaper,
               }}
             >
-              Open-source messenger
+              Open source messenger
             </div>
           </div>
           <div
