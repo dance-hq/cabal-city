@@ -7,7 +7,7 @@ import { onlineCount } from '@/lib/online-count'
 import { latestRelease } from '@/lib/releases'
 import { githubUrl } from '@/lib/config'
 import { GithubIcon } from '@/components/brand/github-icon'
-import { AppleIcon, LinuxIcon, WindowsIcon } from '@/components/brand/platform-icons'
+import { AppleIcon, WindowsIcon } from '@/components/brand/platform-icons'
 import { ChicagoFlag } from '@/components/marketing/chicago-flag'
 import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
@@ -23,13 +23,13 @@ export const metadata: Metadata = {
 }
 
 const PLATFORM_BUTTON =
-  'group flex flex-col items-start gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:flex-row sm:items-center sm:gap-3 sm:pr-4'
+  'group flex items-center gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:gap-3 sm:pr-4'
 
 const OPEN_SOURCE =
-  'rounded-sm text-foreground underline decoration-primary decoration-[1.5px] underline-offset-4 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+  'rounded-sm font-medium text-foreground underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
-const GITHUB_BUTTON =
-  'inline-flex h-10 items-center gap-2 rounded-lg border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+const GITHUB_TILE =
+  'group flex items-center gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-foreground/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none col-span-2 sm:gap-3 sm:pr-4'
 
 const SECONDARY_LINK =
   'group inline-flex items-center gap-1.5 rounded text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
@@ -37,14 +37,13 @@ const SECONDARY_LINK =
 export default async function Home() {
   const community = await getCommunity()
   const [release, online] = await Promise.all([latestRelease(), community ? onlineCount(community.id) : null])
-  // Straight to the installer when the release has one (Mac = Apple Silicon, Linux = AppImage,
-  // which runs on any distro); otherwise the downloads section further down.
-  const installer = (files: 'windows' | 'mac' | 'linux') =>
+  // Straight to the installer when the release has one (Mac = Apple Silicon); otherwise the
+  // downloads section further down, which also has Linux.
+  const installer = (files: 'windows' | 'mac') =>
     (release.state === 'ready' && release[files][0]?.url) || '#download'
   const platforms = [
     { name: 'Windows', href: installer('windows'), Icon: WindowsIcon },
     { name: 'Mac', href: installer('mac'), Icon: AppleIcon },
-    { name: 'Linux', href: installer('linux'), Icon: LinuxIcon },
   ]
 
   return (
@@ -69,7 +68,7 @@ export default async function Home() {
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
             Cabal is an{' '}
             {githubUrl ? (
-              <a href={githubUrl} className={`${OPEN_SOURCE} hover:decoration-foreground`}>
+              <a href={githubUrl} className={`${OPEN_SOURCE} hover:underline`}>
                 open source
               </a>
             ) : (
@@ -78,43 +77,48 @@ export default async function Home() {
             home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
-          <div className="flex flex-col gap-5 pt-4">
+          <div className="grid grid-cols-2 gap-2.5 pt-2 sm:flex sm:flex-wrap sm:items-center">
             {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
-            <nav aria-label="Download the desktop app" className="grid grid-cols-3 gap-2.5 sm:flex sm:flex-wrap">
-              {platforms.map(({ name, href, Icon }) => (
-                <a key={name} href={href} className={PLATFORM_BUTTON}>
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                    <Icon className="size-5" />
-                  </span>
-                  <span className="flex flex-col gap-0.5">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      <span className="sm:hidden">Get it for</span>
-                      <span className="hidden sm:inline">Download for</span>
-                    </span>
-                    <span className="text-base font-semibold leading-tight">{name}</span>
-                  </span>
-                  <ArrowDownToLine
-                    className="ml-3 hidden size-4 text-muted-foreground transition-colors group-hover:text-primary sm:block"
-                    aria-hidden
-                  />
-                </a>
-              ))}
-            </nav>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-              {githubUrl && (
-                <a href={githubUrl} className={GITHUB_BUTTON}>
-                  <GithubIcon className="size-4" />
-                  View on GitHub
-                </a>
-              )}
-              <Link href="/login" className={`${SECONDARY_LINK} text-foreground`}>
-                Or open Cabal in your browser
-                <ArrowUpRight
-                  className="size-4 text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
+            {platforms.map(({ name, href, Icon }) => (
+              <a key={name} href={href} className={PLATFORM_BUTTON}>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <Icon className="size-5" />
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-mono text-xs text-muted-foreground">Download for</span>
+                  <span className="text-base font-semibold leading-tight">{name}</span>
+                </span>
+                <ArrowDownToLine
+                  className="ml-3 hidden size-4 text-muted-foreground transition-colors group-hover:text-primary sm:block"
                   aria-hidden
                 />
-              </Link>
-            </div>
+              </a>
+            ))}
+            {githubUrl && (
+              <a href={githubUrl} className={GITHUB_TILE}>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-foreground">
+                  <GithubIcon className="size-5" />
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-mono text-xs text-muted-foreground">View on</span>
+                  <span className="text-base font-semibold leading-tight">GitHub</span>
+                </span>
+                <ArrowUpRight
+                  className="ml-3 hidden size-4 text-muted-foreground transition-colors group-hover:text-foreground sm:block"
+                  aria-hidden
+                />
+              </a>
+            )}
+            <Link
+              href="/login"
+              className={`${SECONDARY_LINK} col-span-2 pt-2 text-foreground sm:ml-3 sm:pt-0`}
+            >
+              Or open Cabal in your browser
+              <ArrowUpRight
+                className="size-4 text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
+                aria-hidden
+              />
+            </Link>
           </div>
         </section>
 
