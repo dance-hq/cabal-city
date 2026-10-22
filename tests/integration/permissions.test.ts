@@ -235,7 +235,8 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
       grace.id,
       'the eval harness',
     ])
-    const outsiderView = await outsider.db.rpc('community_lock_ins', { p_community: communityId })
+    // (The "outsider" joined this test community too, so ask about one they're not in.)
+    const outsiderView = await outsider.db.rpc('community_lock_ins', { p_community: crypto.randomUUID() })
     expect(outsiderView.error).not.toBeNull()
 
     const paused = await grace.db.rpc('pause_lock_in')
@@ -247,6 +248,144 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect(resumed.data?.paused_at).toBeNull()
     const ended = await grace.db.rpc('end_work_session')
     expect(typeof ended.data).toBe('number')
+  })
+
+  it('never makes a second session, and closes a forgotten one at 8 hours', async () => {
+    const [a, b] = await Promise.all([grace.db.rpc('lock_in'), grace.db.rpc('lock_in')])
+    expect(a.error).toBeNull()
+    expect(b.error).toBeNull()
+    const open = await admin.from('work_sessions').select('id, started_at').eq('user_id', grace.id).is('ended_at', null)
+    expect(open.data).toHaveLength(1)
+    // Locking in again from another device keeps the same session.
+    const again = await grace.db.rpc('lock_in')
+    expect(again.data?.started_at).toBe(open.data![0].started_at)
+
+    // Paused, Lock in picks it back up instead of starting over.
+    await grace.db.rpc('pause_lock_in')
+    const resumed = await grace.db.rpc('lock_in')
+    expect(resumed.data?.paused_at).toBeNull()
+    expect(resumed.data?.started_at).toBe(open.data![0].started_at)
+    const done = await grace.db.rpc('finish_lock_in')
+    expect(done.data?.id).toBe(open.data![0].id)
+    expect(await grace.db.rpc('finish_lock_in')).toMatchObject({ data: null })
+
+    // Left running for 9 hours (the app kept checking in): saved at 8.
+    const nineHoursAgo = new Date(Date.now() - 9 * 3600_000).toISOString()
+    const { data: forgotten } = await admin
+      .from('work_sessions')
+      .insert({ user_id: grace.id, started_at: nineHoursAgo, running_since: nineHoursAgo, last_beat: new Date().toISOString() })
+      .select('id')
+      .single()
+    const after = await grace.db.rpc('my_lock_in')
+    expect(after.data).toBeNull()
+    const { data: saved } = await admin.from('work_sessions').select('worked_seconds, ended_at').eq('id', forgotten!.id).single()
+    expect(saved?.worked_seconds).toBe(8 * 3600)
+    expect(Date.parse(saved!.ended_at) - Date.parse(nineHoursAgo)).toBe(8 * 3600_000)
+    await admin.from('work_sessions').delete().eq('id', forgotten!.id)
+  })
+
+  it('ranks finished hours by week for people who opted in, and keeps notes private', async () => {
+    await admin.from('work_sessions').delete().in('user_id', [ada.id, grace.id])
+    const first = await ada.db.rpc('lock_in_board', { p_community: communityId })
+    expect(first.error).toBeNull()
+    // The week starts Monday 00:00 in the community's time zone (Chicago).
+    const weekStart = Date.parse(first.data.week_start)
+    const local = new Intl.DateTimeFormat('en-US', {
+      timeZone: first.data.time_zone,
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(weekStart)
+    expect(first.data.time_zone).toBe('America/Chicago')
+    expect(local).toBe('Mon 00:00')
+    expect([167, 168, 169]).toContain((Date.parse(first.data.week_end) - weekStart) / 3600_000)
+
+    const end = Date.now() - 30_000
+    const finished = (user: string, seconds: number, endedAt = end, note?: string) => ({
+      user_id: user,
+      started_at: new Date(endedAt - seconds * 1000).toISOString(),
+      ended_at: new Date(endedAt).toISOString(),
+      running_since: null,
+      worked_seconds: seconds,
+      note: note ?? null,
+    })
+    const { data: rows } = await admin
+      .from('work_sessions')
+      .insert([
+        finished(grace.id, 7200, end, 'Shipped the eval harness'),
+        finished(grace.id, 30, end - 3600_000), // under a minute: not counted
+        finished(grace.id, 10800, weekStart - 3600_000), // last week
+        finished(ada.id, 3600, end),
+      ])
+      .select('id, user_id')
+    const graceSession = rows!.find((r) => r.user_id === grace.id)!.id
+
+    // Nobody opted in yet: an empty board, but your own numbers are there.
+    const empty = await ada.db.rpc('lock_in_board', { p_community: communityId })
+    expect(empty.data.rows).toEqual([])
+    expect(empty.data.joined).toBe(false)
+    const mine = await grace.db.rpc('lock_in_stats', { p_community: communityId })
+    expect(mine.data).toMatchObject({ week_seconds: 7200, all_seconds: 18000, sessions: 2, self: true, board: false })
+    expect(mine.data.days.reduce((s: number, d: number) => s + d, 0)).toBe(7200)
+    expect(mine.data.recent[0].note).toBe('Shipped the eval harness')
+    // Not shared, so not visible to anyone else.
+    expect((await ada.db.rpc('lock_in_stats', { p_community: communityId, p_user: grace.id })).data).toBeNull()
+
+    // Opting in is your own setting; you can't flip it for someone else.
+    expect((await grace.db.from('user_settings').update({ lock_in_board: true }).eq('user_id', grace.id)).error).toBeNull()
+    await ada.db.from('user_settings').update({ lock_in_board: false }).eq('user_id', grace.id)
+    const { data: graceSettings } = await admin.from('user_settings').select('lock_in_board').eq('user_id', grace.id).single()
+    expect(graceSettings?.lock_in_board).toBe(true)
+
+    const one = await ada.db.rpc('lock_in_board', { p_community: communityId })
+    expect(one.data.rows).toEqual([{ user_id: grace.id, seconds: 7200, sessions: 1, rank: 1 }])
+
+    await ada.db.from('user_settings').update({ lock_in_board: true }).eq('user_id', ada.id)
+    const two = await grace.db.rpc('lock_in_board', { p_community: communityId })
+    expect(two.data.joined).toBe(true)
+    expect(two.data.rows.map((r: { user_id: string; rank: number }) => [r.user_id, r.rank])).toEqual([
+      [grace.id, 1],
+      [ada.id, 2],
+    ])
+    const lastWeek = await grace.db.rpc('lock_in_board', { p_community: communityId, p_weeks_ago: 1 })
+    expect(lastWeek.data.rows).toEqual([{ user_id: grace.id, seconds: 10800, sessions: 1, rank: 1 }])
+
+    // A running timer doesn't move the board.
+    await ada.db.rpc('lock_in')
+    const running = await grace.db.rpc('lock_in_board', { p_community: communityId })
+    expect(running.data.rows.find((r: { user_id: string }) => r.user_id === ada.id).seconds).toBe(3600)
+    await ada.db.rpc('finish_lock_in')
+
+    // Shared numbers are visible to members, but never the sessions or notes.
+    const shared = await ada.db.rpc('lock_in_stats', { p_community: communityId, p_user: grace.id })
+    expect(shared.data).toMatchObject({ week_seconds: 7200, self: false })
+    expect(shared.data.recent).toBeUndefined()
+
+    // Notes: only on your own finished sessions.
+    expect((await grace.db.rpc('note_lock_in', { p_session: graceSession, p_note: '  Fixed the flaky test ' })).error).toBeNull()
+    expect((await ada.db.rpc('note_lock_in', { p_session: graceSession, p_note: 'mine now' })).error).not.toBeNull()
+    const { data: noted } = await admin.from('work_sessions').select('note').eq('id', graceSession).single()
+    expect(noted?.note).toBe('Fixed the flaky test')
+
+    // Nobody can write hours directly.
+    expect((await grace.db.from('work_sessions').update({ worked_seconds: 999_999 }).eq('id', graceSession)).error).not.toBeNull()
+    const { data: untouched } = await admin.from('work_sessions').select('worked_seconds').eq('id', graceSession).single()
+    expect(untouched?.worked_seconds).toBe(7200)
+
+    // Nothing from a community you're not in.
+    const elsewhere = crypto.randomUUID()
+    expect((await grace.db.rpc('lock_in_board', { p_community: elsewhere })).error).not.toBeNull()
+    expect((await ada.db.rpc('lock_in_stats', { p_community: elsewhere, p_user: grace.id })).error).not.toBeNull()
+
+    // Leaving the board hides you again, and "Locked in now" follows its own setting.
+    await ada.db.from('user_settings').update({ lock_in_board: false, lock_in_live: false }).eq('user_id', ada.id)
+    expect((await grace.db.rpc('lock_in_stats', { p_community: communityId, p_user: ada.id })).data).toBeNull()
+    await ada.db.rpc('lock_in')
+    const now = await grace.db.rpc('community_lock_ins', { p_community: communityId })
+    expect(now.data?.some((r: { user_id: string }) => r.user_id === ada.id)).toBe(false)
+    await ada.db.rpc('finish_lock_in')
+    await ada.db.from('user_settings').update({ lock_in_live: true }).eq('user_id', ada.id)
   })
 
   it('hides the invite code column from direct reads', async () => {

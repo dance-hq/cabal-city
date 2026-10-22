@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
+import { useSWRConfig } from 'swr'
+import { lockInsKey } from '@/hooks/use-lock-ins'
+import { refreshLockInHours } from '@/hooks/use-lock-in-hours'
 import { Camera, Link2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -480,6 +483,37 @@ function CommunitySettings() {
           Copy invite link
         </Button>
       </div>
+      <LockInSettings />
+    </div>
+  )
+}
+
+// Your hours are always tracked for you; these only decide what others see.
+function LockInSettings() {
+  const { settings, updateSettings, community } = useCabal()
+  const { mutate } = useSWRConfig()
+  async function set(patch: Partial<Pick<typeof settings, 'lock_in_live' | 'lock_in_board'>>) {
+    await updateSettings(patch)
+    void refreshLockInHours(mutate)
+    void mutate(lockInsKey(community.id))
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-4 border-t pt-5">
+      <h3 className="text-sm font-medium">Lock in</h3>
+      <Toggle
+        id="li-live"
+        label="Show me in Locked in now"
+        hint="People see that you're heads down, for how long, and what you're on if you add it. It never means you're free to chat."
+        checked={settings.lock_in_live}
+        onChange={(v) => set({ lock_in_live: v })}
+      />
+      <Toggle
+        id="li-board"
+        label="Show my hours on the weekly board"
+        hint={`Ranks finished sessions, Monday to Sunday in ${community.name}'s time zone. Also shows your Lock in numbers on your profile. Your own history is always yours either way.`}
+        checked={settings.lock_in_board}
+        onChange={(v) => set({ lock_in_board: v })}
+      />
     </div>
   )
 }

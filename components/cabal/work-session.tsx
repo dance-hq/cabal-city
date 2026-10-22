@@ -6,14 +6,18 @@ import { useSWRConfig } from 'swr'
 import { createClient } from '@/lib/supabase/client'
 import { desktop } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import { describeSession, NO_LOCK_IN, readAwayMs, readLockIn, type LockInState } from '@/lib/session'
 import { lockInsKey } from '@/hooks/use-lock-ins'
+import { refreshLockInHours } from '@/hooks/use-lock-in-hours'
+import { LockInNoteDialog } from './lock-in-note'
 import { useCabal } from './store'
 
 // Locking in is separate from being in Cabal: opening the app never starts
-// or asks for a session. Time only counts while Cabal is open; a session that
-// stopped because Cabal was closed or asleep picks back up on its own when
-// Cabal is open again (the server closes it after 3 hours away).
+// or asks for a session. The clock runs while Cabal is open, minimized or
+// behind other apps; a session that stopped because Cabal was closed or the
+// computer slept picks back up on its own when Cabal is open again (the
+// server closes it after 3 hours away, and any session at 8 hours).
 type WorkSession = LockInState & {
   ready: boolean
   // Set briefly after the session picked back up, so the bar can say how
@@ -24,7 +28,12 @@ type WorkSession = LockInState & {
   pause(): Promise<void>
   resume(): Promise<void>
   end(): Promise<void>
+  setFocus(focus: string): Promise<boolean>
+  // Opens the "what did you get done?" note for a finished session.
+  addNote(session: { id: string; seconds: number; note?: string | null }): void
 }
+
+type NoteTarget = { id: string; seconds: number; note: string | null }
 
 const Ctx = createContext<WorkSession | null>(null)
 
@@ -44,16 +53,49 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
   const [ready, setReady] = useState(false)
   const [state, setState] = useState<LockInState>(NO_LOCK_IN)
   const [awayMs, setAwayMs] = useState<number | null>(null)
+  const [noteFor, setNoteFor] = useState<NoteTarget | null>(null)
   const live = useRef(state)
   live.current = state
 
-  // Every server answer goes through here; a picked-back-up session also
-  // carries how long Cabal was away.
-  const take = useCallback((raw: unknown) => {
-    setState(readLockIn(raw))
-    const away = readAwayMs(raw)
-    if (away !== null) setAwayMs(away)
+  // Starting, pausing and ending tell everyone else's "Locked in now" (and,
+  // when a session ends, the weekly board) to look again. The broadcast only
+  // says "something changed"; what anyone sees still comes from the server.
+  const room = useRef<RealtimeChannel | null>(null)
+  useEffect(() => {
+    const ch = supabase
+      .channel(`lock-ins:${community.id}`, { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'changed' }, ({ payload }) => {
+        void mutate(lockInsKey(community.id))
+        if (payload?.ended) void refreshLockInHours(mutate)
+      })
+      .subscribe()
+    room.current = ch
+    return () => {
+      room.current = null
+      void supabase.removeChannel(ch)
+    }
+  }, [supabase, community.id, mutate])
+  const announce = useCallback((ended = false) => {
+    void room.current?.send({ type: 'broadcast', event: 'changed', payload: { ended } })
   }, [])
+
+  // Every server answer goes through here; a picked-back-up session also
+  // carries how long Cabal was away. A session that closed on its own (8
+  // hours, or 3 hours away) comes back as nothing while we thought it was on.
+  const take = useCallback(
+    (raw: unknown) => {
+      const next = readLockIn(raw)
+      if (next.status === 'none' && live.current.status !== 'none') {
+        toast('Your Lock in ended. The time it ran is saved.')
+        void refreshLockInHours(mutate)
+        announce(true)
+      }
+      setState(next)
+      const away = readAwayMs(raw)
+      if (away !== null) setAwayMs(away)
+    },
+    [mutate, announce],
+  )
 
   useEffect(() => {
     if (awayMs === null) return
@@ -65,8 +107,9 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
     (raw: unknown) => {
       take(raw)
       void mutate(lockInsKey(community.id))
+      announce()
     },
-    [take, mutate, community.id],
+    [take, mutate, community.id, announce],
   )
 
   const call = useCallback(
@@ -152,14 +195,23 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
     return () => off?.()
   }, [])
 
-  // Always visible to the community, with no note of its own; a status
-  // message is how people say what they're on.
+  // One tap, no form. What you're on is optional and added afterwards; who
+  // sees the session is your "Show me in Locked in now" setting.
   const lockIn = useCallback(async () => (await call('lock_in', { p_focus: null, p_shared: true })).ok, [call])
   const pause = useCallback(async () => void (await call('pause_lock_in')), [call])
   const resume = useCallback(async () => void (await call('resume_lock_in')), [call])
+  const setFocus = useCallback(
+    async (focus: string) => (await call('edit_lock_in', { p_focus: focus, p_shared: true })).ok,
+    [call],
+  )
+
+  const addNote = useCallback(
+    (s: { id: string; seconds: number; note?: string | null }) => setNoteFor({ id: s.id, seconds: s.seconds, note: s.note ?? null }),
+    [],
+  )
 
   const end = useCallback(async () => {
-    const { data, error } = await supabase.rpc('end_work_session')
+    const { data, error } = await supabase.rpc('finish_lock_in')
     if (error) {
       toast.error(friendlyError(error))
       return
@@ -167,16 +219,34 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
     setState(NO_LOCK_IN)
     setAwayMs(null)
     void mutate(lockInsKey(community.id))
-    if (typeof data === 'number') toast(`Locked in for ${describeSession(data * 1000)}.`)
-  }, [supabase, mutate, community.id])
+    void refreshLockInHours(mutate)
+    announce(true)
+    const done = data as { id: string; worked_seconds: number } | null
+    if (!done) return
+    const seconds = done.worked_seconds
+    toast(`Locked in for ${describeSession(seconds * 1000)}.`, {
+      description: seconds < 60 ? 'Sessions under a minute aren’t counted.' : undefined,
+      action: seconds >= 60 ? { label: 'Add a note', onClick: () => addNote({ id: done.id, seconds }) } : undefined,
+      duration: 8000,
+    })
+  }, [supabase, mutate, community.id, announce, addNote])
 
   const dismissAway = useCallback(() => setAwayMs(null), [])
 
   const value = useMemo(
-    () => ({ ...state, ready, awayMs, dismissAway, lockIn, pause, resume, end }),
-    [state, ready, awayMs, dismissAway, lockIn, pause, resume, end],
+    () => ({ ...state, ready, awayMs, dismissAway, lockIn, pause, resume, end, setFocus, addNote }),
+    [state, ready, awayMs, dismissAway, lockIn, pause, resume, end, setFocus, addNote],
   )
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      <LockInNoteDialog
+        target={noteFor}
+        onClose={() => setNoteFor(null)}
+        onSaved={() => void refreshLockInHours(mutate)}
+      />
+    </Ctx.Provider>
+  )
 }
 
 // Ticks every second while the timer runs.

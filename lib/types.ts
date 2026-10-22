@@ -21,6 +21,10 @@ export type Settings = {
   notify_dms: boolean
   notify_mentions: boolean
   notify_sound: boolean
+  // Show my running Lock in in "Locked in now".
+  lock_in_live: boolean
+  // Be on the weekly board and share my Lock in numbers on my profile.
+  lock_in_board: boolean
 }
 
 export type Community = {

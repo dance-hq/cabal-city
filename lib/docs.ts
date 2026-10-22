@@ -57,6 +57,7 @@ const FEEDBACK = 'supabase/migrations/0005_feedback.sql'
 const BOARD = 'supabase/migrations/0014_build_cabal_opportunities.sql'
 const LOCK_IN = 'supabase/migrations/0009_lock_in.sql'
 const RESUME = 'supabase/migrations/0010_lock_in_auto_resume.sql'
+const HOURS = 'supabase/migrations/0020_lock_in_hours.sql'
 const STORE = 'components/cabal/store.tsx'
 const E2EE = 'lib/e2ee/crypto.ts'
 const E2EE_SESSION = 'lib/e2ee/session.ts'
@@ -295,8 +296,12 @@ export const DATA_MODEL: Fact[] = [
   {
     label: 'Lock-in',
     value: 'work_sessions',
-    body: 'Focus sessions with server-owned start, pause and end times. At most one open session per person.',
-    sources: [{ path: 'supabase/migrations/0006_work_sessions.sql', proves: ['work_sessions_one_open'] }, { path: RESUME }],
+    body: 'Focus sessions with server-owned start, pause and end times. At most one open session per person. Weekly hours, the opt-in board (`lock_in_board()`) and profile numbers (`lock_in_stats()`) are computed on the server from finished sessions, in the community’s `time_zone`.',
+    sources: [
+      { path: 'supabase/migrations/0006_work_sessions.sql', proves: ['work_sessions_one_open'] },
+      { path: RESUME },
+      { path: HOURS, proves: ['create function public.lock_in_board'] },
+    ],
   },
   {
     label: 'Buddy groups',
@@ -353,9 +358,12 @@ export const FRESHNESS: Freshness[] = [
   },
   {
     what: 'Who’s locked in',
-    how: 'SWR poll of `community_lock_ins()`',
-    when: '30s',
-    sources: [{ path: 'hooks/use-lock-ins.ts', proves: ['refreshInterval: 30_000'] }],
+    how: 'Broadcast on `lock-ins:<community>` says “look again”, then `community_lock_ins()`; SWR poll as a fallback',
+    when: 'Instant, or 30s',
+    sources: [
+      { path: 'components/cabal/work-session.tsx', proves: ['lock-ins:${community.id}'] },
+      { path: 'hooks/use-lock-ins.ts', proves: ['refreshInterval: 30_000'] },
+    ],
   },
   {
     what: 'A peer’s public key',
