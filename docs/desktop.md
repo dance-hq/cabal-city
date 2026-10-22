@@ -6,6 +6,8 @@
 - a dock or taskbar badge, and a flashing taskbar when a new DM arrives in the background
 - a global show/hide shortcut (default `Ctrl/Cmd+Alt+C`, changeable in Settings)
 - start at login, keep on top, and close-to-tray, all in Settings → Desktop
+- floating chat windows: click someone in your buddy list to chat in a small window of its own (up to three at once)
+- a Lock in timer that sits in the corner of your screen during a session, above other apps, and opens into your buddy list when clicked
 - `cabal://c/<conversation-id>` and `cabal://join/<invite-code>` links
 - a "can't reach Cabal" screen that retries on its own
 - telling your friends you went offline before the app quits or the computer sleeps
@@ -17,6 +19,8 @@
 - The window can only show your Cabal's address. Other links open in your browser, and only `https`, `http` and `mailto` links are opened at all.
 - The only web permissions granted are notifications and copying to the clipboard.
 - Only `appUrl` and the extra `allowedOrigins` in `app.json` are trusted, and plain `http` is accepted only for `localhost`.
+- The corner timer page never talks to Cabal's servers. The Cabal window hands it what to show, and it can only send back small, checked requests.
+- Electron fuses (`electronFuses` in `package.json`) turn off running the app as plain Node, `NODE_OPTIONS`, and the inspector flags. They also check the app archive's integrity, so a packaged build can't be bent into running other code.
 
 The decisions above live in `src/rules.cjs` and are tested in `test/rules.test.cjs` (`npm run check`).
 
@@ -33,6 +37,9 @@ npm run dev     # against http://localhost:3000 (run `pnpm dev` at the repo root
 1. In GitHub, set the repository **variable** `CABAL_APP_URL` to your deployed site.
 2. Push a tag: `git tag v0.2.0 && git push origin v0.2.0`.
 3. `.github/workflows/desktop-release.yml` builds macOS (Apple Silicon and Intel `.dmg`), Windows (one installer for x64 and Arm) and Linux (`.AppImage`, `.deb`), then publishes them to a GitHub Release. The app version follows the tag.
+4. The same workflow publishes `SHA256SUMS.txt` and a build-provenance attestation for every file. Anyone can check a download with `gh attestation verify <file> -R dance-hq/cabal-city`.
+
+Before tagging, go through [security/release-checklist.md](./security/release-checklist.md).
 
 You can also run the workflow by hand from the Actions tab. That keeps the installers as build artifacts without publishing a release.
 
