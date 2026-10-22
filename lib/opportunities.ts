@@ -1,4 +1,4 @@
-import type { Identity } from './identity'
+import { IDENTITY_LABEL, orderedIdentities, type Identity } from './identity'
 import { SHIP_ZONE, zoneDay } from './board'
 
 export type OpportunityKind = 'credits' | 'funding' | 'hackathon' | 'event'
@@ -71,8 +71,17 @@ export function isStale(verifiedAt: string, now = Date.now()): boolean {
 }
 
 // A hint from your profile, never a promise: each program decides eligibility.
-export function fitsYou(o: Pick<Opportunity, 'audiences'>, identity: Identity | null | undefined): boolean {
-  return !!identity && o.audiences.includes(identity)
+// It fits if any of your roles is one the program is for.
+export function fitsYou(o: Pick<Opportunity, 'audiences'>, roles: readonly Identity[] | null | undefined): boolean {
+  return fitLabel(o, roles) !== null
+}
+
+// "For founders" or "For founders and builders": the roles you share with it.
+export function fitLabel(o: Pick<Opportunity, 'audiences'>, roles: readonly Identity[] | null | undefined): string | null {
+  const shared = orderedIdentities(roles).filter((r) => o.audiences.includes(r))
+  if (!shared.length) return null
+  const words = shared.map((r) => `${IDENTITY_LABEL[r].toLowerCase()}s`)
+  return `For ${words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words[0]}`
 }
 
 export function sourceHost(url: string): string {
@@ -89,11 +98,11 @@ export function shareText(o: Pick<Opportunity, 'title' | 'summary' | 'url' | 'de
 }
 
 // Soonest deadline first, then programs that fit you, then the freshest checks.
-export function arrangeOpportunities(list: Opportunity[], identity: Identity | null | undefined): Opportunity[] {
+export function arrangeOpportunities(list: Opportunity[], roles: readonly Identity[] | null | undefined): Opportunity[] {
   return [...list].sort((a, b) => {
     if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline)
     if (a.deadline || b.deadline) return a.deadline ? -1 : 1
-    const fit = Number(fitsYou(b, identity)) - Number(fitsYou(a, identity))
+    const fit = Number(fitsYou(b, roles)) - Number(fitsYou(a, roles))
     return fit || b.verified_at.localeCompare(a.verified_at)
   })
 }

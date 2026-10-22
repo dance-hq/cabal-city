@@ -235,6 +235,7 @@ export const PERMISSIONS: Fact[] = [
     body: 'People in your community: name, role, photo, what you’re building and up to four links. Members edit only the columns granted to them.',
     sources: [
       { path: 'supabase/migrations/0011_profile_identity.sql', proves: ['grant update (identity) on public.profiles to authenticated'] },
+      { path: 'supabase/migrations/0030_profile_roles.sql', proves: ['grant update (identities) on public.profiles to authenticated'] },
       { path: 'supabase/migrations/0016_profile_links.sql' },
     ],
   },

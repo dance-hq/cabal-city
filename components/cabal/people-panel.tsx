@@ -5,7 +5,7 @@ import { ChevronDown, UserPlus, X } from 'lucide-react'
 import { CabalStar } from '@/components/brand/logo'
 import { cn } from '@/lib/utils'
 import { compareByPresence } from '@/lib/presence'
-import { IDENTITY_LABEL } from '@/lib/identity'
+import { identityLabels } from '@/lib/identity'
 import { useLockIns } from '@/hooks/use-lock-ins'
 import { Avatar } from './avatar'
 import { STATUS_LABEL } from './status-dot'
@@ -180,7 +180,7 @@ function PeopleList({ people }: { people: PanelPerson[] }) {
         const activity = p.lockedIn
           ? `Locked in${p.profile.status_text ? ` · ${p.profile.status_text}` : ''}`
           : p.profile.status_text || (p.status === 'away' || p.status === 'dnd' ? STATUS_LABEL[p.status] : null)
-        const sub = [p.profile.identity ? IDENTITY_LABEL[p.profile.identity] : null, activity].filter(Boolean).join(' · ')
+        const sub = [identityLabels(p.profile.identities), activity].filter(Boolean).join(' · ')
         const spoken = [
           p.name,
           p.cabalTeam && 'Cabal team',

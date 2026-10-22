@@ -12,7 +12,8 @@ export type Profile = {
   company: string | null
   bio: string | null
   status_text: string | null
-  identity: Identity | null
+  // Any of founder / builder / investor, or none.
+  identities: Identity[]
   links: string[] | null
 }
 

@@ -141,7 +141,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   const membersQuery = useSWR(['members', community.id], async () => {
     const { data, error } = await supabase
       .from('community_members')
-      .select('user_id, role, joined_at, profile:profiles(id, username, display_name, avatar_url, company, bio, status_text, identity, links)')
+      .select('user_id, role, joined_at, profile:profiles(id, username, display_name, avatar_url, company, bio, status_text, identities, links)')
       .eq('community_id', community.id)
       .is('banned_at', null)
     if (error) throw error

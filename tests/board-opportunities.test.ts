@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { arrangeIdeas, githubLabel, shipHeading, splitSuggestion, type Idea } from '@/lib/board'
-import { arrangeOpportunities, daysBetween, deadlineLabel, fitsYou, isStale, type Opportunity } from '@/lib/opportunities'
+import {
+  arrangeOpportunities,
+  daysBetween,
+  deadlineLabel,
+  fitLabel,
+  fitsYou,
+  isStale,
+  type Opportunity,
+} from '@/lib/opportunities'
 
 // 2026-10-21 15:00 in Chicago (CDT, UTC-5).
 const NOW = Date.parse('2026-10-21T20:00:00Z')
@@ -94,9 +102,21 @@ describe('opportunities', () => {
   })
 
   it('treats profile fit as a hint only', () => {
-    expect(fitsYou(opp({ audiences: ['founder'] }), 'founder')).toBe(true)
-    expect(fitsYou(opp({ audiences: ['founder'] }), 'investor')).toBe(false)
+    expect(fitsYou(opp({ audiences: ['founder'] }), ['founder'])).toBe(true)
+    expect(fitsYou(opp({ audiences: ['founder'] }), ['investor'])).toBe(false)
+    expect(fitsYou(opp({ audiences: ['founder'] }), [])).toBe(false)
     expect(fitsYou(opp({ audiences: ['founder'] }), null)).toBe(false)
+  })
+
+  it('fits when any of your roles matches, and says which', () => {
+    const o = opp({ audiences: ['founder', 'builder'] })
+    expect(fitsYou(o, ['investor', 'builder'])).toBe(true)
+    expect(fitLabel(o, ['builder', 'investor'])).toBe('For builders')
+    expect(fitLabel(o, ['builder', 'founder'])).toBe('For founders and builders')
+    expect(fitLabel(opp({ audiences: ['founder', 'builder', 'investor'] }), ['investor', 'founder', 'builder'])).toBe(
+      'For founders, builders and investors',
+    )
+    expect(fitLabel(o, ['investor'])).toBeNull()
   })
 
   it('puts the soonest deadline first, then what fits you', () => {
@@ -106,6 +126,6 @@ describe('opportunities', () => {
       opp({ id: 'soon', deadline: '2026-11-02' }),
       opp({ id: 'open', verified_at: '2026-10-22' }),
     ]
-    expect(arrangeOpportunities(list, 'builder').map((o) => o.id)).toEqual(['soon', 'late', 'open-fit', 'open'])
+    expect(arrangeOpportunities(list, ['builder']).map((o) => o.id)).toEqual(['soon', 'late', 'open-fit', 'open'])
   })
 })

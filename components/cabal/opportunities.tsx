@@ -7,12 +7,12 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { IDENTITY_LABEL } from '@/lib/identity'
 import {
   KIND_LABEL,
   OPPORTUNITY_KINDS,
   arrangeOpportunities,
   deadlineLabel,
+  fitLabel,
   fitsYou,
   formatDay,
   isStale,
@@ -45,7 +45,7 @@ export function Opportunities({ compact }: { compact?: boolean }) {
   const [editing, setEditing] = useState<EditorSeed | null>(null)
   const [reviewing, setReviewing] = useState(false)
 
-  const all = useMemo(() => arrangeOpportunities(list.data ?? [], me.identity), [list.data, me.identity])
+  const all = useMemo(() => arrangeOpportunities(list.data ?? [], me.identities), [list.data, me.identities])
   const shown = all.filter((o) => (tab === 'all' ? true : tab === 'saved' ? o.saved : o.kind === tab))
   const counts = Object.fromEntries(OPPORTUNITY_KINDS.map((k) => [k.value, all.filter((o) => o.kind === k.value).length]))
   const saved = all.filter((o) => o.saved).length
@@ -118,8 +118,7 @@ export function Opportunities({ compact }: { compact?: boolean }) {
                 <OpportunityRow
                   key={o.id}
                   o={o}
-                  fits={fitsYou(o, me.identity)}
-                  identityLabel={me.identity ? IDENTITY_LABEL[me.identity].toLowerCase() : ''}
+                  fit={fitLabel(o, me.identities)}
                   onSave={() => toggleSave(o)}
                   onShare={() => setSharing(o)}
                   onEdit={isAdmin ? () => setEditing({ id: o.id }) : undefined}
@@ -130,10 +129,10 @@ export function Opportunities({ compact }: { compact?: boolean }) {
 
           <SubmitLink communityId={community.id} />
 
-          {me.identity && all.some((o) => fitsYou(o, me.identity)) && (
+          {all.some((o) => fitsYou(o, me.identities)) && (
             <p className="text-xs leading-relaxed text-muted-foreground">
-              &ldquo;For {IDENTITY_LABEL[me.identity].toLowerCase()}s&rdquo; is a hint from your profile. Each program
-              decides who&apos;s eligible, so read its terms before you apply.
+              The &ldquo;For …&rdquo; tags are a hint from the roles on your profile. Each program decides who&apos;s
+              eligible, so read its terms before you apply.
             </p>
           )}
         </div>
@@ -171,15 +170,13 @@ export function Opportunities({ compact }: { compact?: boolean }) {
 
 function OpportunityRow({
   o,
-  fits,
-  identityLabel,
+  fit,
   onSave,
   onShare,
   onEdit,
 }: {
   o: Opportunity
-  fits: boolean
-  identityLabel: string
+  fit: string | null
   onSave: () => void
   onShare: () => void
   onEdit?: () => void
@@ -215,10 +212,10 @@ function OpportunityRow({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        {fits && (
+        {fit && (
           <span className="inline-flex items-center gap-1.5 text-xs text-foreground/80">
             <span className="size-1.5 rounded-full bg-flag" aria-hidden />
-            For {identityLabel}s
+            {fit}
           </span>
         )}
         <a

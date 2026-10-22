@@ -20,7 +20,7 @@ export async function loadBoot(): Promise<Boot> {
   const [{ data: profile }, { data: settings }, { data: membership }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url, company, bio, status_text, identity, links')
+      .select('id, username, display_name, avatar_url, company, bio, status_text, identities, links')
       .eq('id', user.id)
       .single(),
     supabase
