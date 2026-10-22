@@ -1,6 +1,8 @@
 # Contributing to Cabal
 
-Thanks for helping. A few things keep Cabal trustworthy:
+Thanks for helping. Everyone taking part follows the [code of conduct](./CODE_OF_CONDUCT.md).
+
+A few things keep Cabal trustworthy:
 
 1. **Privacy rules belong in the database.** If a change affects who can see or do something, put it in a new migration (`supabase/migrations/000N_description.sql`). Add a case to `tests/integration/permissions.test.ts`, and, if it's a new function people can call, a "someone else tries this" case to `tests/integration/authorization.test.ts`. Hiding a button in the UI isn't a permission.
 2. **Never edit an applied migration.** Add a new one. Use `create or replace function` to change a function. Wrap permission checks in `coalesce(…, false)` so a missing row means no.
