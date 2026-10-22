@@ -8,7 +8,7 @@ Short on purpose. Copy it into the release PR and tick it off.
 - [ ] The Security workflow is green: CodeQL, plus dependency review on the PR.
 - [ ] A new table has row-level security and at least one policy, or a comment saying why it's deny-all.
 - [ ] A new `security definer` function sets `search_path = ''` and checks who's calling, wrapped in `coalesce(…, false)`.
-- [ ] A new realtime topic is private and handled in `can_use_topic`.
+- [ ] A new realtime broadcast topic is private and handled in `can_use_topic`. (`postgres_changes` channels can stay public: Realtime filters them through row-level security.)
 - [ ] A new POST route that uses the session cookie calls `isCrossSite()` first.
 - [ ] Anything that fetches a user-supplied URL goes through `lib/safe-fetch.ts`.
 - [ ] Authorization changes come with a case in `tests/integration/authorization.test.ts`.

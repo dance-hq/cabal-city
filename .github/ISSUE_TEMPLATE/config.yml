@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/dance-hq/cabal-city/security/advisories/new
+    about: Please report vulnerabilities privately, not in a public issue.
+  - name: Suggest an idea for Cabal
+    url: https://www.cabal.city
+    about: Post it in the app under Build Cabal, where the community can back it.
