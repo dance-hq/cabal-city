@@ -407,7 +407,7 @@
           }
           for (const g of list.groups) content.append(groupSection(g))
           if (everyone) {
-            content.append(plainSection('here', 'Here now', list.here, {
+            content.append(plainSection('here', 'Online', list.here, {
               empty: 'Nobody else is around right now.',
               onDrop: (id) => api.act({ type: 'move', userId: id, groupId: null }),
             }))
