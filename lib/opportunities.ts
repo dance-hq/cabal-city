@@ -17,6 +17,9 @@ export type Opportunity = {
   audiences: Identity[]
   verified_at: string
   saved: boolean
+  // From opportunities_for: when it was added, and whether you added it.
+  added_at?: string | null
+  mine?: boolean
 }
 
 export const OPPORTUNITY_KINDS: { value: OpportunityKind; label: string; tab: string }[] = [

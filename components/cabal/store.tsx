@@ -59,7 +59,7 @@ type Store = {
   me: Profile
   settings: Settings
   setAvailability(a: Availability): Promise<void>
-  updateSettings(patch: Partial<Omit<Settings, 'availability'>>): Promise<void>
+  updateSettings(patch: Partial<Omit<Settings, 'availability'>>): Promise<boolean>
   members: MemberRow[]
   membersLoading: boolean
   profileById(id: string | null | undefined): Profile | undefined
@@ -513,7 +513,9 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       if (error) {
         setSettings(previous)
         toast.error(friendlyError(error))
+        return false
       }
+      return true
     },
     [supabase, userId],
   )
