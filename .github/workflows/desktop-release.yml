@@ -9,11 +9,14 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# Nothing gets write access unless a job asks for it below.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
+    permissions:
+      contents: write # create the release and upload installers
     strategy:
       fail-fast: false
       matrix:
@@ -24,12 +27,14 @@ jobs:
         working-directory: desktop
         shell: bash
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      # No dependency cache here: release builds install fresh from the lockfile,
+      # so nothing another workflow cached can end up inside an installer.
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm run check
 
@@ -128,7 +133,7 @@ jobs:
 
       - name: Keep the installers from a manual run
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cabal-${{ matrix.os }}
           path: |
@@ -138,3 +143,35 @@ jobs:
             desktop/dist/*.AppImage
             desktop/dist/*.deb
           if-no-files-found: warn
+
+  # Publishes SHA256SUMS.txt next to the installers and a signed build-provenance
+  # attestation for every file, tying each download to this repository, this
+  # workflow and the exact commit. Check a download with:
+  #   gh attestation verify Cabal-<version>-<platform>.<ext> -R dance-hq/cabal-city
+  checksums:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload SHA256SUMS.txt to the release
+      id-token: write # sign the attestation with this workflow's identity
+      attestations: write
+    steps:
+      - name: Collect the published installers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir dist && cd dist
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" \
+            -p '*.dmg' -p '*.zip' -p '*.exe' -p '*.AppImage' -p '*.deb' -p 'latest*.yml'
+          sha256sum -- * | sort -k2 > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: SHA256SUMS.txt
+      - name: Attach SHA256SUMS.txt to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "$TAG" SHA256SUMS.txt -R "$GITHUB_REPOSITORY" --clobber

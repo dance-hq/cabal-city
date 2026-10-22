@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { contextOf, fromBase64, isEnvelope, openWithMessageKey } from '@/lib/e2ee/crypto'
 import { unpackPreview } from '@/lib/long-text'
+import { crossSiteResponse, isCrossSite } from '@/lib/same-origin'
 
 const body = z.object({
   message: z.string().uuid(),
@@ -17,6 +18,7 @@ const body = z.object({
 // really opens the message as stored, so a report can't put words in anyone's
 // mouth, and only then file it with the text for the admins.
 export async function POST(request: NextRequest) {
+  if (isCrossSite(request.headers)) return crossSiteResponse()
   const supabase = await createClient()
   const {
     data: { user },

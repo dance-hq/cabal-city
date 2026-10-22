@@ -235,3 +235,41 @@ test('a Dock entry is found by the app bundle it points at', () => {
   assert.equal(rules.dockKeepsApp(dock, 'file:///Volumes/Cabal/Cabal.app'), false)
   assert.equal(rules.dockKeepsApp(null, 'file:///Applications/Cabal.app'), false)
 })
+
+test('global shortcuts need a real modifier and leave everyday combinations alone', () => {
+  for (const ok of ['CommandOrControl+Alt+C', 'Alt+K', 'Ctrl+Shift+Space', 'CommandOrControl+/', 'Super+F12', '']) {
+    assert.equal(rules.validShortcut(ok), true, ok)
+  }
+  for (const bad of ['C', 'Shift+A', 'CommandOrControl+C', 'Ctrl+V', 'Cmd+Q', 'Alt+Tab', 'Ctrl+Alt', 'Ctrl+A+B', 'Ctrl+<script>', 'x'.repeat(61), 42]) {
+    assert.equal(rules.validShortcut(bad), false, String(bad))
+  }
+  assert.deepEqual(rules.settingsPatch({ shortcut: 'CommandOrControl+C' }), {})
+  assert.equal(rules.normalizeSettings({ shortcut: 'Ctrl+V' }).shortcut, rules.DEFAULT_SETTINGS.shortcut)
+})
+
+test('released builds turn off the Electron features an attacker could borrow', () => {
+  const fuses = require('../package.json').build.electronFuses
+  assert.equal(fuses.runAsNode, false)
+  assert.equal(fuses.enableNodeOptionsEnvironmentVariable, false)
+  assert.equal(fuses.enableNodeCliInspectArguments, false)
+  assert.equal(fuses.onlyLoadAppFromAsar, true)
+  assert.equal(fuses.enableEmbeddedAsarIntegrityValidation, true)
+  assert.equal(fuses.grantFileProtocolExtraPrivileges, false)
+})
+
+test('the main process trusts only the bundled offline page among local files', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/main.cjs'), 'utf8')
+  const fromApp = src.match(/function fromApp\(event\) \{([\s\S]*?)\n\}/)[1]
+  assert.doesNotMatch(fromApp, /startsWith\('file:'\)/)
+  assert.match(fromApp, /event\.sender !== win\.webContents/)
+  for (const nav of src.matchAll(/on\('will-navigate', \(event, url\) => \{([\s\S]*?)\n  \}\)/g)) {
+    assert.doesNotMatch(nav[1], /startsWith\('file:'\)/)
+  }
+  assert.equal((src.match(/on\('will-redirect'/g) ?? []).length, 2)
+  for (const prefs of src.matchAll(/webPreferences:\s*\{([^}]*)\}/g)) {
+    assert.match(prefs[1], /contextIsolation:\s*true/)
+    assert.match(prefs[1], /nodeIntegration:\s*false/)
+    assert.match(prefs[1], /sandbox:\s*true/)
+    assert.doesNotMatch(prefs[1], /webSecurity:\s*false|allowRunningInsecureContent|nodeIntegrationInSubFrames|webviewTag:\s*true/)
+  }
+})

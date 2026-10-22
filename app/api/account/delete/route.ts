@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { crossSiteResponse, isCrossSite } from '@/lib/same-origin'
 
 // Permanently deletes the signed-in person: their photo, every message they
 // wrote, and their account. Teams they own pass to the longest-standing other
@@ -10,6 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const body = z.object({ confirm: z.string().trim().min(1).max(254) })
 
 export async function POST(request: NextRequest) {
+  if (isCrossSite(request.headers)) return crossSiteResponse()
   const supabase = await createClient()
   const {
     data: { user },

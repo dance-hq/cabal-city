@@ -127,13 +127,30 @@ function findDeepLink(argv) {
   return null
 }
 
+// A global shortcut fires in every app, so it must use a real modifier and
+// can't take over everyday combinations like copy, paste or quit.
+const SHORTCUT_MODIFIERS = new Set(['commandorcontrol', 'cmdorctrl', 'command', 'cmd', 'control', 'ctrl', 'alt', 'option', 'altgr', 'super', 'meta'])
+const SHORTCUT_TAKEN = new Set(['c', 'v', 'x', 'z', 'y', 'a', 'q', 'w', 's', 'f', 'p', 'n', 't', 'r', 'tab', 'space', 'enter', 'return', 'esc', 'escape', 'backspace', 'delete'])
+
+function validShortcut(raw) {
+  if (raw === '') return true
+  if (typeof raw !== 'string' || raw.length > 60) return false
+  const parts = raw.split('+').map((p) => p.trim().toLowerCase())
+  if (parts.some((p) => !/^(?:[a-z0-9]{1,20}|[!-/:-@[-`{-~])$/.test(p))) return false
+  const mods = parts.filter((p) => SHORTCUT_MODIFIERS.has(p) || p === 'shift')
+  const keys = parts.filter((p) => !SHORTCUT_MODIFIERS.has(p) && p !== 'shift')
+  if (keys.length !== 1 || !mods.some((p) => SHORTCUT_MODIFIERS.has(p))) return false
+  const onlyOneMod = mods.filter((p) => p !== 'shift').length === 1 && !mods.includes('shift')
+  return !(onlyOneMod && SHORTCUT_TAKEN.has(keys[0]))
+}
+
 function normalizeSettings(raw) {
   const s = { ...DEFAULT_SETTINGS }
   if (raw && typeof raw === 'object') {
     for (const key of BOOLEAN_SETTINGS) {
       if (typeof raw[key] === 'boolean') s[key] = raw[key]
     }
-    if (typeof raw.shortcut === 'string' && raw.shortcut.length <= 60) s.shortcut = raw.shortcut.trim()
+    if (typeof raw.shortcut === 'string' && validShortcut(raw.shortcut.trim())) s.shortcut = raw.shortcut.trim()
   }
   return s
 }
@@ -145,7 +162,7 @@ function settingsPatch(raw) {
   for (const key of BOOLEAN_SETTINGS) {
     if (typeof raw[key] === 'boolean') patch[key] = raw[key]
   }
-  if (typeof raw.shortcut === 'string' && raw.shortcut.length <= 60) patch.shortcut = raw.shortcut.trim()
+  if (typeof raw.shortcut === 'string' && validShortcut(raw.shortcut.trim())) patch.shortcut = raw.shortcut.trim()
   return patch
 }
 
@@ -354,6 +371,7 @@ module.exports = {
   findDeepLink,
   normalizeSettings,
   settingsPatch,
+  validShortcut,
   restoreBounds,
   badgeCount,
   sessionStart,

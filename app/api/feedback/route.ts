@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendFeedbackEmail } from '@/lib/email'
+import { crossSiteResponse, isCrossSite } from '@/lib/same-origin'
 
 const short = z.string().trim().max(300)
 
@@ -25,6 +26,7 @@ const body = z.object({
 const PER_HOUR = 10
 
 export async function POST(request: NextRequest) {
+  if (isCrossSite(request.headers)) return crossSiteResponse()
   const supabase = await createClient()
   const {
     data: { user },

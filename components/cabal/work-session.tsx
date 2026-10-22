@@ -69,7 +69,7 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
   const room = useRef<RealtimeChannel | null>(null)
   useEffect(() => {
     const ch = supabase
-      .channel(`lock-ins:${community.id}`, { config: { broadcast: { self: false } } })
+      .channel(`lock-ins:${community.id}`, { config: { private: true, broadcast: { self: false } } })
       .on('broadcast', { event: 'changed' }, ({ payload }) => {
         void mutate(lockInsKey(community.id))
         if (payload?.ended) void refreshLockInHours(mutate)
