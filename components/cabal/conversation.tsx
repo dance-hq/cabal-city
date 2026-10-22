@@ -218,17 +218,16 @@ function OpenConversation({
             </div>
           )}
           {channel.kind === 'team' && (
-            <div className="flex min-w-0 items-baseline gap-2 px-1">
-              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold">
-                <TeamIcon
-                  visibility={channel.team_visibility}
-                  logo={channel.team_logo_url}
-                  className={channel.team_logo_url ? 'size-5' : 'size-3.5 text-muted-foreground'}
-                />
+            <div className="flex min-w-0 items-center gap-2 px-1">
+              <TeamIcon
+                visibility={channel.team_visibility}
+                logo={channel.team_logo_url}
+                className={channel.team_logo_url ? 'size-5 shrink-0' : 'size-3.5 shrink-0 text-muted-foreground'}
+              />
+              <span className="truncate text-sm leading-5 font-semibold">
                 {channel.team_name}
-                {channel.team_visibility !== 'public' && <span className="sr-only">(invite-only)</span>}
+                {channel.team_visibility !== 'public' && <span className="sr-only"> (invite-only)</span>}
               </span>
-              <span className="truncate font-mono text-xs text-muted-foreground">#{channel.slug}</span>
             </div>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
