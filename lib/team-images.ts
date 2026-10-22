@@ -12,6 +12,11 @@ const SIZE: Record<TeamImageKind, { width: number; height: number }> = {
   logo: { width: 512, height: 512 },
   banner: { width: 2400, height: 400 },
 }
+
+// What Team settings recommends uploading: the size we save at.
+export function recommendedSize(kind: TeamImageKind): string {
+  return `${SIZE[kind].width} × ${SIZE[kind].height} px`
+}
 // Below this many source pixels across, the picture is stretched on a big screen.
 export const SHARP_WIDTH: Record<TeamImageKind, number> = { logo: 200, banner: 1200 }
 

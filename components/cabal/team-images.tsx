@@ -13,6 +13,7 @@ import {
   type CropArea,
   isOwnTeamImageUrl,
   prepareTeamImage,
+  recommendedSize,
   removeTeamImage,
   uploadTeamImage,
   type TeamImageKind,
@@ -162,8 +163,13 @@ export function TeamImagesEditor({
       <div className="flex flex-col gap-0.5">
         <span className="text-sm font-medium">Logo and banner</span>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Shown at the top of the team, in the sidebar and in the Teams list. Banners are wide and short; after you
-          pick a picture you can drag and zoom to choose the part that shows.
+          Shown at the top of the team, in the sidebar and in the Teams list. After you pick a picture you can drag
+          and zoom to choose the part that shows.
+        </p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">Banner</span> {recommendedSize('banner')} (6:1)
+          <span aria-hidden> · </span>
+          <span className="font-medium text-foreground">Logo</span> {recommendedSize('logo')} (square)
         </p>
       </div>
 
