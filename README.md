@@ -73,7 +73,7 @@ Found a problem? Please report it privately, as described in [SECURITY.md](./SEC
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). Ideas for the product itself are best posted in the app under **Build Cabal**, where the community can back them.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md), and please follow the [code of conduct](./CODE_OF_CONDUCT.md). Ideas for the product itself are best posted in the app under **Build Cabal**, where the community can back them.
 
 ## License
 
