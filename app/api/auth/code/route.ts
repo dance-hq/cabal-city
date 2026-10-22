@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { config } from '@/lib/config'
 import { sendSignInCode } from '@/lib/email'
+import { crossSiteResponse, isCrossSite } from '@/lib/same-origin'
 
 // Step 1 of sign-in: email a short code. The code is checked by Supabase
 // Auth itself (verifyOtp) in the browser or desktop window, so no email links
@@ -17,11 +18,15 @@ const body = z.object({
 const PER_EMAIL = { count: 5, minutes: 15 }
 const PER_IP = { count: 30, minutes: 60 }
 
+// Emails and IPs are only kept as keyed hashes, so the key must be a real secret.
 function hash(value: string) {
-  return createHmac('sha256', process.env.SUPABASE_JWT_SECRET ?? 'cabal').update(value).digest('hex')
+  const key = process.env.SUPABASE_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!key) throw new Error('SUPABASE_JWT_SECRET is not set')
+  return createHmac('sha256', key).update(value).digest('hex')
 }
 
 export async function POST(request: NextRequest) {
+  if (isCrossSite(request.headers)) return crossSiteResponse()
   const parsed = body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 })

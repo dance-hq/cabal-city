@@ -27,6 +27,7 @@ for (const [net, prefix] of [
   ['172.16.0.0', 12],
   ['192.0.0.0', 24],
   ['192.0.2.0', 24],
+  ['192.88.99.0', 24],
   ['192.168.0.0', 16],
   ['198.18.0.0', 15],
   ['198.51.100.0', 24],
@@ -37,14 +38,18 @@ for (const [net, prefix] of [
   blockedV4.addSubnet(net, prefix, 'ipv4')
 }
 for (const [net, prefix] of [
-  ['::', 128],
-  ['::1', 128],
+  // Unspecified, loopback and the deprecated IPv4-compatible range (::a.b.c.d).
+  ['::', 96],
   ['::ffff:0:0', 96],
   ['64:ff9b::', 96],
+  ['64:ff9b:1::', 48],
   ['100::', 64],
+  // IETF protocol assignments, including Teredo tunnels.
+  ['2001::', 23],
   ['2001:db8::', 32],
   ['2002::', 16],
   ['fc00::', 7],
+  ['fec0::', 10],
   ['fe80::', 10],
   ['ff00::', 8],
 ] as const) {
@@ -112,6 +117,8 @@ function get(url: URL): Promise<Hop> {
         },
       },
       (res) => {
+        // A connection reset mid-body must end this fetch, not crash the server.
+        res.on('error', () => finish({ status: 0 }))
         const status = res.statusCode ?? 0
         if (status >= 300 && status < 400 && res.headers.location) {
           res.resume()

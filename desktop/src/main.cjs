@@ -1,7 +1,7 @@
 const path = require('node:path')
 const fs = require('node:fs')
 const { execFile } = require('node:child_process')
-const { pathToFileURL } = require('node:url')
+const { fileURLToPath, pathToFileURL } = require('node:url')
 const {
   app,
   BrowserWindow,
@@ -21,6 +21,18 @@ const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json')
 const APP_URL = (process.env.CABAL_APP_URL || config.appUrl).replace(/\/+$/, '')
 const ORIGINS = rules.allowedOrigins(APP_URL, config.allowedOrigins)
 const OFFLINE_PAGE = path.join(__dirname, 'offline.html')
+// The only local page the main window may show, and the only one it trusts.
+// Compared as file paths, so URL spelling (drive letters, %20) can't matter.
+function isOfflinePage(url) {
+  if (typeof url !== 'string' || !url.startsWith('file:')) return false
+  try {
+    const a = path.resolve(fileURLToPath(url.split(/[?#]/)[0]))
+    const b = path.resolve(OFFLINE_PAGE)
+    return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b
+  } catch {
+    return false
+  }
+}
 const OVERLAY_PAGE = path.join(__dirname, 'overlay.html')
 const OVERLAY_SIZE = { width: 144, height: 34 }
 const BUILD = path.join(__dirname, '..', 'build')
@@ -197,7 +209,14 @@ function createWindow() {
     return { action: 'deny' }
   })
   contents.on('will-navigate', (event, url) => {
-    if (url.startsWith('file:') || rules.isAppUrl(url, ORIGINS)) return
+    if (isOfflinePage(url) || rules.isAppUrl(url, ORIGINS)) return
+    event.preventDefault()
+    if (rules.canOpenExternally(url)) shell.openExternal(url)
+  })
+  // A server redirect away from Cabal (say, through an open redirect) must not
+  // land a foreign page in this window, next to the desktop bridge.
+  contents.on('will-redirect', (event, url, _inPlace, isMainFrame) => {
+    if (!isMainFrame || rules.isAppUrl(url, ORIGINS)) return
     event.preventDefault()
     if (rules.canOpenExternally(url)) shell.openExternal(url)
   })
@@ -481,9 +500,11 @@ function applySettings(patch) {
 
 // --- messages from the page -------------------------------------------------------
 
+// Only Cabal's own pages, in the main window, may use the desktop bridge.
 function fromApp(event) {
+  if (!win || event.sender !== win.webContents) return false
   const url = event.senderFrame?.url ?? ''
-  return rules.isAppUrl(url, ORIGINS) || url.startsWith('file:')
+  return rules.isAppUrl(url, ORIGINS) || isOfflinePage(url)
 }
 
 ipcMain.on('cabal:show', (event) => fromApp(event) && showWindow())
@@ -669,6 +690,11 @@ function openChat(userId) {
     if (rules.isAppUrl(url, ORIGINS)) return
     event.preventDefault()
     if (rules.canOpenExternally(url)) shell.openExternal(url)
+  })
+  contents.on('will-redirect', (event, url, _inPlace, isMainFrame) => {
+    if (!isMainFrame || rules.isAppUrl(url, ORIGINS)) return
+    event.preventDefault()
+    giveUp()
   })
   contents.on('will-attach-webview', (event) => event.preventDefault())
   contents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {

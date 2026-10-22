@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { crossSiteResponse, isCrossSite } from '@/lib/same-origin'
 
 // Grants the admin role to people listed in CABAL_ADMIN_EMAILS. This is the
 // only way anyone becomes an admin: the list lives in server configuration,
 // so the first person to sign up gets no special powers.
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (isCrossSite(request.headers)) return crossSiteResponse()
   const supabase = await createClient()
   const {
     data: { user },

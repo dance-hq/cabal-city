@@ -105,8 +105,8 @@ export default function PrivacyPage() {
           </li>
           <li>
             Direct messages, and the photos and videos in them: only the two people in the conversation.
-            They&apos;re end-to-end encrypted, so neither community admins nor the team that runs cabal.city can
-            read them.
+            They&apos;re end-to-end encrypted, so the copies we store can&apos;t be read by community admins or by
+            the team that runs cabal.city.
           </li>
           <li>
             Photos and videos in rooms and teams: the same people who can read that conversation. They&apos;re kept
@@ -132,7 +132,9 @@ export default function PrivacyPage() {
         </ul>
         <p>
           Direct messages are end-to-end encrypted on your device; we can see who messaged whom and when, but not
-          what was said. Messages that were sent before encryption arrived stay as they were. Room and team
+          what was said. The app that does the encrypting, in your browser and in the desktop app, is loaded from
+          cabal.city, so this relies on that code being the open-source code on GitHub, which anyone can check.
+          Messages that were sent before encryption arrived stay as they were. Room and team
           messages, and their photos and videos, are encrypted in transit and stored on our servers, but they
           aren&apos;t end-to-end encrypted: the small team that operates cabal.city could technically access them,
           and only does so to keep the service running or when the law requires it. Profile photos are stored at
