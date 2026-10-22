@@ -19,7 +19,7 @@ export function useLockIns(communityId: string) {
       if (error) throw error
       return { rows: (data ?? []) as Row[], receivedAt: Date.now() }
     },
-    { refreshInterval: 30_000 },
+    { refreshInterval: 10_000 },
   )
   return useMemo(() => {
     const map = new Map<string, LockedIn>()

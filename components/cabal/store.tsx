@@ -10,22 +10,26 @@ import { HEARTBEAT_MS } from '@/lib/config'
 import { desktop } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
 import { playChime, showNotification } from '@/lib/notify'
+import { showDmToast } from './dm-toast'
 import { foldPresence, type UserPresence } from '@/lib/presence'
 import { listenForPopouts, viewedInPopout } from '@/lib/popout'
 import { personLabel } from '@/lib/mentions'
 import { mentions, plainText } from '@/lib/text'
 import { charCount, isLong, previewOf, titleOf } from '@/lib/long-text'
 import { linkLabel } from '@/lib/channel-links'
+import { AttachmentError, attachmentPath, filesLabel, releaseLocal, removeUploads, upload } from '@/lib/attachments'
 import { useE2ee } from './e2ee-provider'
 import type {
   Availability,
   Channel,
   Community,
+  LocalFile,
   Message,
   PresenceSession,
   Profile,
   Settings,
   ShownStatus,
+  TeamVisibility,
 } from '@/lib/types'
 
 export type Boot = {
@@ -42,7 +46,7 @@ export type InviteRow = {
   id: string
   team_id: string
   created_at: string
-  team: { name: string } | null
+  team: { name: string; visibility: TeamVisibility } | null
   inviter: { display_name: string | null; username: string | null } | null
 }
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'offline'
@@ -71,7 +75,7 @@ type Store = {
   openDm(userId: string): Promise<void>
   markRead(channelId: string): void
   outbox: Record<string, Message[]>
-  send(channelId: string, body: string, retryId?: string): Promise<boolean>
+  send(channelId: string, body: string, retryId?: string, files?: LocalFile[]): Promise<boolean>
   discard(channelId: string, id: string): void
   refreshChannels(): void
   refreshMembers(): void
@@ -100,7 +104,7 @@ export function isView(id: string | null | undefined): id is View {
 }
 
 export const messagesKey = (channelId: string) => ['messages', channelId] as const
-export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, long_text, long_chars, created_at, deleted_at'
+export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, long_text, long_chars, files, created_at, deleted_at'
 
 // Keeps a conversation in time order when an incoming message took a moment to open.
 function insertInOrder(list: Message[], m: Message): Message[] {
@@ -151,7 +155,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   const invitesQuery = useSWR(['invites', userId], async () => {
     const { data, error } = await supabase
       .from('team_invites')
-      .select('id, team_id, created_at, team:teams(name), inviter:profiles!team_invites_invited_by_fkey(display_name, username)')
+      .select('id, team_id, created_at, team:teams(name, visibility), inviter:profiles!team_invites_invited_by_fkey(display_name, username)')
       .eq('user_id', userId)
       .order('created_at')
     if (error) throw error
@@ -181,6 +185,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   // Keep the newest values reachable from long-lived realtime callbacks.
   const live = useRef({ channels, profiles, settings, me, active, visible: true })
   live.current = { ...live.current, channels, profiles, settings, me, active }
+  // Who last DMed you while Cabal was in the background (drives the tab title).
+  const [attention, setAttention] = useState<string | null>(null)
 
   // SWR's bound mutate functions are stable; the query objects are not.
   const mutateChannels = channelsQuery.mutate
@@ -213,10 +219,47 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
     [lastOpenKey, popout],
   )
 
+  // A team invite that arrives while you're here gets a one-tap Join, so you
+  // don't have to spot it in the buddy list.
+  const announceInvite = useCallback(
+    async (inviteId: string) => {
+      const list = await mutateInvites()
+      const inv = list?.find((i) => i.id === inviteId)
+      if (!inv || popout) return
+      toast(`${inv.inviter?.display_name ?? 'Someone'} invited you to ${inv.team?.name ?? 'a team'}`, {
+        duration: 20_000,
+        closeButton: true,
+        action: {
+          label: 'Join',
+          onClick: async () => {
+            const { data: teamId, error } = await supabase.rpc('respond_team_invite', { p_invite: inv.id, p_accept: true })
+            void mutateInvites()
+            if (error) {
+              toast.error(friendlyError(error))
+              return
+            }
+            const fresh = await supabase.rpc('my_channels', { p_community: community.id })
+            void mutateChannels()
+            const ch = (fresh.data as Channel[] | null)?.find((c) => c.team_id === teamId)
+            if (ch) open(ch.id)
+          },
+        },
+      })
+    },
+    [mutateInvites, mutateChannels, popout, supabase, community.id, open],
+  )
+
   const restored = useRef<string | null>(null)
   useEffect(() => {
     if (popout) return
     let c = new URLSearchParams(window.location.search).get('c')
+    // A team invite link carried through sign-up (see /join/[code]).
+    if (!c) {
+      try {
+        c = sessionStorage.getItem('cabal:open')
+        sessionStorage.removeItem('cabal:open')
+      } catch {}
+    }
     if (!c) {
       try {
         c = localStorage.getItem(lastOpenKey)
@@ -253,6 +296,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   const readTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const markRead = useCallback(
     (channelId: string) => {
+      toast.dismiss(`dm:${channelId}`)
       mutate(
         ['channels', community.id],
         (cur?: Channel[]) => cur?.map((c) => (c.id === channelId ? { ...c, unread: 0, last_read_at: new Date().toISOString() } : c)),
@@ -276,10 +320,12 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   // --- sending ----------------------------------------------------------------
 
   const send = useCallback(
-    async (channelId: string, text: string, retryId?: string) => {
+    async (channelId: string, text: string, retryId?: string, attachments?: LocalFile[]) => {
       const id = retryId ?? crypto.randomUUID()
+      const files = attachments ?? []
       // Too big to read comfortably inline: sent whole, shown as a card that opens in a reader.
-      const long = isLong(text)
+      // (The composer sends files and a long text as two messages.)
+      const long = files.length === 0 && isLong(text)
       const body = long ? previewOf(text) : text
       const longFields = long ? { long_text: true, long_chars: charCount(text), long_body: text } : {}
       const draft: Message = {
@@ -289,6 +335,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
         kind: 'user',
         body,
         ...longFields,
+        ...(files.length ? { files: files.length, local_files: files } : {}),
         created_at: new Date().toISOString(),
         deleted_at: null,
         pending: true,
@@ -303,7 +350,64 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       // Direct messages are sealed here, on this device; the server only ever sees the sealed text.
       const dm = live.current.channels.find((c) => c.id === channelId)?.kind === 'dm'
       const peer = live.current.channels.find((c) => c.id === channelId)?.other_user_id ?? null
+      let uploaded: string[] = []
       const insert = async () => {
+        if (files.length) {
+          // Each attempt uploads under fresh ids, so a retry never meets half of an earlier one.
+          removeUploads(uploaded)
+          const ids = files.map(() => crypto.randomUUID())
+          const paths = ids.map((fid) => attachmentPath(channelId, id, fid))
+          uploaded = paths
+          if (dm) {
+            const sealed = await e2ee.sealWithFiles(
+              channelId,
+              id,
+              peer ?? '',
+              body,
+              await Promise.all(
+                files.map(async (f, i) => ({
+                  id: ids[i],
+                  bytes: new Uint8Array(await f.blob.arrayBuffer()),
+                  meta: { name: f.name, mime: f.mime, kind: f.kind, width: f.width, height: f.height },
+                })),
+              ),
+            )
+            await Promise.all(
+              sealed.files.map((f, i) =>
+                upload(paths[i], new Blob([new Uint8Array(f.cipher)], { type: 'application/octet-stream' }), 'application/octet-stream'),
+              ),
+            )
+            return supabase
+              .rpc('send_message_with_files', {
+                p_id: id,
+                p_channel: channelId,
+                p_body: '',
+                p_sealed: sealed.message,
+                p_files: sealed.files.map((f, i) => ({ id: ids[i], path: paths[i], sealed: f.sealed })),
+              })
+              .select(MESSAGE_COLUMNS)
+              .single()
+          }
+          await Promise.all(files.map((f, i) => upload(paths[i], f.blob, f.mime)))
+          return supabase
+            .rpc('send_message_with_files', {
+              p_id: id,
+              p_channel: channelId,
+              p_body: body,
+              p_sealed: null,
+              p_files: files.map((f, i) => ({
+                id: ids[i],
+                path: paths[i],
+                kind: f.kind,
+                mime: f.mime,
+                name: f.name,
+                width: f.width,
+                height: f.height,
+              })),
+            })
+            .select(MESSAGE_COLUMNS)
+            .single()
+        }
         if (long) {
           // One call writes the preview and the full text together, or neither.
           const sealed = dm ? await e2ee.sealLong(channelId, id, peer ?? '', text) : null
@@ -334,12 +438,14 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
           result = await insert()
         }
       } catch (err) {
+        removeUploads(uploaded)
         fail()
-        toast.error(friendlyError(err))
+        toast.error(err instanceof AttachmentError ? err.message : friendlyError(err))
         return false
       }
       const { data, error } = result
       if (error && error.code !== '23505') {
+        removeUploads(uploaded)
         fail()
         if (error.code === 'P0429' || error.code === 'P0409' || error.code === '22023') toast.error(error.message)
         return false
@@ -347,12 +453,14 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       if (data) {
         const row = data as Message
         const sent: Message = { ...row, ...(dm ? { body, e2ee: 'ok' as const } : {}), ...longFields }
+        // The sender keeps showing the pictures from memory; nothing to download back.
+        if (files.length) sent.local_files = files
         mutate(
           messagesKey(channelId),
           (cur?: Message[]) => {
             if (!cur) return cur
             // Realtime may have delivered it first; keep this device's full copy of a long message.
-            if (long && cur.some((m) => m.id === id)) return cur.map((m) => (m.id === id ? { ...m, ...sent } : m))
+            if ((long || files.length) && cur.some((m) => m.id === id)) return cur.map((m) => (m.id === id ? { ...m, ...sent } : m))
             return insertInOrder(cur, sent)
           },
           { revalidate: false },
@@ -366,7 +474,10 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   )
 
   const discard = useCallback((channelId: string, id: string) => {
-    setOutbox((o) => ({ ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }))
+    setOutbox((o) => {
+      releaseLocal((o[channelId] ?? []).find((m) => m.id === id)?.local_files)
+      return { ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }
+    })
   }, [])
 
   // --- settings ---------------------------------------------------------------
@@ -539,17 +650,34 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       const people = personLabel((id) => live.current.profiles.get(id))
       if ((isDm && s.notify_dms) || (isMention && s.notify_mentions)) {
         const where = channel.kind === 'room' ? `#${channel.slug}` : channel.team_name ?? 'your team'
-        showNotification({
-          title: isDm ? authorName : `${authorName} in ${where}`,
-          body:
-  m.sealed && m.e2ee !== 'ok'
-  ? 'New encrypted message'
-  : m.long_text
-  ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels), people)}`
-  : plainText(m.body, linkLabel(live.current.channels), people),
-          tag: m.channel_id,
-          onClick: () => open(m.channel_id),
-        })
+        const preview =
+          m.sealed && m.e2ee !== 'ok'
+            ? 'New encrypted message'
+            : !m.body && m.files
+              ? filesLabel(m.files)
+              : m.long_text
+                ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels), people)}`
+                : plainText(m.body, linkLabel(live.current.channels), people)
+        if (isDm && live.current.visible) {
+          // Looking at Cabal, just somewhere else: say so inside the app, where
+          // it can't be missed (system notifications are easy to miss or blocked).
+          showDmToast({
+            channelId: m.channel_id,
+            name: authorName,
+            avatarUrl: author?.avatar_url ?? null,
+            preview,
+            count: Math.max(1, counted ? channel.unread : channel.unread + 1),
+            onOpen: () => open(m.channel_id),
+          })
+        } else {
+          showNotification({
+            title: isDm ? `${authorName} messaged you` : `${authorName} in ${where}`,
+            body: preview,
+            tag: m.channel_id,
+            onClick: () => open(m.channel_id),
+          })
+          if (isDm) setAttention(authorName)
+        }
         if (s.notify_sound) playChime()
       }
     },
@@ -558,8 +686,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
 
   // Realtime callbacks read the latest handlers through a ref, so the socket
   // subscription is created once per user/community and never churns.
-  const handlers = useRef({ handleIncoming, refreshMembers, refreshInvites, refreshChannels, loadPresence })
-  handlers.current = { handleIncoming, refreshMembers, refreshInvites, refreshChannels, loadPresence }
+  const handlers = useRef({ handleIncoming, refreshMembers, refreshInvites, announceInvite, refreshChannels, loadPresence })
+  handlers.current = { handleIncoming, refreshMembers, refreshInvites, announceInvite, refreshChannels, loadPresence }
 
   useEffect(() => {
     let wasLive = false
@@ -613,7 +741,10 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'team_invites', filter: `user_id=eq.${userId}` },
-          () => h().refreshInvites(),
+          (p) => {
+            if (p.eventType === 'INSERT') void h().announceInvite((p.new as { id: string }).id)
+            else h().refreshInvites()
+          },
         )
         .on(
           'postgres_changes',
@@ -674,6 +805,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
     const update = () => {
       const onScreen = document.visibilityState === 'visible'
       live.current.visible = onScreen && document.hasFocus()
+      if (live.current.visible) setAttention(null)
       if (onScreen && live.current.active) {
         const c = live.current.channels.find((x) => x.id === live.current.active)
         if (c && c.unread > 0) markRead(c.id)
@@ -696,8 +828,22 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   useEffect(() => {
     if (popout) return
     desktop()?.setBadge(unreadDms)
-    document.title = unreadDms > 0 ? `(${unreadDms}) Cabal` : 'Cabal'
-  }, [unreadDms, popout])
+    const counted = unreadDms > 0 ? `(${unreadDms}) Cabal` : 'Cabal'
+    document.title = counted
+    // While you're away, the tab takes turns saying who wrote, so a DM stands
+    // out in a row of tabs. It stops the moment you come back.
+    if (!attention || unreadDms === 0) return
+    const call = `${attention} messaged you`
+    let flip = false
+    const timer = window.setInterval(() => {
+      flip = !flip
+      document.title = flip ? call : counted
+    }, 1500)
+    return () => {
+      window.clearInterval(timer)
+      document.title = counted
+    }
+  }, [unreadDms, popout, attention])
 
   useEffect(() => desktop()?.onNavigate((target) => open(target)), [open])
 

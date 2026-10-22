@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { useCabal } from './store'
-import { TeamIcon, openTeam } from './team-dialogs'
+import { openTeam } from './team-dialogs'
+import { TeamMark, useTeamImages } from './team-images'
 import type { TeamVisibility } from '@/lib/types'
 
 type Place = {
@@ -35,6 +36,11 @@ function useTeams(communityId: string, personId: string) {
         return (a.team_name ?? '').localeCompare(b.team_name ?? '')
       })
   })
+}
+
+function TeamRowMark({ teamId, visibility }: { teamId: string; visibility: TeamVisibility | null }) {
+  const logo = useTeamImages(teamId).data?.logo_url ?? null
+  return <TeamMark logo={logo} visibility={visibility} size={24} className="rounded-md" />
 }
 
 // The teams someone is on, on their profile card. Picking one takes you there
@@ -90,7 +96,7 @@ export function MemberPlaces({ personId, self, onNavigate }: { personId: string;
                   aria-label={spoken}
                   className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
                 >
-                  <TeamIcon visibility={t.visibility} className="size-3.5 shrink-0 text-muted-foreground" />
+                  <TeamRowMark teamId={t.team_id} visibility={t.visibility} />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {busy === t.team_id ? (
                     <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />

@@ -1,12 +1,11 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import Link from 'next/link'
-import { ArrowDownToLine, ArrowUpRight } from 'lucide-react'
 import { getCommunity } from '@/lib/community'
 import { onlineCount } from '@/lib/online-count'
 import { latestRelease } from '@/lib/releases'
 import { githubUrl } from '@/lib/config'
 import { GithubIcon } from '@/components/brand/github-icon'
+import { AppleIcon, WindowsIcon } from '@/components/brand/platform-icons'
 import { ChicagoFlag } from '@/components/marketing/chicago-flag'
 import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
@@ -21,9 +20,16 @@ export const metadata: Metadata = {
   openGraph: { type: 'website', siteName: 'cabal.city', description: SITE_DESCRIPTION, locale: 'en_US', url: '/' },
 }
 
+const HERO_PRIMARY =
+  'inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+
 export default async function Home() {
   const community = await getCommunity()
   const [release, online] = await Promise.all([latestRelease(), community ? onlineCount(community.id) : null])
+  // Straight to the installer when the release has one (Mac = Apple Silicon first);
+  // otherwise the downloads section further down.
+  const windowsDownload = (release.state === 'ready' && release.windows[0]?.url) || '#download'
+  const macDownload = (release.state === 'ready' && release.mac[0]?.url) || '#download'
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -48,58 +54,25 @@ export default async function Home() {
             Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
-          <div className="flex flex-col gap-3 pt-2">
-            <div className="flex flex-wrap gap-3">
-              {/* A plain anchor: next/link ignores a click when the URL already ends in #download. */}
+          <div className="flex flex-wrap gap-3 pt-2">
+            {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
+            <a href={windowsDownload} className={HERO_PRIMARY}>
+              <WindowsIcon className="size-4" />
+              Download for Windows
+            </a>
+            <a href={macDownload} className={HERO_PRIMARY}>
+              <AppleIcon className="size-4" />
+              Download for Mac
+            </a>
+            {githubUrl && (
               <a
-                href="#download"
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                href={githubUrl}
+                className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <ArrowDownToLine className="size-4" aria-hidden />
-                Get the desktop app
+                <GithubIcon className="size-4" />
+                View on GitHub
               </a>
-              {githubUrl ? (
-                <a
-                  href={githubUrl}
-                  className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <GithubIcon className="size-4" aria-hidden />
-                  View on GitHub
-                </a>
-              ) : (
-                <Link
-                  href="/login"
-                  className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  Open in browser
-                  <ArrowUpRight className="size-4" aria-hidden />
-                </Link>
-              )}
-            </div>
-            <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground">
-              <span>Open source</span>
-              <span aria-hidden className="text-muted-foreground/50">
-                ·
-              </span>
-              <span>Mac, Windows &amp; Linux</span>
-              {githubUrl && (
-                <>
-                  <span aria-hidden className="text-muted-foreground/50">
-                    ·
-                  </span>
-                  <Link
-                    href="/login"
-                    className="group inline-flex items-center gap-0.5 rounded font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    Open in browser
-                    <ArrowUpRight
-                      className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
-                      aria-hidden
-                    />
-                  </Link>
-                </>
-              )}
-            </p>
+            )}
           </div>
         </section>
 
@@ -119,7 +92,7 @@ export default async function Home() {
                 Say what you&apos;re working on and choose when you&apos;re around, away, or heads-down with
                 notifications muted. Cabal never watches your keyboard or screen.
               </Feature>
-              <Feature title="Help each other ship" mono="#lobby">
+              <Feature title="Help each other ship" mono="#cabal-chat">
                 Share what you&apos;re launching, ask for feedback, and make the intro someone needs. Start a team
                 room for your crew. Build your thing, just not alone.
               </Feature>

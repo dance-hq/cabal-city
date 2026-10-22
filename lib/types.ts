@@ -21,6 +21,10 @@ export type Settings = {
   notify_dms: boolean
   notify_mentions: boolean
   notify_sound: boolean
+  // Show my running Lock in in "Locked in now".
+  lock_in_live: boolean
+  // Be on the weekly board and share my Lock in numbers on my profile.
+  lock_in_board: boolean
 }
 
 export type Community = {
@@ -46,6 +50,10 @@ export type TeamRoom = {
   last_message_at: string | null
   created_at: string
   welcome: string | null
+  // Who started it, oldest owner first. Readable before you join.
+  owner_ids: string[]
+  logo_url: string | null
+  banner_url: string | null
 }
 
 export type Channel = {
@@ -64,6 +72,7 @@ export type Channel = {
   last_read_at: string | null
   unread: number
   muted: boolean
+  team_logo_url?: string | null
 }
 
 export type Message = {
@@ -82,6 +91,10 @@ export type Message = {
   long_chars?: number | null
   /** Client-only: the full text of a long message this device sent, so it never has to be fetched back. */
   long_body?: string
+  /** How many photos or videos it carries (rows in message_files). */
+  files?: number
+  /** Client-only: the photos and videos this device is sending, shown from memory until they're stored. */
+  local_files?: LocalFile[]
   // Client-only: optimistic sends.
   pending?: boolean
   failed?: boolean
@@ -99,3 +112,34 @@ export type PresenceSession = {
 }
 
 export type TeamInvite = { id: string; team_id: string; user_id: string; invited_by: string | null; created_at: string }
+
+export type FileKind = 'image' | 'video'
+
+/** A photo or video picked on this device and ready to send. */
+export type LocalFile = {
+  key: string
+  blob: Blob
+  /** An object URL for showing it before it's stored. */
+  url: string
+  kind: FileKind
+  mime: string
+  name: string
+  width: number | null
+  height: number | null
+}
+
+/** A stored attachment. Direct messages keep kind, type, name and size inside `sealed`. */
+export type MessageFileRow = {
+  id: string
+  message_id: string
+  channel_id: string
+  position: number
+  path: string
+  bytes: number
+  kind: FileKind | null
+  mime: string | null
+  name: string | null
+  width: number | null
+  height: number | null
+  sealed: Envelope | null
+}

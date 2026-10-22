@@ -13,13 +13,17 @@ import {
   newDeviceOffer,
   newKeyPair,
   newRecoveryKey,
+  openFile,
+  openFileMeta,
   openLongText,
   openMessage,
   packKeyring,
+  sealFile,
   sealLongText,
   sealMessage,
 } from '@/lib/e2ee/crypto'
 import { charCount, longBody, packPreview, previewOf, unpackPreview } from '@/lib/long-text'
+import { attachmentPath } from '@/lib/attachments'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -33,6 +37,9 @@ const tag = Math.random().toString(36).slice(2, 8)
 const slug = `cabal-test-${tag}`
 const admin = run ? createClient(url!, service!, { auth: { persistSession: false } }) : (null as never)
 const people: Person[] = []
+const uploads: string[] = []
+const teamImageUploads: string[] = []
+const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 let communityId = ''
 
 async function person(name: string): Promise<Person> {
@@ -115,6 +122,8 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
   })
 
   afterAll(async () => {
+    if (uploads.length) await admin.storage.from('attachments').remove(uploads)
+    if (teamImageUploads.length) await admin.storage.from('team-images').remove(teamImageUploads)
     // Rooms, teams, DMs, members and their messages all go with the community.
     await admin.from('communities').delete().eq('slug', slug)
     for (const p of people) {
@@ -235,7 +244,8 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
       grace.id,
       'the eval harness',
     ])
-    const outsiderView = await outsider.db.rpc('community_lock_ins', { p_community: communityId })
+    // (The "outsider" joined this test community too, so ask about one they're not in.)
+    const outsiderView = await outsider.db.rpc('community_lock_ins', { p_community: crypto.randomUUID() })
     expect(outsiderView.error).not.toBeNull()
 
     const paused = await grace.db.rpc('pause_lock_in')
@@ -247,6 +257,144 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect(resumed.data?.paused_at).toBeNull()
     const ended = await grace.db.rpc('end_work_session')
     expect(typeof ended.data).toBe('number')
+  })
+
+  it('never makes a second session, and closes a forgotten one at 8 hours', async () => {
+    const [a, b] = await Promise.all([grace.db.rpc('lock_in'), grace.db.rpc('lock_in')])
+    expect(a.error).toBeNull()
+    expect(b.error).toBeNull()
+    const open = await admin.from('work_sessions').select('id, started_at').eq('user_id', grace.id).is('ended_at', null)
+    expect(open.data).toHaveLength(1)
+    // Locking in again from another device keeps the same session.
+    const again = await grace.db.rpc('lock_in')
+    expect(again.data?.started_at).toBe(open.data![0].started_at)
+
+    // Paused, Lock in picks it back up instead of starting over.
+    await grace.db.rpc('pause_lock_in')
+    const resumed = await grace.db.rpc('lock_in')
+    expect(resumed.data?.paused_at).toBeNull()
+    expect(resumed.data?.started_at).toBe(open.data![0].started_at)
+    const done = await grace.db.rpc('finish_lock_in')
+    expect(done.data?.id).toBe(open.data![0].id)
+    expect(await grace.db.rpc('finish_lock_in')).toMatchObject({ data: null })
+
+    // Left running for 9 hours (the app kept checking in): saved at 8.
+    const nineHoursAgo = new Date(Date.now() - 9 * 3600_000).toISOString()
+    const { data: forgotten } = await admin
+      .from('work_sessions')
+      .insert({ user_id: grace.id, started_at: nineHoursAgo, running_since: nineHoursAgo, last_beat: new Date().toISOString() })
+      .select('id')
+      .single()
+    const after = await grace.db.rpc('my_lock_in')
+    expect(after.data).toBeNull()
+    const { data: saved } = await admin.from('work_sessions').select('worked_seconds, ended_at').eq('id', forgotten!.id).single()
+    expect(saved?.worked_seconds).toBe(8 * 3600)
+    expect(Date.parse(saved!.ended_at) - Date.parse(nineHoursAgo)).toBe(8 * 3600_000)
+    await admin.from('work_sessions').delete().eq('id', forgotten!.id)
+  })
+
+  it('ranks finished hours by week for people who opted in, and keeps notes private', async () => {
+    await admin.from('work_sessions').delete().in('user_id', [ada.id, grace.id])
+    const first = await ada.db.rpc('lock_in_board', { p_community: communityId })
+    expect(first.error).toBeNull()
+    // The week starts Monday 00:00 in the community's time zone (Chicago).
+    const weekStart = Date.parse(first.data.week_start)
+    const local = new Intl.DateTimeFormat('en-US', {
+      timeZone: first.data.time_zone,
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(weekStart)
+    expect(first.data.time_zone).toBe('America/Chicago')
+    expect(local).toBe('Mon 00:00')
+    expect([167, 168, 169]).toContain((Date.parse(first.data.week_end) - weekStart) / 3600_000)
+
+    const end = Date.now() - 30_000
+    const finished = (user: string, seconds: number, endedAt = end, note?: string) => ({
+      user_id: user,
+      started_at: new Date(endedAt - seconds * 1000).toISOString(),
+      ended_at: new Date(endedAt).toISOString(),
+      running_since: null,
+      worked_seconds: seconds,
+      note: note ?? null,
+    })
+    const { data: rows } = await admin
+      .from('work_sessions')
+      .insert([
+        finished(grace.id, 7200, end, 'Shipped the eval harness'),
+        finished(grace.id, 30, end - 3600_000), // under a minute: not counted
+        finished(grace.id, 10800, weekStart - 3600_000), // last week
+        finished(ada.id, 3600, end),
+      ])
+      .select('id, user_id')
+    const graceSession = rows!.find((r) => r.user_id === grace.id)!.id
+
+    // Nobody opted in yet: an empty board, but your own numbers are there.
+    const empty = await ada.db.rpc('lock_in_board', { p_community: communityId })
+    expect(empty.data.rows).toEqual([])
+    expect(empty.data.joined).toBe(false)
+    const mine = await grace.db.rpc('lock_in_stats', { p_community: communityId })
+    expect(mine.data).toMatchObject({ week_seconds: 7200, all_seconds: 18000, sessions: 2, self: true, board: false })
+    expect(mine.data.days.reduce((s: number, d: number) => s + d, 0)).toBe(7200)
+    expect(mine.data.recent[0].note).toBe('Shipped the eval harness')
+    // Not shared, so not visible to anyone else.
+    expect((await ada.db.rpc('lock_in_stats', { p_community: communityId, p_user: grace.id })).data).toBeNull()
+
+    // Opting in is your own setting; you can't flip it for someone else.
+    expect((await grace.db.from('user_settings').update({ lock_in_board: true }).eq('user_id', grace.id)).error).toBeNull()
+    await ada.db.from('user_settings').update({ lock_in_board: false }).eq('user_id', grace.id)
+    const { data: graceSettings } = await admin.from('user_settings').select('lock_in_board').eq('user_id', grace.id).single()
+    expect(graceSettings?.lock_in_board).toBe(true)
+
+    const one = await ada.db.rpc('lock_in_board', { p_community: communityId })
+    expect(one.data.rows).toEqual([{ user_id: grace.id, seconds: 7200, sessions: 1, rank: 1 }])
+
+    await ada.db.from('user_settings').update({ lock_in_board: true }).eq('user_id', ada.id)
+    const two = await grace.db.rpc('lock_in_board', { p_community: communityId })
+    expect(two.data.joined).toBe(true)
+    expect(two.data.rows.map((r: { user_id: string; rank: number }) => [r.user_id, r.rank])).toEqual([
+      [grace.id, 1],
+      [ada.id, 2],
+    ])
+    const lastWeek = await grace.db.rpc('lock_in_board', { p_community: communityId, p_weeks_ago: 1 })
+    expect(lastWeek.data.rows).toEqual([{ user_id: grace.id, seconds: 10800, sessions: 1, rank: 1 }])
+
+    // A running timer doesn't move the board.
+    await ada.db.rpc('lock_in')
+    const running = await grace.db.rpc('lock_in_board', { p_community: communityId })
+    expect(running.data.rows.find((r: { user_id: string }) => r.user_id === ada.id).seconds).toBe(3600)
+    await ada.db.rpc('finish_lock_in')
+
+    // Shared numbers are visible to members, but never the sessions or notes.
+    const shared = await ada.db.rpc('lock_in_stats', { p_community: communityId, p_user: grace.id })
+    expect(shared.data).toMatchObject({ week_seconds: 7200, self: false })
+    expect(shared.data.recent).toBeUndefined()
+
+    // Notes: only on your own finished sessions.
+    expect((await grace.db.rpc('note_lock_in', { p_session: graceSession, p_note: '  Fixed the flaky test ' })).error).toBeNull()
+    expect((await ada.db.rpc('note_lock_in', { p_session: graceSession, p_note: 'mine now' })).error).not.toBeNull()
+    const { data: noted } = await admin.from('work_sessions').select('note').eq('id', graceSession).single()
+    expect(noted?.note).toBe('Fixed the flaky test')
+
+    // Nobody can write hours directly.
+    expect((await grace.db.from('work_sessions').update({ worked_seconds: 999_999 }).eq('id', graceSession)).error).not.toBeNull()
+    const { data: untouched } = await admin.from('work_sessions').select('worked_seconds').eq('id', graceSession).single()
+    expect(untouched?.worked_seconds).toBe(7200)
+
+    // Nothing from a community you're not in.
+    const elsewhere = crypto.randomUUID()
+    expect((await grace.db.rpc('lock_in_board', { p_community: elsewhere })).error).not.toBeNull()
+    expect((await ada.db.rpc('lock_in_stats', { p_community: elsewhere, p_user: grace.id })).error).not.toBeNull()
+
+    // Leaving the board hides you again, and "Locked in now" follows its own setting.
+    await ada.db.from('user_settings').update({ lock_in_board: false, lock_in_live: false }).eq('user_id', ada.id)
+    expect((await grace.db.rpc('lock_in_stats', { p_community: communityId, p_user: ada.id })).data).toBeNull()
+    await ada.db.rpc('lock_in')
+    const now = await grace.db.rpc('community_lock_ins', { p_community: communityId })
+    expect(now.data?.some((r: { user_id: string }) => r.user_id === ada.id)).toBe(false)
+    await ada.db.rpc('finish_lock_in')
+    await ada.db.from('user_settings').update({ lock_in_live: true }).eq('user_id', ada.id)
   })
 
   it('hides the invite code column from direct reads', async () => {
@@ -497,6 +645,27 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     await outsider.db.removeAllChannels()
   })
 
+  it('lets only team owners set a logo and banner, from their own team folder', async () => {
+    const png = new Blob([Uint8Array.from(atob(TINY_PNG), (c) => c.charCodeAt(0))], { type: 'image/png' })
+    const own = `${teamId}/logo-${tag}.png`
+    expect((await ada.db.storage.from('team-images').upload(own, png, { contentType: 'image/png' })).error).toBeNull()
+    teamImageUploads.push(own)
+    expect((await outsider.db.storage.from('team-images').upload(`${teamId}/evil-${tag}.png`, png, { contentType: 'image/png' })).error).not.toBeNull()
+    expect((await outsider.db.storage.from('team-images').upload(`not-a-team/x-${tag}.png`, png, { contentType: 'image/png' })).error).not.toBeNull()
+
+    const publicUrl = (path: string) => ada.db.storage.from('team-images').getPublicUrl(path).data.publicUrl
+    expect((await outsider.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: publicUrl(own) })).error).not.toBeNull()
+    // A file that isn't in this team's folder (or doesn't exist) is refused.
+    const elsewhere = publicUrl(`${crypto.randomUUID()}/logo.png`)
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: elsewhere })).error).not.toBeNull()
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: 'https://example.com/x.png' })).error).not.toBeNull()
+
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: publicUrl(own) })).error).toBeNull()
+    const mine = await ada.db.rpc('my_channels', { p_community: communityId })
+    expect((mine.data as { team_id: string; team_logo_url: string }[]).find((c) => c.team_id === teamId)?.team_logo_url).toBe(publicUrl(own))
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: null })).error).toBeNull()
+  })
+
   it('lets anyone in the community find and join an open team room', async () => {
     const created = await ada.db.rpc('create_team', {
       p_community: communityId,
@@ -512,7 +681,9 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     // Listed for everyone, but you join before you read or post.
     const listed = await outsider.db.rpc('community_teams', { p_community: communityId })
     const entry = (listed.data as { id: string; joined: boolean; member_count: number }[]).find((t) => t.id === openTeam)
-    expect(entry).toMatchObject({ joined: false, member_count: 1 })
+    expect(entry).toMatchObject({ joined: false, member_count: 1, owner_ids: [ada.id] })
+    // Not on the team yet, so no inviting people to it.
+    expect((await outsider.db.rpc('invite_to_team', { p_team: openTeam, p_user: grace.id })).error).not.toBeNull()
     expect((await outsider.db.from('messages').select('id').eq('channel_id', ch!.id)).data).toEqual([])
     expect((await outsider.db.from('messages').insert({ channel_id: ch!.id, author_id: outsider.id, body: 'x' })).error).not.toBeNull()
 
@@ -522,6 +693,12 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     const history = await outsider.db.from('messages').select('body').eq('channel_id', ch!.id)
     expect(history.data?.map((m) => m.body)).toContain(hello)
     expect((await outsider.db.from('messages').insert({ channel_id: ch!.id, author_id: outsider.id, body: 'hi all' })).error).toBeNull()
+
+    // Any member of a public team can invite; the invitee sees who asked.
+    expect((await outsider.db.rpc('invite_to_team', { p_team: openTeam, p_user: grace.id })).error).toBeNull()
+    const { data: graceInvite } = await grace.db.from('team_invites').select('id, invited_by').eq('team_id', openTeam).single()
+    expect(graceInvite?.invited_by).toBe(outsider.id)
+    expect((await grace.db.rpc('respond_team_invite', { p_invite: graceInvite!.id, p_accept: false })).error).toBeNull()
     // Joining twice is harmless and doesn't post a second notice.
     expect((await outsider.db.rpc('join_team', { p_team: openTeam })).error).toBeNull()
     const notices = await ada.db.from('messages').select('body').eq('channel_id', ch!.id).eq('kind', 'system').like('body', '%joined.')
@@ -547,6 +724,8 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     const read = await grace.db.from('messages').select('body').eq('channel_id', teamChannelId)
     expect(read.data?.some((m) => m.body.startsWith('secret plan'))).toBe(true)
     expect((await grace.db.from('messages').insert({ channel_id: teamChannelId, author_id: grace.id, body: 'on it' })).error).toBeNull()
+    // On an invite-only team, members can't invite; the invite is the access.
+    expect((await grace.db.rpc('invite_to_team', { p_team: teamId, p_user: outsider.id })).error).not.toBeNull()
 
     // A member can't remove the owner; the owner can remove the member.
     expect((await grace.db.rpc('remove_team_member', { p_team: teamId, p_user: ada.id })).error).not.toBeNull()
@@ -581,6 +760,111 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     await grace.db.rpc('presence_heartbeat', { p_session: session, p_community: communityId })
     await grace.db.rpc('presence_leave', { p_session: session })
     expect((await ada.db.from('presence_sessions').select('id').eq('user_id', grace.id)).data).toEqual([])
+  })
+
+  it('shares a photo in a room only once a message claims it, and stops when it is deleted', async () => {
+    const { data: lobby } = await grace.db.from('channels').select('id').eq('community_id', communityId).eq('slug', 'lobby').single()
+    const id = crypto.randomUUID()
+    const fileId = crypto.randomUUID()
+    const path = attachmentPath(lobby!.id, id, fileId)
+    uploads.push(path)
+    const photo = new Blob([crypto.getRandomValues(new Uint8Array(2048))], { type: 'image/png' })
+    expect((await grace.db.storage.from('attachments').upload(path, photo, { contentType: 'image/png' })).error).toBeNull()
+
+    // Nobody else can read it until a message claims it.
+    expect((await ada.db.storage.from('attachments').createSignedUrl(path, 60)).error).not.toBeNull()
+
+    // A message can't claim files that never arrived.
+    const missing = await grace.db.rpc('send_message_with_files', {
+      p_id: crypto.randomUUID(),
+      p_channel: lobby!.id,
+      p_body: 'look',
+      p_sealed: null,
+      p_files: [{ id: crypto.randomUUID(), path: `${lobby!.id}/x/y`, kind: 'image', mime: 'image/png', name: 'a.png' }],
+    })
+    expect(missing.error).not.toBeNull()
+    // Nor can a plain insert say it has files.
+    expect((await grace.db.from('messages').insert({ channel_id: lobby!.id, author_id: grace.id, body: 'hi', files: 1 })).error).not.toBeNull()
+
+    const sent = await grace.db
+      .rpc('send_message_with_files', {
+        p_id: id,
+        p_channel: lobby!.id,
+        p_body: '',
+        p_sealed: null,
+        p_files: [{ id: fileId, path, kind: 'image', mime: 'image/png', name: 'board.png', width: 40, height: 30 }],
+      })
+      .select('id, body, files')
+      .single()
+    expect(sent.error).toBeNull()
+    expect(sent.data).toMatchObject({ body: '', files: 1 })
+
+    const rows = await ada.db.from('message_files').select('path, bytes, kind, name').eq('message_id', id)
+    expect(rows.data).toEqual([{ path, bytes: 2048, kind: 'image', name: 'board.png' }])
+    const link = await ada.db.storage.from('attachments').createSignedUrl(path, 60)
+    expect(link.error).toBeNull()
+    expect((await fetch(link.data!.signedUrl)).status).toBe(200)
+
+    expect((await grace.db.rpc('delete_message', { p_message: id })).error).toBeNull()
+    expect((await ada.db.from('message_files').select('id').eq('message_id', id)).data).toEqual([])
+    expect((await ada.db.storage.from('attachments').createSignedUrl(path, 60)).error).not.toBeNull()
+  })
+
+  it('sends a DM photo the server stores but cannot read', async () => {
+    const mine = keys.get(ada.id)!
+    const theirs = keys.get(grace.id)!
+    const id = crypto.randomUUID()
+    const fileId = crypto.randomUUID()
+    const ctx = { channelId: dmId, messageId: id, authorId: ada.id, sk: mine.id, rk: theirs.id }
+    const conversation = await conversationKey(mine.pair.privateKey, theirs.pair.publicKey)
+    const bytes = crypto.getRandomValues(new Uint8Array(4096))
+    const meta = { name: 'secret-plan.jpg', mime: 'image/jpeg', kind: 'image' as const, width: 800, height: 600 }
+    const file = await sealFile(conversation, ctx, fileId, bytes, meta)
+    const path = attachmentPath(dmId, id, fileId)
+    uploads.push(path)
+
+    // Encrypted files must be stored as opaque bytes.
+    const asPhoto = await ada.db.storage
+      .from('attachments')
+      .upload(path, new Blob([file.cipher], { type: 'image/jpeg' }), { contentType: 'image/jpeg' })
+    expect(asPhoto.error).toBeNull()
+    const refused = await ada.db.rpc('send_message_with_files', {
+      p_id: id,
+      p_channel: dmId,
+      p_body: '',
+      p_sealed: await sealMessage(conversation, ctx, ''),
+      p_files: [{ id: fileId, path, sealed: file.sealed }],
+    })
+    expect(refused.error).not.toBeNull()
+    await ada.db.storage.from('attachments').remove([path])
+
+    const up = await ada.db.storage
+      .from('attachments')
+      .upload(path, new Blob([file.cipher], { type: 'application/octet-stream' }), { contentType: 'application/octet-stream' })
+    expect(up.error).toBeNull()
+    const sent = await ada.db.rpc('send_message_with_files', {
+      p_id: id,
+      p_channel: dmId,
+      p_body: '',
+      p_sealed: await sealMessage(conversation, ctx, 'the plan'),
+      p_files: [{ id: fileId, path, sealed: file.sealed }],
+    })
+    expect(sent.error).toBeNull()
+
+    const row = await grace.db.from('message_files').select('id, kind, mime, name, sealed').eq('message_id', id).single()
+    expect(row.data).toMatchObject({ kind: null, mime: null, name: null })
+    expect(JSON.stringify(row.data)).not.toContain('secret-plan')
+
+    const download = await grace.db.storage.from('attachments').download(path)
+    expect(download.error).toBeNull()
+    const g = keys.get(grace.id)!
+    const theirConversation = await conversationKey(g.pair.privateKey, mine.pair.publicKey)
+    const opened = await openFileMeta(theirConversation, ctx, fileId, row.data!.sealed)
+    expect(opened).toMatchObject(meta)
+    expect(await openFile(theirConversation, ctx, fileId, opened, new Uint8Array(await download.data!.arrayBuffer()))).toEqual(bytes)
+
+    expect((await outsider.db.storage.from('attachments').download(path)).error).not.toBeNull()
+    expect((await outsider.db.from('message_files').select('id').eq('message_id', id)).data).toEqual([])
   })
 
   it('blocks DMs between people who blocked each other', async () => {

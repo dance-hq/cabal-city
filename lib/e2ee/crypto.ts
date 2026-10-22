@@ -181,6 +181,64 @@ export async function openLongText(conversation: CryptoKey, ctx: MessageContext,
   return unpad(await decrypt(await messageKey(conversation, ctx), env.iv, env.ct, longTextAad(ctx)))
 }
 
+// Photos and videos: each file gets its own key from the conversation (so a
+// report, which hands over one message's key, never opens its files). The
+// bytes are uploaded encrypted; their description (name, type, size and the
+// bytes' iv) is sealed separately. Both are bound to the file's id.
+
+export type FileMeta = { name: string; mime: string; kind: 'image' | 'video'; width: number | null; height: number | null; iv: string }
+
+function fileKey(conversation: CryptoKey, ctx: MessageContext, fileId: string) {
+  return hkdf(conversation, `cabal-dm-v1:${ctx.channelId}`, `file:${ctx.messageId}:${fileId}`)
+}
+
+function fileAad(label: string, ctx: MessageContext, fileId: string) {
+  return encode([label, ctx.channelId, ctx.messageId, fileId, ctx.authorId, ctx.sk, ctx.rk].join('|'))
+}
+
+export async function sealFile(
+  conversation: CryptoKey,
+  ctx: MessageContext,
+  fileId: string,
+  bytes: Uint8Array,
+  meta: Omit<FileMeta, 'iv'>,
+): Promise<{ sealed: Envelope; cipher: Bytes }> {
+  const raw = await fileKey(conversation, ctx, fileId)
+  const iv = randomBytes(12)
+  const cipher = new Uint8Array(
+    await subtle().encrypt(
+      { name: 'AES-GCM', iv, additionalData: fileAad('cabal-dm-file-v1', ctx, fileId) },
+      await aesKey(raw, ['encrypt']),
+      new Uint8Array(bytes),
+    ),
+  )
+  const full: FileMeta = { ...meta, iv: toBase64(iv) }
+  const sealedMeta = await encrypt(raw, pad(JSON.stringify(full)), fileAad('cabal-dm-file-meta-v1', ctx, fileId))
+  return { sealed: { v: 1, sk: ctx.sk, rk: ctx.rk, ...sealedMeta }, cipher }
+}
+
+/** Throws if the key is wrong or anything about the description was changed. */
+export async function openFileMeta(conversation: CryptoKey, ctx: MessageContext, fileId: string, env: Envelope): Promise<FileMeta> {
+  if (env.v !== 1 || env.sk !== ctx.sk || env.rk !== ctx.rk) throw new Error('Envelope mismatch')
+  const raw = await fileKey(conversation, ctx, fileId)
+  const meta = JSON.parse(unpad(await decrypt(raw, env.iv, env.ct, fileAad('cabal-dm-file-meta-v1', ctx, fileId)))) as FileMeta
+  if (typeof meta.name !== 'string' || typeof meta.mime !== 'string' || typeof meta.iv !== 'string') throw new Error('Bad description')
+  if (meta.kind !== 'image' && meta.kind !== 'video') throw new Error('Bad description')
+  return meta
+}
+
+/** Throws if the key is wrong or the bytes were changed. */
+export async function openFile(conversation: CryptoKey, ctx: MessageContext, fileId: string, meta: FileMeta, cipher: Uint8Array): Promise<Bytes> {
+  const raw = await fileKey(conversation, ctx, fileId)
+  return new Uint8Array(
+    await subtle().decrypt(
+      { name: 'AES-GCM', iv: fromBase64(meta.iv), additionalData: fileAad('cabal-dm-file-v1', ctx, fileId) },
+      await aesKey(raw, ['decrypt']),
+      new Uint8Array(cipher),
+    ),
+  )
+}
+
 export function contextOf(m: { id: string; channel_id: string; author_id: string | null }, env: Envelope): MessageContext {
   return { channelId: m.channel_id, messageId: m.id, authorId: m.author_id ?? '', sk: env.sk, rk: env.rk }
 }

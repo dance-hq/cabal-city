@@ -15,12 +15,15 @@ import {
   newDeviceOffer,
   newKeyPair,
   newRecoveryKey,
+  openFile,
+  openFileMeta,
   openFromDevice,
   openLongText,
   openMessage,
   openWithRecoveryKey,
   packKeyring,
   parseRecoveryKey,
+  sealFile,
   sealForDevice,
   sealLongText,
   sealMessage,
@@ -29,6 +32,7 @@ import {
   type DeviceExchange,
   type DeviceOffer,
   type Envelope,
+  type FileMeta,
   type KeyringEntry,
 } from './crypto'
 import { loadPeer, loadVault, removeVault, savePeer, saveVault, type Vault } from './vault'
@@ -359,6 +363,40 @@ export class E2eeSession {
       sealLongText(conversation, ctx, text),
     ])
     return { preview, full }
+  }
+
+  /** A message with photos or videos: its text, and each file encrypted for upload with its sealed description. */
+  async sealWithFiles(
+    channelId: string,
+    messageId: string,
+    peerId: string,
+    text: string,
+    files: { id: string; bytes: Uint8Array; meta: Omit<FileMeta, 'iv'> }[],
+  ) {
+    const { ctx, conversation } = await this.sendingKeys(channelId, messageId, peerId)
+    const [message, ...sealed] = await Promise.all([
+      sealMessage(conversation, ctx, text),
+      ...files.map((f) => sealFile(conversation, ctx, f.id, f.bytes, f.meta)),
+    ])
+    return { message: message as Envelope, files: sealed as { sealed: Envelope; cipher: Uint8Array }[] }
+  }
+
+  /** The description of one sealed file. Throws if it can't be opened here. */
+  async openFileMeta(m: Message, fileId: string, sealed: unknown): Promise<FileMeta> {
+    const env = m.sealed
+    if (!env || !isEnvelope(env) || !isEnvelope(sealed)) throw new E2eeError('This file can’t be opened on this device.')
+    const keys = await this.keysFor(m, env)
+    if (!keys) throw new E2eeError('This file can’t be opened on this device.')
+    return openFileMeta(await this.conversation(keys.own, keys.theirs), contextOf(m, env), fileId, sealed)
+  }
+
+  /** The bytes of one sealed file. Throws if it can't be opened here or was changed. */
+  async openFile(m: Message, fileId: string, meta: FileMeta, cipher: Uint8Array): Promise<Uint8Array> {
+    const env = m.sealed
+    if (!env || !isEnvelope(env)) throw new E2eeError('This file can’t be opened on this device.')
+    const keys = await this.keysFor(m, env)
+    if (!keys) throw new E2eeError('This file can’t be opened on this device.')
+    return openFile(await this.conversation(keys.own, keys.theirs), contextOf(m, env), fileId, meta, cipher)
   }
 
   /** Opens the full text of a sealed long message. Throws if it can't be opened here. */

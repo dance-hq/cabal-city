@@ -15,7 +15,7 @@ insert into public.channels (community_id, kind, slug, name, topic, position)
 select c.id, 'room', r.slug, r.slug, r.topic, r.position
 from public.communities c
 cross join (values
-  ('lobby', 'The main hangout. Say what you''re working on.', 0),
+  ('cabal-chat', 'The main hangout. Say what you''re working on.', 0),
   ('introductions', 'New here? Tell people who you are and what you''re building.', 1)
 ) as r (slug, topic, position)
 where c.slug = 'chicago'

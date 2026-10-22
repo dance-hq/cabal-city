@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown, UserPlus, X } from 'lucide-react'
 import { CabalStar } from '@/components/brand/logo'
 import { cn } from '@/lib/utils'
 import { compareByPresence } from '@/lib/presence'
@@ -68,6 +68,7 @@ export function PeoplePanel({
   total,
   loading,
   onClose,
+  onInvite,
 }: {
   channel: Channel
   online: PanelPerson[]
@@ -76,6 +77,7 @@ export function PeoplePanel({
   loading: boolean
   // Set when the panel floats over the conversation (narrow windows).
   onClose?: () => void
+  onInvite?: () => void
 }) {
   const [showOffline, setShowOffline] = useState(true)
   const title = channel.kind === 'team' ? (channel.team_name ?? 'Team') : `#${channel.slug}`
@@ -119,6 +121,18 @@ export function PeoplePanel({
       </div>
 
       <div className="quiet-scroll flex-1 overflow-y-auto pb-4">
+        {onInvite && (
+          <button
+            type="button"
+            onClick={onInvite}
+            className="mx-2 mt-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="flex size-6 items-center justify-center rounded-full border border-dashed">
+              <UserPlus className="size-3.5" aria-hidden />
+            </span>
+            Invite people
+          </button>
+        )}
         <section className="mt-2">
           <h3 className="px-4 py-1 font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase">
             Online · {online.length}

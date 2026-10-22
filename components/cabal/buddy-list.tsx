@@ -9,7 +9,6 @@ import {
   Hammer,
   Hash,
   Link2,
-  Lock,
   Plus,
   Radar,
   Search,
@@ -59,7 +58,6 @@ export function BuddyList({ compact }: { compact?: boolean }) {
     channels,
     userId,
     statusOf,
-    presence,
     active,
     open,
     openDm,
@@ -125,6 +123,17 @@ export function BuddyList({ compact }: { compact?: boolean }) {
   })
   const here = arranged.here
   const away = arranged.offline
+
+  // Anyone waiting on a reply jumps to the top, wherever they'd normally sit
+  // (a collapsed group, Offline), and comes back once you've read it.
+  const waiting = q
+    ? []
+    : channels
+        .filter((c) => c.kind === 'dm' && c.other_user_id && c.unread > 0 && !c.muted)
+        .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''))
+        .flatMap((c) => people.find((p) => p.user_id === c.other_user_id) ?? [])
+  const waitingIds = new Set(waiting.map((p) => p.user_id))
+  const notWaiting = (p: (typeof people)[number]) => !waitingIds.has(p.user_id)
   const groupOf = new Map(buddyGroups.placements.map((p) => [p.member_id, p.group_id]))
 
   function personRow(p: (typeof people)[number]) {
@@ -247,6 +256,10 @@ export function BuddyList({ compact }: { compact?: boolean }) {
       <nav className="quiet-scroll min-h-0 flex-1 overflow-y-auto pb-4" aria-label="Conversations">
         <WelcomeCard />
 
+        {waiting.length > 0 && (
+          <Section label={`New messages · ${waiting.length}`}>{waiting.map(personRow)}</Section>
+        )}
+
         {!q && (
           <div className="mt-1 flex flex-col gap-px">
             <Row selected={active === VIEWS.opportunities} onClick={() => open(VIEWS.opportunities)} unread={0}>
@@ -260,7 +273,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
           <Section label="Team invites">
             {invites.map((inv) => (
               <div key={inv.id} className="mx-2 flex items-center gap-2 rounded-md border bg-card px-2.5 py-2">
-                <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <TeamIcon visibility={inv.team?.visibility ?? null} className="size-3.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1 text-xs leading-relaxed">
                   <span className="font-medium">{inv.team?.name ?? 'A team'}</span>
                   <span className="text-muted-foreground"> from {inv.inviter?.display_name ?? 'a teammate'}</span>
@@ -288,29 +301,14 @@ export function BuddyList({ compact }: { compact?: boolean }) {
 
         {visibleRooms.length > 0 && (
           <Section label="Channels">
-            {visibleRooms.map((r) => {
-              // Other people only: counting yourself made a bare "1" that read as unread.
-              const here = [...presence].filter(([id, p]) => id !== userId && p.rooms.has(r.id)).length
-              const hereLabel = `${here} ${here === 1 ? 'person' : 'people'} here now`
-              return (
-                <Row key={r.id} selected={active === r.id} onClick={() => open(r.id)} unread={r.unread} quiet muted={r.muted}>
-                  <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className={cn('truncate font-mono text-[13px]', r.unread > 0 && !r.muted && 'font-semibold text-foreground')}>
-                    {r.slug}
-                  </span>
-                  {here > 0 && (
-                    <span
-                      className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground"
-                      title={hereLabel}
-                      aria-label={hereLabel}
-                    >
-                      <span className="size-1.5 rounded-full bg-online" aria-hidden />
-                      {here}
-                    </span>
-                  )}
-                </Row>
-              )
-            })}
+            {visibleRooms.map((r) => (
+              <Row key={r.id} selected={active === r.id} onClick={() => open(r.id)} unread={r.unread} quiet muted={r.muted}>
+                <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <span className={cn('truncate font-mono text-[13px]', r.unread > 0 && !r.muted && 'font-semibold text-foreground')}>
+                  {r.slug}
+                </span>
+              </Row>
+            ))}
           </Section>
         )}
 
@@ -329,7 +327,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         >
           {visibleTeams.map((t) => (
             <Row key={t.id} selected={active === t.id} onClick={() => open(t.id)} unread={t.unread} muted={t.muted}>
-              <TeamIcon visibility={t.team_visibility} className="size-3.5 shrink-0 text-muted-foreground" />
+              <TeamIcon visibility={t.team_visibility} logo={t.team_logo_url} className="size-3.5 shrink-0 text-muted-foreground" />
               <span className={cn('truncate text-[13px]', t.unread > 0 && !t.muted && 'font-semibold text-foreground')}>
                 {t.team_name}
               </span>
@@ -373,7 +371,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
                 />
               }
             >
-              {expanded && online.map(personRow)}
+              {expanded && online.filter(notWaiting).map(personRow)}
               {expanded && !q && online.length === 0 && (
                 <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
                   {total === 0 ? 'Drag someone here, or use ··· on their name.' : 'Nobody in this group is around.'}
@@ -401,7 +399,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
           }
         >
           {membersLoading && <PeopleSkeleton />}
-          {here.map(personRow)}
+          {here.filter(notWaiting).map(personRow)}
           {!membersLoading && here.length === 0 && othersExist && !q && (
             <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">Nobody else is around right now.</p>
           )}
@@ -414,7 +412,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             expanded={showOffline || !!q}
             onToggle={() => setShowOffline((v) => !v)}
           >
-            {(showOffline || q) && away.map(personRow)}
+            {(showOffline || q) && away.filter(notWaiting).map(personRow)}
           </Section>
         )}
 
@@ -611,6 +609,7 @@ function PersonRow({
   const sub = lockedIn
     ? `Locked in${statusText ? ` · ${statusText}` : ''}`
     : statusText || (status === 'away' || status === 'dnd' ? STATUS_LABEL[status] : null)
+  const waiting = unread > 0 && !selected
   return (
     <div
       draggable
@@ -621,6 +620,7 @@ function PersonRow({
       className={cn(
         'group mx-2 flex items-center rounded-md transition-colors hover:bg-sidebar-accent',
         selected && 'bg-sidebar-accent',
+        waiting && 'bg-primary/10 hover:bg-primary/15',
       )}
     >
       <button
@@ -641,7 +641,11 @@ function PersonRow({
           >
             {name}
           </span>
-          {sub && (
+          {waiting ? (
+            <span className="truncate text-[11.5px] leading-tight font-medium text-primary">
+              {unread === 1 ? 'New message' : `${unread >= 100 ? '99+' : unread} new messages`}
+            </span>
+          ) : sub && (
             <span className={cn('flex min-w-0 items-center gap-1 text-[11.5px] leading-tight text-muted-foreground', status === 'offline' && 'opacity-70')}>
               {lockedIn && <span className="size-1.5 shrink-0 rounded-full bg-gold" aria-hidden />}
               <span className="truncate">{sub}</span>

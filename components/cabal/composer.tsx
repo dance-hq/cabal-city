@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUp, FileText, Hash } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowUp, FileText, Film, Hash, ImagePlus, Loader2, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import type { ShownStatus } from '@/lib/types'
+import type { LocalFile, ShownStatus } from '@/lib/types'
+import { ACCEPT, AttachmentError, MAX_FILES, prepareFile, releaseLocal } from '@/lib/attachments'
 import { MESSAGE_MAX } from '@/lib/config'
 import { cleanBody } from '@/lib/text'
 import { charCount, formatCount, isLong, longBody, LONG_TEXT_MAX } from '@/lib/long-text'
@@ -13,6 +15,8 @@ import { useLinkableChannels } from './channel-links'
 import { TeamIcon } from './team-dialogs'
 import { Avatar } from './avatar'
 import { useCabal } from './store'
+
+type Attached = { key: string; name: string; file?: LocalFile }
 
 type Suggestion = { kind: 'channel'; id: string; c: LinkableChannel } | { kind: 'person'; id: string; p: Mentionable }
 
@@ -27,7 +31,7 @@ export function Composer({
 }: {
   channelId: string
   placeholder: string
-  onSend: (body: string) => void
+  onSend: (body: string, files?: LocalFile[]) => Promise<unknown>
   onTyping: () => void
   onStopTyping: () => void
   disabled?: boolean
@@ -60,6 +64,93 @@ export function Composer({
   }, [value])
 
   const set = (v: string) => setDrafts((d) => ({ ...d, [channelId]: v }))
+
+  // Photos and videos waiting to go with the next message, per conversation.
+  const [attached, setAttached] = useState<Record<string, Attached[]>>({})
+  const files = attached[channelId] ?? []
+  const preparing = files.some((f) => !f.file)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const addFiles = useCallback(
+    (list: FileList | File[]) => {
+      const picked = [...list]
+      if (!picked.length || disabled) return
+      const room = MAX_FILES - (attached[channelId]?.length ?? 0)
+      if (room <= 0 || picked.length > room) toast.error(`A message holds up to ${MAX_FILES} photos or videos.`)
+      const take = picked.slice(0, Math.max(0, room))
+      const placeholders = take.map((f) => ({ key: crypto.randomUUID(), name: f.name }))
+      const target = channelId
+      setAttached((a) => ({ ...a, [target]: [...(a[target] ?? []), ...placeholders] }))
+      take.forEach((f, i) => {
+        const key = placeholders[i].key
+        prepareFile(f).then(
+          (file) =>
+            setAttached((a) => {
+              // Removed while it was being prepared.
+              if (!(a[target] ?? []).some((x) => x.key === key)) {
+                releaseLocal([file])
+                return a
+              }
+              return { ...a, [target]: (a[target] ?? []).map((x) => (x.key === key ? { ...x, file } : x)) }
+            }),
+          (err) => {
+            toast.error(err instanceof AttachmentError ? err.message : `Couldn’t attach ${f.name || 'that file'}.`)
+            setAttached((a) => ({ ...a, [target]: (a[target] ?? []).filter((x) => x.key !== key) }))
+          },
+        )
+      })
+      ref.current?.focus()
+    },
+    [attached, channelId, disabled],
+  )
+
+  const removeFile = (key: string) =>
+    setAttached((a) => {
+      releaseLocal((a[channelId] ?? []).flatMap((x) => (x.key === key && x.file ? [x.file] : [])))
+      return { ...a, [channelId]: (a[channelId] ?? []).filter((x) => x.key !== key) }
+    })
+
+  // Drop photos anywhere in the window to attach them.
+  const addRef = useRef(addFiles)
+  addRef.current = addFiles
+  useEffect(() => {
+    if (disabled) return
+    let depth = 0
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
+    const enter = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      depth++
+      setDragging(true)
+    }
+    const leave = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) setDragging(false)
+    }
+    const over = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault()
+    }
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      depth = 0
+      setDragging(false)
+      if (e.dataTransfer?.files.length) addRef.current(e.dataTransfer.files)
+    }
+    window.addEventListener('dragenter', enter)
+    window.addEventListener('dragleave', leave)
+    window.addEventListener('dragover', over)
+    window.addEventListener('drop', drop)
+    return () => {
+      window.removeEventListener('dragenter', enter)
+      window.removeEventListener('dragleave', leave)
+      window.removeEventListener('dragover', over)
+      window.removeEventListener('drop', drop)
+      setDragging(false)
+    }
+  }, [disabled])
+
   const body = cleanBody(value)
   // Past the inline size the draft is sent whole, exactly as typed, as a long message.
   const long = isLong(body)
@@ -118,19 +209,24 @@ export function Composer({
     })
   }
 
+  const canSend = (!!body || files.length > 0) && !preparing && !tooLong && !disabled
+
   function submit() {
-    if (!body || tooLong || disabled) return
+    if (!canSend) return
+    const ready = files.flatMap((f) => (f.file ? [f.file] : []))
     if (long) {
-      onSend(longText)
+      // A long text is its own message; the files follow it.
+      void onSend(longText).then(() => ready.length && onSend('', ready))
     } else {
-      const withPeople = encodeMentions(body, personPicks.current.get(channelId) ?? new Map(), people)
-      const linked = encodeChannelLinks(withPeople, picks.current.get(channelId) ?? new Map(), linkables.data ?? [])
-      onSend(linked.length <= MESSAGE_MAX ? linked : body)
+      const withPeople = body ? encodeMentions(body, personPicks.current.get(channelId) ?? new Map(), people) : ''
+      const linked = body ? encodeChannelLinks(withPeople, picks.current.get(channelId) ?? new Map(), linkables.data ?? []) : ''
+      void onSend(linked.length <= MESSAGE_MAX ? linked : body, ready.length ? ready : undefined)
     }
     picks.current.delete(channelId)
     personPicks.current.delete(channelId)
     onStopTyping()
     set('')
+    setAttached((a) => ({ ...a, [channelId]: [] }))
   }
 
   return (
@@ -169,10 +265,65 @@ export function Composer({
         )}
         <div
           className={cn(
-            'flex items-end gap-2 rounded-lg border bg-card px-3 py-2 focus-within:border-ring',
+            'flex flex-col gap-2 rounded-lg border bg-card px-3 py-2 focus-within:border-ring',
             tooLong && 'border-destructive focus-within:border-destructive',
+            dragging && 'border-primary',
           )}
         >
+          {files.length > 0 && (
+            <ul className="flex flex-wrap gap-2 pt-1" aria-label="Attached photos and videos">
+              {files.map((f) => (
+                <li key={f.key} className="relative size-16 shrink-0">
+                  <div className="size-full overflow-hidden rounded-md border bg-muted">
+                    {!f.file ? (
+                      <span className="flex size-full items-center justify-center">
+                        <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+                        <span className="sr-only">{`Preparing ${f.name}`}</span>
+                      </span>
+                    ) : f.file.kind === 'image' ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- a local object URL
+                      <img src={f.file.url} alt={f.file.name} className="size-full object-cover" />
+                    ) : (
+                      <span className="relative block size-full">
+                        <video src={f.file.url} muted playsInline preload="metadata" className="size-full object-cover" aria-label={f.file.name} />
+                        <Film className="absolute bottom-1 left-1 size-3.5 text-background drop-shadow" aria-hidden />
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(f.key)}
+                    aria-label={`Remove ${f.file?.name ?? f.name}`}
+                    className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border bg-popover text-popover-foreground shadow-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <X className="size-3" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex items-end gap-2">
+          <input
+            ref={fileInput}
+            type="file"
+            accept={ACCEPT}
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) addFiles(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            disabled={disabled || files.length >= MAX_FILES}
+            aria-label="Attach photos or videos"
+            title="Attach photos or videos"
+            className="-ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+          >
+            <ImagePlus className="size-4" aria-hidden />
+          </button>
           <label htmlFor={`composer-${channelId}`} className="sr-only">
             {placeholder}
           </label>
@@ -196,6 +347,12 @@ export function Composer({
               else onStopTyping()
             }}
             onSelect={trackCaret}
+            onPaste={(e) => {
+              const pasted = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'))
+              if (!pasted.length) return
+              e.preventDefault()
+              addFiles(pasted)
+            }}
             onBlur={() => setCaret(null)}
             onFocus={trackCaret}
             onKeyDown={(e) => {
@@ -228,14 +385,23 @@ export function Composer({
           <button
             type="button"
             onClick={submit}
-            disabled={!body || tooLong || disabled}
+            disabled={!canSend}
             aria-label="Send message"
             className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground"
           >
             <ArrowUp className="size-4" aria-hidden />
           </button>
+          </div>
         </div>
       </div>
+      {dragging && (
+        <div className="pointer-events-none fixed inset-2 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/80">
+          <span className="inline-flex items-center gap-2 rounded-md bg-popover px-3 py-2 text-sm text-popover-foreground shadow-sm">
+            <ImagePlus className="size-4 text-primary" aria-hidden />
+            Drop to attach photos and videos
+          </span>
+        </div>
+      )}
       <div className="mt-1 flex h-4 items-center justify-between px-1 font-mono text-[10.5px] text-muted-foreground">
         {long ? (
           <span className={cn('inline-flex items-center gap-1.5', tooLong && 'text-destructive')} aria-live="polite">
@@ -244,8 +410,14 @@ export function Composer({
               ? `${chars.toLocaleString('en-US')} characters · one message holds up to ${LONG_TEXT_MAX.toLocaleString('en-US')}`
               : `Long message · ${formatCount(chars, 'character')} · sends whole, opens in a reader`}
           </span>
+        ) : files.length > 0 ? (
+          <span aria-live="polite">
+            {preparing
+              ? 'Preparing…'
+              : `${files.length} ${files.length === 1 ? 'file' : 'files'} attached · Enter to send`}
+          </span>
         ) : (
-          <span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · @ to mention · # to link a channel</span>
+          <span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · @ to mention · # to link a channel · paste or drop photos</span>
         )}
       </div>
     </div>

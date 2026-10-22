@@ -7,12 +7,15 @@ import { cn } from '@/lib/utils'
 import { Avatar } from './avatar'
 import { MessageText } from './message-text'
 import { LongTextCard } from './long-text'
+import { MessageFiles } from './message-files'
 import { ReportDialog } from './moderation'
 import { useCabal } from './store'
 import { useE2ee } from './e2ee-provider'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
+import { nickColor } from '@/lib/nick-color'
+import { pathsOf, removeUploads } from '@/lib/attachments'
 import { mentions, plainText } from '@/lib/text'
 import { linkLabel } from '@/lib/channel-links'
 import { personLabel } from '@/lib/mentions'
@@ -137,8 +140,11 @@ export function MessageList({
   }
 
   async function remove(m: Message) {
+    // Your own files go too; ones an admin removes just stop being readable.
+    const paths = m.files && m.author_id === userId ? await pathsOf(m.id).catch(() => []) : []
     const { error } = await createClient().rpc('delete_message', { p_message: m.id })
     if (error) toast.error(friendlyError(error))
+    else removeUploads(paths)
   }
 
   if (isLoading) {
@@ -255,10 +261,8 @@ export function MessageList({
                             type="button"
                             onClick={() => m.author_id && showProfile(m.author_id)}
                             title={author?.username ? `@${author.username}` : undefined}
-                            className={cn(
-                              'mr-2 rounded text-[13px] font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ring',
-                              mine ? 'text-mark' : 'text-foreground',
-                            )}
+                            className="mr-2 rounded text-[13px] font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                            style={{ color: nickColor(m.author_id, mine) }}
                           >
                             {name}
                           </button>
@@ -268,18 +272,21 @@ export function MessageList({
                         ) : m.deleted_at ? (
                           <span className="text-muted-foreground italic">message deleted</span>
                         ) : (
-                          <span className="text-foreground/90">
-                            <MessageBody
-                              m={m}
-                              myUsername={me.username}
-                              authorName={mine ? 'You' : name}
-                              onUnlock={() => setUnlockOpen(true)}
-                            />
-                          </span>
+                          <>
+                            <span className="text-foreground/90">
+                              <MessageBody
+                                m={m}
+                                myUsername={me.username}
+                                authorName={mine ? 'You' : name}
+                                onUnlock={() => setUnlockOpen(true)}
+                              />
+                            </span>
+                            <MessageFiles m={m} />
+                          </>
                         )}
                         <SendState
                           m={m}
-                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id)}
+                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id, m.local_files)}
                           onDiscard={() => discard(channel.id, m.id)}
                         />
                       </div>
@@ -311,7 +318,9 @@ export function MessageList({
                       <div className="min-w-0 flex-1">
                         {!grouped && (
                           <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-semibold">{mine ? 'You' : name}</span>
+                            <span className="text-sm font-semibold" style={{ color: nickColor(m.author_id, mine) }}>
+                              {mine ? 'You' : name}
+                            </span>
                             <time dateTime={m.created_at} title={fullTime(m.created_at)} className="text-[11px] text-muted-foreground">
                               {clock(m.created_at)}
                             </time>
@@ -331,17 +340,20 @@ export function MessageList({
                           ) : m.deleted_at ? (
                             <span className="text-muted-foreground italic">message deleted</span>
                           ) : (
-                            <MessageBody
-                              m={m}
-                              myUsername={me.username}
-                              authorName={mine ? 'You' : name}
-                              onUnlock={() => setUnlockOpen(true)}
-                            />
+                            <>
+                              <MessageBody
+                                m={m}
+                                myUsername={me.username}
+                                authorName={mine ? 'You' : name}
+                                onUnlock={() => setUnlockOpen(true)}
+                              />
+                              <MessageFiles m={m} />
+                            </>
                           )}
                         </div>
                         <SendState
                           m={m}
-                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id)}
+                          onRetry={() => send(channel.id, m.long_body ?? m.body, m.id, m.local_files)}
                           onDiscard={() => discard(channel.id, m.id)}
                         />
                       </div>

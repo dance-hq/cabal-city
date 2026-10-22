@@ -6,9 +6,9 @@ import { Compass, Hash, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { compareByPresence } from '@/lib/presence'
-import { shortDuration } from '@/lib/session'
 import { ago } from '@/lib/time'
 import { plainText } from '@/lib/text'
+import { filesLabel } from '@/lib/attachments'
 import { linkLabel } from '@/lib/channel-links'
 import { personLabel } from '@/lib/mentions'
 import { useLockIns } from '@/hooks/use-lock-ins'
@@ -16,9 +16,11 @@ import type { Channel, Message, Profile, ShownStatus } from '@/lib/types'
 import { Avatar } from './avatar'
 import { copyInviteLink } from './buddy-list'
 import { LockInControl } from './session-bar'
+import { LockedInList, WeekBoard } from './lock-in-panel'
 import { MESSAGE_COLUMNS, useCabal } from './store'
 import { useE2ee } from './e2ee-provider'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
+import { TeamPicks } from './team-picks'
 
 const RECENT = 6
 
@@ -68,11 +70,20 @@ export function Home() {
       <div className="quiet-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid max-w-4xl gap-8 px-5 py-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10">
           <div className="flex min-w-0 flex-col gap-8">
-            <LockedIn lockIns={lockIns} now={now} />
+            <TeamPicks />
+            <section className="flex flex-col gap-2">
+              <LockedInList />
+              {lockIns.size === 0 && (
+                <Quiet>When you want to focus, tap Lock in at the top right. Your hours count even with Cabal in the background.</Quiet>
+              )}
+            </section>
             <Recent channels={recent} loading={channelsLoading} now={now} />
           </div>
           <div className="flex min-w-0 flex-col gap-8">
             <HereNow people={here} />
+            <section className="flex flex-col gap-2">
+              <WeekBoard limit={5} />
+            </section>
             <Channels />
           </div>
         </div>
@@ -92,55 +103,6 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
 
 function Quiet({ children }: { children: React.ReactNode }) {
   return <p className="text-sm leading-relaxed text-muted-foreground text-pretty">{children}</p>
-}
-
-function LockedIn({ lockIns, now }: { lockIns: ReturnType<typeof useLockIns>; now: number }) {
-  const { profileById, userId, showProfile } = useCabal()
-  const rows = [...lockIns.entries()]
-    .map(([id, l]) => ({ id, ...l, profile: profileById(id) }))
-    .filter((r) => r.profile)
-    .sort((a, b) => a.startedAt - b.startedAt)
-
-  return (
-    <Block label={`Locked in · ${rows.length}`}>
-      {rows.length === 0 ? (
-        <Quiet>
-          Nobody&apos;s locked in right now. When you want to focus, tap Lock in at the top right.
-        </Quiet>
-      ) : (
-        <ul className="flex flex-col">
-          {rows.map((r) => {
-            const name = r.profile!.display_name ?? r.profile!.username ?? 'Someone'
-            const mine = r.id === userId
-            return (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => showProfile(r.id)}
-                  className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Avatar name={name} url={r.profile!.avatar_url} size={32} lockedIn />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm leading-tight font-medium">
-                      {name}
-                      {mine && <span className="font-normal text-muted-foreground"> (you)</span>}
-                    </span>
-                    <span className="truncate text-[13px] leading-snug text-muted-foreground">
-                      {r.profile!.status_text || 'Heads down'}
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                    <span className="size-1.5 rounded-full bg-flag" aria-hidden />
-                    {shortDuration(now - r.startedAt)}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </Block>
-  )
 }
 
 function useLatest(channels: Channel[]) {
@@ -218,7 +180,7 @@ function Recent({ channels, loading, now }: { channels: Channel[]; loading: bool
                     {c.kind === 'room' ? (
                       <Hash className="size-3.5" aria-hidden />
                     ) : c.kind === 'team' ? (
-                      <TeamIcon visibility={c.team_visibility} className="size-3.5" />
+                      <TeamIcon visibility={c.team_visibility} logo={c.team_logo_url} className={c.team_logo_url ? 'size-5' : 'size-3.5'} />
                     ) : (
                       <DmAvatar userId={c.other_user_id} />
                     )}
@@ -247,6 +209,8 @@ function Recent({ channels, loading, now }: { channels: Channel[]; loading: bool
                             {!dm || author === 'You' ? `${author ?? 'Someone'}: ` : ''}
                             {m.sealed && m.e2ee !== 'ok' ? (
                               <span className="italic">Encrypted message</span>
+                            ) : !m.body && m.files ? (
+                              <span className="italic">{filesLabel(m.files)}</span>
                             ) : (
                               plainText(m.body, linkLabel(all), personLabel(profileById))
                             )}

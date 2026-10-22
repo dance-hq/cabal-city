@@ -25,7 +25,7 @@ export async function loadBoot(): Promise<Boot> {
       .single(),
     supabase
       .from('user_settings')
-      .select('availability, notify_dms, notify_mentions, notify_sound')
+      .select('availability, notify_dms, notify_mentions, notify_sound, lock_in_live, lock_in_board')
       .eq('user_id', user.id)
       .single(),
     supabase

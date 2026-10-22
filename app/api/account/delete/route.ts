@@ -30,6 +30,13 @@ export async function POST(request: NextRequest) {
       await admin.storage.from('avatars').remove(files.map((f) => `${user.id}/${f.name}`))
     }
 
+    // Photos and videos they shared, before their messages (and the rows naming them) go.
+    const { data: shared } = await admin.from('message_files').select('path').eq('author_id', user.id)
+    const paths = (shared ?? []).map((f) => f.path as string)
+    for (let i = 0; i < paths.length; i += 100) {
+      await admin.storage.from('attachments').remove(paths.slice(i, i + 100))
+    }
+
     const { error: messagesError } = await admin.from('messages').delete().eq('author_id', user.id)
     if (messagesError) throw messagesError
 
