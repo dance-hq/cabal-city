@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { CabalWordmark } from '@/components/brand/logo'
+import { githubUrl } from '@/lib/config'
 import { cn } from '@/lib/utils'
 
 export function SiteHeader({ current }: { current?: string }) {
@@ -21,6 +22,11 @@ export function SiteHeader({ current }: { current?: string }) {
         <a href="/#download" className="hidden hover:text-foreground sm:inline">
           Download
         </a>
+        {githubUrl && (
+          <a href={githubUrl} className="hidden hover:text-foreground md:inline">
+            GitHub
+          </a>
+        )}
         <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
           Sign in
         </Link>
