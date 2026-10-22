@@ -11,7 +11,7 @@ import { Avatar } from './avatar'
 import { STATUS_LABEL } from './status-dot'
 import { useCabal } from './store'
 import { refreshTeamMembers, useTeamMembers } from './team-dialogs'
-import { useWorkSession } from './work-session'
+import { useWorkSessionIfAny } from './work-session'
 import type { Channel, Profile, ShownStatus } from '@/lib/types'
 
 export type PanelPerson = {
@@ -30,7 +30,9 @@ export type PanelPerson = {
 export function usePeopleIn(channel: Channel, lastNotice: string | null) {
   const { members, statusOf, userId, community } = useCabal()
   const lockIns = useLockIns(community.id)
-  const session = useWorkSession()
+  // The desktop chat window has no session of its own; there your own dot
+  // follows the shared list like everyone else's.
+  const sessionStatus = useWorkSessionIfAny()?.status
   const teamId = channel.kind === 'team' ? channel.team_id : null
   const team = useTeamMembers(teamId)
 
@@ -52,13 +54,16 @@ export function usePeopleIn(channel: Channel, lastNotice: string | null) {
           profile: m.profile,
           cabalTeam: m.role === 'admin',
           teamOwner: roles?.get(m.user_id) === 'owner',
-          lockedIn: m.user_id === userId ? session.status === 'running' : status !== 'offline' && lockIns.has(m.user_id),
+          lockedIn:
+            m.user_id === userId && sessionStatus
+              ? sessionStatus === 'running'
+              : status !== 'offline' && lockIns.has(m.user_id),
         }
       })
     const online = people.filter((p) => p.status !== 'offline').sort(compareByPresence)
     const offline = people.filter((p) => p.status === 'offline').sort(compareByPresence)
     return { online, offline, total: people.length, loading: !!teamId && team.isLoading }
-  }, [members, statusOf, userId, session.status, lockIns, teamId, team.data, team.isLoading])
+  }, [members, statusOf, userId, sessionStatus, lockIns, teamId, team.data, team.isLoading])
 }
 
 export function PeoplePanel({

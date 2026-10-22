@@ -65,6 +65,12 @@ test('a session start from the page must be a sensible time', () => {
   assert.equal(rules.sessionStart(Number.NaN, now), null)
   assert.equal(rules.sessionStart(now + 10 * 60_000, now), null)
   assert.equal(rules.sessionStart(now - 2 * 24 * 3600_000, now), null)
+  assert.equal(rules.pausedWork(25 * 60_000 + 0.4), 25 * 60_000)
+  assert.equal(rules.pausedWork(0), 0)
+  assert.equal(rules.pausedWork(-1), null)
+  assert.equal(rules.pausedWork(Number.NaN), null)
+  assert.equal(rules.pausedWork('600000'), null)
+  assert.equal(rules.pausedWork(2 * 24 * 3600_000), null)
 })
 
 test('the corner timer stays on a screen, bottom-right by default', () => {
@@ -156,6 +162,7 @@ test('the corner can only ask for a short list of things', () => {
     collapsed: true,
   })
   assert.deepEqual(rules.overlayAction({ type: 'pause-session', extra: 'ignored' }), { type: 'pause-session' })
+  assert.deepEqual(rules.overlayAction({ type: 'resume-session' }), { type: 'resume-session' })
   assert.equal(rules.overlayAction({ type: 'move', userId: ANA }), null)
   assert.equal(rules.overlayAction({ type: 'create-group', name: '   ' }), null)
   assert.equal(rules.overlayAction({ type: 'create-group', name: 'x', userId: 'bad' }), null)

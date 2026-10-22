@@ -175,6 +175,13 @@ function sessionStart(raw, now) {
   return Math.round(raw)
 }
 
+// How long a paused session has run so far; the corner shows it frozen.
+function pausedWork(raw) {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null
+  if (raw < 0 || raw > 24 * 60 * 60 * 1000) return null
+  return Math.round(raw)
+}
+
 // The corner timer goes back where it was dragged, as long as it would be
 // fully on a screen that still exists; otherwise bottom-right of the main one.
 function overlayPosition(saved, displays, primaryArea, size, margin = 20) {
@@ -320,6 +327,8 @@ function overlayAction(raw) {
     }
     case 'pause-session':
       return { type: 'pause-session' }
+    case 'resume-session':
+      return { type: 'resume-session' }
     default:
       return null
   }
@@ -348,5 +357,6 @@ module.exports = {
   restoreBounds,
   badgeCount,
   sessionStart,
+  pausedWork,
   overlayPosition,
 }

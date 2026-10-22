@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('cabalDesktop', {
   platform: process.platform,
   launchedAt: Number(arg('cabal-launched')) || undefined,
   setSession: (startedAt) => ipcRenderer.send('cabal:session', startedAt === null ? null : Number(startedAt)),
+  setPausedSession: (workedMs) => ipcRenderer.send('cabal:session-paused', Number(workedMs)),
   setBuddies: (list) => ipcRenderer.send('cabal:buddies', list),
   onBuddyAction: listen('cabal:buddy-action', (cb, action) => cb(action)),
   show: () => ipcRenderer.send('cabal:show'),

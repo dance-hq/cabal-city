@@ -30,6 +30,8 @@ export type DesktopBridge = {
   // Desktop apps released before the session timer don't have these.
   launchedAt?: number
   setSession?(startedAt: number | null): void
+  // Desktop apps released before the paused corner timer don't have this.
+  setPausedSession?(workedMs: number): void
   // Desktop apps released before the corner buddy list don't have these.
   setBuddies?(list: OverlayBuddies): void
   onBuddyAction?(cb: (action: BuddyAction) => void): () => void

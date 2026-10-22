@@ -9,8 +9,14 @@ function listen(channel) {
 // The corner hears when the session started, whether it's open, and the buddy
 // list the Cabal window hands over. It can move or open itself, bring Cabal
 // back, and ask for a short list of buddy-list changes (checked again in main).
+function session(v) {
+  if (v?.status === 'running' && Number.isFinite(v.startedAt)) return { status: 'running', startedAt: v.startedAt }
+  if (v?.status === 'paused' && Number.isFinite(v.workedMs)) return { status: 'paused', workedMs: v.workedMs }
+  return null
+}
+
 contextBridge.exposeInMainWorld('cabalOverlay', {
-  onSession: (cb) => listen('cabal:overlay-session')((v) => cb(typeof v === 'number' ? v : null)),
+  onSession: (cb) => listen('cabal:overlay-session')((v) => cb(session(v))),
   onExpanded: (cb) => listen('cabal:overlay-expanded')((v) => cb(v === true)),
   onBuddies: (cb) => listen('cabal:overlay-buddies')((v) => cb(v && typeof v === 'object' ? v : null)),
   open: () => ipcRenderer.send('cabal:overlay-open'),
