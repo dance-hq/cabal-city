@@ -14,7 +14,10 @@ import { useCabal } from './store'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { isMakersTeam } from '@/lib/config'
+import { isOwnTeamImageUrl } from '@/lib/team-images'
+import { cn } from '@/lib/utils'
 import type { Channel, TeamRoom, TeamVisibility } from '@/lib/types'
+import { TeamImagesEditor, TeamMark, refreshTeamImages } from './team-images'
 
 const teamRoomsKey = (communityId: string) => ['team-rooms', communityId] as const
 
@@ -56,7 +59,19 @@ export function refreshTeamMembers(teamId: string) {
   return mutateGlobal(teamMembersKey(teamId))
 }
 
-export function TeamIcon({ visibility, className }: { visibility: TeamVisibility | null; className?: string }) {
+export function TeamIcon({
+  visibility,
+  logo,
+  className,
+}: {
+  visibility: TeamVisibility | null
+  logo?: string | null
+  className?: string
+}) {
+  if (logo && isOwnTeamImageUrl(logo)) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={logo} alt="" className={cn(className, 'rounded-[3px] bg-muted object-cover')} />
+  }
   const Icon = visibility === 'public' ? Users : Lock
   return <Icon className={className} aria-hidden />
 }
@@ -183,7 +198,7 @@ export function BrowseTeamsDialog({
           <ul className="-mx-2 flex max-h-80 flex-col overflow-y-auto">
             {list.map((r) => (
               <li key={r.id} className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-accent">
-                <TeamIcon visibility={r.visibility} className="size-4 shrink-0 text-muted-foreground" />
+                <TeamMark logo={r.logo_url} visibility={r.visibility} size={36} className="self-start" />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="flex min-w-0 items-baseline gap-2">
                     <span className="truncate text-sm font-medium">{r.name}</span>
@@ -368,7 +383,7 @@ export function TeamManageDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isOwner ? 'Team settings' : channel.team_name}</DialogTitle>
           <DialogDescription>
@@ -413,6 +428,17 @@ export function TeamManageDialog({
               </Button>
             </div>
           </form>
+        )}
+
+        {isOwner && (
+          <TeamImagesEditor
+            teamId={teamId}
+            onChanged={() => {
+              refreshChannels()
+              void refreshTeamRooms(community.id)
+              void refreshTeamImages(teamId)
+            }}
+          />
         )}
 
         {isOwner && onEditWelcome && (

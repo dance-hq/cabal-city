@@ -327,7 +327,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         >
           {visibleTeams.map((t) => (
             <Row key={t.id} selected={active === t.id} onClick={() => open(t.id)} unread={t.unread} muted={t.muted}>
-              <TeamIcon visibility={t.team_visibility} className="size-3.5 shrink-0 text-muted-foreground" />
+              <TeamIcon visibility={t.team_visibility} logo={t.team_logo_url} className="size-3.5 shrink-0 text-muted-foreground" />
               <span className={cn('truncate text-[13px]', t.unread > 0 && !t.muted && 'font-semibold text-foreground')}>
                 {t.team_name}
               </span>

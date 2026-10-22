@@ -38,6 +38,8 @@ const slug = `cabal-test-${tag}`
 const admin = run ? createClient(url!, service!, { auth: { persistSession: false } }) : (null as never)
 const people: Person[] = []
 const uploads: string[] = []
+const teamImageUploads: string[] = []
+const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 let communityId = ''
 
 async function person(name: string): Promise<Person> {
@@ -121,6 +123,7 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
 
   afterAll(async () => {
     if (uploads.length) await admin.storage.from('attachments').remove(uploads)
+    if (teamImageUploads.length) await admin.storage.from('team-images').remove(teamImageUploads)
     // Rooms, teams, DMs, members and their messages all go with the community.
     await admin.from('communities').delete().eq('slug', slug)
     for (const p of people) {
@@ -640,6 +643,27 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     expect((await outsider.db.rpc('join_team', { p_team: teamId })).error?.message).toMatch(/not found/i)
 
     await outsider.db.removeAllChannels()
+  })
+
+  it('lets only team owners set a logo and banner, from their own team folder', async () => {
+    const png = new Blob([Uint8Array.from(atob(TINY_PNG), (c) => c.charCodeAt(0))], { type: 'image/png' })
+    const own = `${teamId}/logo-${tag}.png`
+    expect((await ada.db.storage.from('team-images').upload(own, png, { contentType: 'image/png' })).error).toBeNull()
+    teamImageUploads.push(own)
+    expect((await outsider.db.storage.from('team-images').upload(`${teamId}/evil-${tag}.png`, png, { contentType: 'image/png' })).error).not.toBeNull()
+    expect((await outsider.db.storage.from('team-images').upload(`not-a-team/x-${tag}.png`, png, { contentType: 'image/png' })).error).not.toBeNull()
+
+    const publicUrl = (path: string) => ada.db.storage.from('team-images').getPublicUrl(path).data.publicUrl
+    expect((await outsider.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: publicUrl(own) })).error).not.toBeNull()
+    // A file that isn't in this team's folder (or doesn't exist) is refused.
+    const elsewhere = publicUrl(`${crypto.randomUUID()}/logo.png`)
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: elsewhere })).error).not.toBeNull()
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: 'https://example.com/x.png' })).error).not.toBeNull()
+
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: publicUrl(own) })).error).toBeNull()
+    const mine = await ada.db.rpc('my_channels', { p_community: communityId })
+    expect((mine.data as { team_id: string; team_logo_url: string }[]).find((c) => c.team_id === teamId)?.team_logo_url).toBe(publicUrl(own))
+    expect((await ada.db.rpc('set_team_image', { p_team: teamId, p_kind: 'logo', p_url: null })).error).toBeNull()
   })
 
   it('lets anyone in the community find and join an open team room', async () => {

@@ -52,6 +52,8 @@ export type TeamRoom = {
   welcome: string | null
   // Who started it, oldest owner first. Readable before you join.
   owner_ids: string[]
+  logo_url: string | null
+  banner_url: string | null
 }
 
 export type Channel = {
@@ -70,6 +72,7 @@ export type Channel = {
   last_read_at: string | null
   unread: number
   muted: boolean
+  team_logo_url?: string | null
 }
 
 export type Message = {

@@ -180,7 +180,7 @@ function Recent({ channels, loading, now }: { channels: Channel[]; loading: bool
                     {c.kind === 'room' ? (
                       <Hash className="size-3.5" aria-hidden />
                     ) : c.kind === 'team' ? (
-                      <TeamIcon visibility={c.team_visibility} className="size-3.5" />
+                      <TeamIcon visibility={c.team_visibility} logo={c.team_logo_url} className={c.team_logo_url ? 'size-5' : 'size-3.5'} />
                     ) : (
                       <DmAvatar userId={c.other_user_id} />
                     )}

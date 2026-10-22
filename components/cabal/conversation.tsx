@@ -219,7 +219,11 @@ function OpenConversation({
           {channel.kind === 'team' && (
             <div className="flex min-w-0 items-baseline gap-2 px-1">
               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold">
-                <TeamIcon visibility={channel.team_visibility} className="size-3.5 text-muted-foreground" />
+                <TeamIcon
+                  visibility={channel.team_visibility}
+                  logo={channel.team_logo_url}
+                  className={channel.team_logo_url ? 'size-5' : 'size-3.5 text-muted-foreground'}
+                />
                 {channel.team_name}
                 {channel.team_visibility !== 'public' && <span className="sr-only">(invite-only)</span>}
               </span>
@@ -292,6 +296,7 @@ function OpenConversation({
             notice={lastNotice}
             editing={editingWelcome}
             onEditingChange={setEditingWelcome}
+            onEditLook={() => setManaging(true)}
           />
         )}
         {invitable && <TeamInviteNudge channel={channel} onInvite={() => setInviting(true)} />}

@@ -13,6 +13,8 @@ const room = (over: Partial<TeamRoom>): TeamRoom => ({
   created_at: '2026-10-01T00:00:00Z',
   welcome: null,
   owner_ids: [],
+  logo_url: null,
+  banner_url: null,
   ...over,
 })
 

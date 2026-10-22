@@ -10,7 +10,9 @@ import { BrowseTeamsDialog, CreateTeamDialog, Founders, MakersTag, activeLabel, 
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { isMakersTeam } from '@/lib/config'
+import { isOwnTeamImageUrl } from '@/lib/team-images'
 import type { TeamRoom } from '@/lib/types'
+import { TeamBanner, TeamMark } from './team-images'
 
 const PICKS = 3
 const SETTLED_MS = 24 * 60 * 60 * 1000
@@ -105,28 +107,32 @@ export function TeamPicks() {
       </p>
       <ul className="flex flex-col gap-2">
         {picks.map((r) => (
-          <li key={r.id} className="flex items-start gap-3 rounded-lg border bg-card px-3.5 py-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="text-sm font-semibold">{r.name}</span>
-                {isMakersTeam(r.name) && <MakersTag />}
+          <li key={r.id} className="flex flex-col overflow-hidden rounded-lg border bg-card">
+            {r.banner_url && isOwnTeamImageUrl(r.banner_url) && <TeamBanner url={r.banner_url} className="h-16" />}
+            <div className="flex items-start gap-3 px-3.5 py-3">
+              <TeamMark logo={r.logo_url} visibility={r.visibility} size={36} />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="text-sm font-semibold">{r.name}</span>
+                  {isMakersTeam(r.name) && <MakersTag />}
+                </div>
+                {r.welcome && (
+                  <p className="line-clamp-2 text-[13px] leading-relaxed text-foreground/85 text-pretty">
+                    {r.welcome.replace(/\s+/g, ' ')}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  <Founders ownerIds={r.owner_ids} />
+                  <span>
+                    {r.member_count} {r.member_count === 1 ? 'member' : 'members'} · {activeLabel(r.last_message_at)}
+                  </span>
+                </div>
               </div>
-              {r.welcome && (
-                <p className="line-clamp-2 text-[13px] leading-relaxed text-foreground/85 text-pretty">
-                  {r.welcome.replace(/\s+/g, ' ')}
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <Founders ownerIds={r.owner_ids} />
-                <span>
-                  {r.member_count} {r.member_count === 1 ? 'member' : 'members'} · {activeLabel(r.last_message_at)}
-                </span>
-              </div>
+              <Button size="sm" variant="secondary" disabled={busyId !== null} onClick={() => join(r)} aria-label={`Join ${r.name}`}>
+                {busyId === r.id && <Loader2 className="animate-spin" aria-hidden />}
+                Join
+              </Button>
             </div>
-            <Button size="sm" variant="secondary" disabled={busyId !== null} onClick={() => join(r)} aria-label={`Join ${r.name}`}>
-              {busyId === r.id && <Loader2 className="animate-spin" aria-hidden />}
-              Join
-            </Button>
           </li>
         ))}
       </ul>
