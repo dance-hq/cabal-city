@@ -1,55 +1,56 @@
 'use client'
 
+import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { IDENTITIES, type Identity } from '@/lib/identity'
+import { IDENTITIES, orderedIdentities, type Identity } from '@/lib/identity'
 
+// Pick any that fit, or none. Nothing in Cabal requires a role.
 export function IdentityPicker({
   value,
   onChange,
-  required,
-  compact,
-  legend = "I'm a",
+  legend = 'Role',
 }: {
-  value: Identity | null
-  onChange: (value: Identity) => void
-  required?: boolean
-  // One row of labels; the chosen role's hint shows underneath.
-  compact?: boolean
+  value: Identity[]
+  onChange: (value: Identity[]) => void
   legend?: string
 }) {
-  const chosen = IDENTITIES.find((o) => o.value === value)
+  function toggle(role: Identity, on: boolean) {
+    onChange(orderedIdentities(on ? [...value, role] : value.filter((v) => v !== role)))
+  }
   return (
-    <fieldset className="flex min-w-0 flex-col gap-2">
+    <fieldset className="flex min-w-0 flex-col gap-2" aria-describedby="identity-hint">
       <legend className="mb-2 text-sm leading-none font-medium">{legend}</legend>
-      <div className={cn('grid grid-cols-3', compact ? 'gap-1.5' : 'gap-2')}>
-        {IDENTITIES.map((o) => (
-          <label
-            key={o.value}
-            className={cn(
-              'flex cursor-pointer flex-col gap-0.5 rounded-md border transition-colors hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
-              compact ? 'h-10 items-center justify-center px-2' : 'px-3 py-2.5',
-              value === o.value && 'border-flag bg-flag/10 hover:bg-flag/15',
-            )}
-          >
-            <input
-              type="radio"
-              name="identity"
-              value={o.value}
-              checked={value === o.value}
-              onChange={() => onChange(o.value)}
-              required={required}
-              className="sr-only"
-            />
-            <span className="text-sm font-medium">{o.label}</span>
-            {!compact && <span className="text-xs leading-snug text-muted-foreground">{o.hint}</span>}
-          </label>
-        ))}
+      <div className="grid grid-cols-3 gap-2">
+        {IDENTITIES.map((o) => {
+          const on = value.includes(o.value)
+          return (
+            <label
+              key={o.value}
+              className={cn(
+                'relative flex cursor-pointer flex-col gap-0.5 rounded-md border px-3 py-2.5 transition-colors hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
+                on && 'border-flag bg-flag/10 hover:bg-flag/15',
+              )}
+            >
+              <input
+                type="checkbox"
+                name="identities"
+                value={o.value}
+                checked={on}
+                onChange={(e) => toggle(o.value, e.target.checked)}
+                className="sr-only"
+              />
+              <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                {o.label}
+                <Check className={cn('size-3.5 shrink-0 text-flag', !on && 'invisible')} aria-hidden />
+              </span>
+              <span className="text-xs leading-snug text-muted-foreground">{o.hint}</span>
+            </label>
+          )
+        })}
       </div>
-      {compact && (
-        <p className="min-h-4 text-xs text-muted-foreground" aria-live="polite">
-          {chosen?.hint ?? ''}
-        </p>
-      )}
+      <p id="identity-hint" className="text-xs text-muted-foreground">
+        Pick any that fit, or none.
+      </p>
     </fieldset>
   )
 }

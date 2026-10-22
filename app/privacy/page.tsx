@@ -22,8 +22,8 @@ export default function PrivacyPage() {
             <strong>Your email address</strong>, to send you sign-in codes. It isn&apos;t shown to other people.
           </li>
           <li>
-            <strong>Your profile</strong>: your name and @username, your role (founder, builder or investor), and
-            the photo, company, what you&apos;re building, bio, up to four links and status line you choose to add.
+            <strong>Your profile</strong>: your name and @username, and the roles (founder, builder, investor),
+            photo, company, what you&apos;re building, bio, up to four links and status line you choose to add.
             Other signed-in members can see these.
           </li>
           <li>

@@ -105,6 +105,7 @@ export function QuietIconButton({
       aria-pressed={pressed}
       className={cn(
         'inline-flex h-7 min-w-7 items-center justify-center gap-1 rounded-md px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+        pressed && 'bg-accent text-foreground',
         className,
       )}
     >

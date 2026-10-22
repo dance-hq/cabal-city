@@ -8,6 +8,9 @@ export type CalendarEvent = {
   url: string | null
   summary: string | null
   time_zone: string
+  // From calendar_for: when it first went up, and whether you sent it in.
+  added_at?: string | null
+  mine?: boolean
 }
 
 export type PendingEvent = CalendarEvent & { submitted_by: string | null; created_at: string }

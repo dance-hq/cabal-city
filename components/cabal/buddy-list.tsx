@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Check,
@@ -15,39 +15,61 @@ import {
   Search,
   Settings,
   X,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { CabalStar } from '@/components/brand/logo'
-import { Avatar } from './avatar'
-import { MeCard } from './me-card'
-import { SessionBar } from './session-bar'
-import { ConnectionBanner } from './connection-banner'
-import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
-import { VIEWS, useCabal } from './store'
-import { compareByPresence } from '@/lib/presence'
-import { createClient } from '@/lib/supabase/client'
-import { friendlyError } from '@/lib/errors'
-import { STATUS_LABEL } from './status-dot'
-import { GroupMenu, GroupNameDialog, PERSON_DRAG_TYPE, PersonMenu, type Naming } from './buddy-group-ui'
-import { useBuddyGroups } from '@/hooks/use-buddy-groups'
-import { useLockIns, type LockedIn } from '@/hooks/use-lock-ins'
-import { arrangeBuddies, type BuddyGroup } from '@/lib/buddy-groups'
-import type { Channel, ShownStatus } from '@/lib/types'
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { CabalStar } from "@/components/brand/logo";
+import { Avatar } from "./avatar";
+import { MeCard } from "./me-card";
+import { SessionBar } from "./session-bar";
+import { ConnectionBanner } from "./connection-banner";
+import {
+  BrowseTeamsDialog,
+  CreateTeamDialog,
+  TeamIcon,
+  useTeamRooms,
+} from "./team-dialogs";
+import { VIEWS, useCabal } from "./store";
+import { useBoardNews } from "./board-alerts";
+import { compareByPresence } from "@/lib/presence";
+import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@/lib/errors";
+import { STATUS_LABEL } from "./status-dot";
+import {
+  GroupMenu,
+  GroupNameDialog,
+  PERSON_DRAG_TYPE,
+  PersonMenu,
+  type Naming,
+} from "./buddy-group-ui";
+import { useBuddyGroups } from "@/hooks/use-buddy-groups";
+import { useLockIns, type LockedIn } from "@/hooks/use-lock-ins";
+import { arrangeBuddies, type BuddyGroup } from "@/lib/buddy-groups";
+import type { Channel, ShownStatus } from "@/lib/types";
 
 export async function copyInviteLink(communityId: string) {
-  const { data, error } = await createClient().rpc('community_invite_code', { p_community: communityId })
+  const { data, error } = await createClient().rpc("community_invite_code", {
+    p_community: communityId,
+  });
   if (error || !data) {
-    toast.error(friendlyError(error) || "Couldn't get an invite link.")
-    return
+    toast.error(friendlyError(error) || "Couldn't get an invite link.");
+    return;
   }
-  const link = `${window.location.origin}/join/${data}`
+  const link = `${window.location.origin}/join/${data}`;
   try {
-    await navigator.clipboard.writeText(link)
-    toast.success('Invite link copied', { description: link, closeButton: true, duration: 3000 })
+    await navigator.clipboard.writeText(link);
+    toast.success("Invite link copied", {
+      description: link,
+      closeButton: true,
+      duration: 3000,
+    });
   } catch {
     // Clipboard blocked: the link has to be copied by hand, so it stays until dismissed.
-    toast.message('Invite link', { description: link, closeButton: true, duration: Infinity })
+    toast.message("Invite link", {
+      description: link,
+      closeButton: true,
+      duration: Infinity,
+    });
   }
 }
 
@@ -67,75 +89,108 @@ export function BuddyList({ compact }: { compact?: boolean }) {
     invites,
     refreshInvites,
     refreshChannels,
-  } = useCabal()
-  const [query, setQuery] = useState('')
-  const [searching, setSearching] = useState(false)
-  const [showOffline, setShowOffline] = useState(false)
+    settings,
+  } = useCabal();
+  const news = useBoardNews();
+  // The open board is being read, so it never counts as new.
+  const newOpportunities =
+    active === VIEWS.opportunities ? 0 : (news.data?.opportunities ?? 0);
+  const newEvents = active === VIEWS.calendar ? 0 : (news.data?.calendar ?? 0);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [showOffline, setShowOffline] = useState(false);
 
   function closeSearch() {
-    setQuery('')
-    setSearching(false)
+    setQuery("");
+    setSearching(false);
   }
 
   // Search stays tucked behind an icon; Ctrl/Cmd+K opens it from anywhere.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setSearching(true)
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === "k"
+      ) {
+        e.preventDefault();
+        setSearching(true);
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-  const [creatingTeam, setCreatingTeam] = useState(false)
-  const [browsingTeams, setBrowsingTeams] = useState(false)
-  const [naming, setNaming] = useState<Naming | null>(null)
-  const buddyGroups = useBuddyGroups()
-  const teamRooms = useTeamRooms(community.id)
-  const lockIns = useLockIns(community.id)
-  const joinable = teamRooms.data?.filter((r) => !r.joined).length ?? 0
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [browsingTeams, setBrowsingTeams] = useState(false);
+  const [naming, setNaming] = useState<Naming | null>(null);
+  const buddyGroups = useBuddyGroups();
+  const teamRooms = useTeamRooms(community.id);
+  const lockIns = useLockIns(community.id);
+  const joinable = teamRooms.data?.filter((r) => !r.joined).length ?? 0;
 
   const dmByUser = useMemo(() => {
-    const map = new Map<string, Channel>()
-    for (const c of channels) if (c.kind === 'dm' && c.other_user_id) map.set(c.other_user_id, c)
-    return map
-  }, [channels])
+    const map = new Map<string, Channel>();
+    for (const c of channels)
+      if (c.kind === "dm" && c.other_user_id) map.set(c.other_user_id, c);
+    return map;
+  }, [channels]);
 
-  const rooms = channels.filter((c) => c.kind === 'room').sort((a, b) => a.position - b.position)
-  const teams = channels.filter((c) => c.kind === 'team').sort((a, b) => (a.team_name ?? '').localeCompare(b.team_name ?? ''))
+  const rooms = channels
+    .filter((c) => c.kind === "room")
+    .sort((a, b) => a.position - b.position);
+  const teams = channels
+    .filter((c) => c.kind === "team")
+    .sort((a, b) => (a.team_name ?? "").localeCompare(b.team_name ?? ""));
 
-  const q = query.trim().toLowerCase()
+  const q = query.trim().toLowerCase();
   const people = members
     .filter((m) => m.user_id !== userId)
-    .map((m) => ({ ...m, status: statusOf(m.user_id), name: m.profile.display_name ?? m.profile.username ?? '' }))
+    .map((m) => ({
+      ...m,
+      status: statusOf(m.user_id),
+      name: m.profile.display_name ?? m.profile.username ?? "",
+    }))
     .filter(
       (m) =>
         !q ||
         m.name.toLowerCase().includes(q) ||
         m.profile.username?.toLowerCase().includes(q) ||
         m.profile.company?.toLowerCase().includes(q),
-    )
-  const arranged = arrangeBuddies(people, buddyGroups.groups, buddyGroups.placements, (a, b) => {
-    const ua = dmByUser.get(a.user_id)?.unread ?? 0
-    const ub = dmByUser.get(b.user_id)?.unread ?? 0
-    if ((ua > 0) !== (ub > 0) && a.status === b.status) return ub - ua
-    return compareByPresence(a, b)
-  })
-  const here = arranged.here
-  const away = arranged.offline
+    );
+  const arranged = arrangeBuddies(
+    people,
+    buddyGroups.groups,
+    buddyGroups.placements,
+    (a, b) => {
+      const ua = dmByUser.get(a.user_id)?.unread ?? 0;
+      const ub = dmByUser.get(b.user_id)?.unread ?? 0;
+      if (ua > 0 !== ub > 0 && a.status === b.status) return ub - ua;
+      return compareByPresence(a, b);
+    },
+  );
+  const here = arranged.here;
+  const away = arranged.offline;
 
   // Anyone waiting on a reply jumps to the top, wherever they'd normally sit
   // (a collapsed group, Offline), and comes back once you've read it.
   const waiting = q
     ? []
     : channels
-        .filter((c) => c.kind === 'dm' && c.other_user_id && c.unread > 0 && !c.muted)
-        .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''))
-        .flatMap((c) => people.find((p) => p.user_id === c.other_user_id) ?? [])
-  const waitingIds = new Set(waiting.map((p) => p.user_id))
-  const notWaiting = (p: (typeof people)[number]) => !waitingIds.has(p.user_id)
-  const groupOf = new Map(buddyGroups.placements.map((p) => [p.member_id, p.group_id]))
+        .filter(
+          (c) => c.kind === "dm" && c.other_user_id && c.unread > 0 && !c.muted,
+        )
+        .sort((a, b) =>
+          (b.last_message_at ?? "").localeCompare(a.last_message_at ?? ""),
+        )
+        .flatMap(
+          (c) => people.find((p) => p.user_id === c.other_user_id) ?? [],
+        );
+  const waitingIds = new Set(waiting.map((p) => p.user_id));
+  const notWaiting = (p: (typeof people)[number]) => !waitingIds.has(p.user_id);
+  const groupOf = new Map(
+    buddyGroups.placements.map((p) => [p.member_id, p.group_id]),
+  );
 
   function personRow(p: (typeof people)[number]) {
     return (
@@ -146,7 +201,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         avatarUrl={p.profile.avatar_url}
         status={p.status}
         statusText={p.profile.status_text}
-        lockedIn={p.status === 'offline' ? undefined : lockIns.get(p.user_id)}
+        lockedIn={p.status === "offline" ? undefined : lockIns.get(p.user_id)}
         unread={dmByUser.get(p.user_id)?.unread ?? 0}
         selected={!!active && dmByUser.get(p.user_id)?.id === active}
         onOpen={() => openDm(p.user_id)}
@@ -157,38 +212,55 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             currentGroup={groupOf.get(p.user_id) ?? null}
             onProfile={() => showProfile(p.user_id)}
             onMove={(groupId) => buddyGroups.moveTo(p.user_id, groupId)}
-            onNewGroup={() => setNaming({ kind: 'create', memberId: p.user_id, memberName: p.name })}
+            onNewGroup={() =>
+              setNaming({
+                kind: "create",
+                memberId: p.user_id,
+                memberName: p.name,
+              })
+            }
           />
         }
       />
-    )
+    );
   }
 
   async function saveName(n: Naming, name: string) {
-    if (n.kind === 'create') await buddyGroups.createGroup(name, n.memberId)
-    else await buddyGroups.renameGroup(n.groupId, name)
+    if (n.kind === "create") await buddyGroups.createGroup(name, n.memberId);
+    else await buddyGroups.renameGroup(n.groupId, name);
   }
 
   function deleteGroup(g: BuddyGroup) {
-    buddyGroups.deleteGroup(g.id)
-    toast.message(`Deleted ${g.name}`, { description: 'Everyone in it is back in Online.' })
+    buddyGroups.deleteGroup(g.id);
+    toast.message(`Deleted ${g.name}`, {
+      description: "Everyone in it is back in Online.",
+    });
   }
-  const visibleRooms = rooms.filter((r) => !q || r.slug?.includes(q))
-  const visibleTeams = teams.filter((t) => !q || t.team_name?.toLowerCase().includes(q))
-  const othersExist = members.some((m) => m.user_id !== userId)
+  const visibleRooms = rooms.filter((r) => !q || r.slug?.includes(q));
+  const visibleTeams = teams.filter(
+    (t) => !q || t.team_name?.toLowerCase().includes(q),
+  );
+  const othersExist = members.some((m) => m.user_id !== userId);
 
   async function respond(inviteId: string, accept: boolean) {
-    const { data, error } = await createClient().rpc('respond_team_invite', { p_invite: inviteId, p_accept: accept })
+    const { data, error } = await createClient().rpc("respond_team_invite", {
+      p_invite: inviteId,
+      p_accept: accept,
+    });
     if (error) {
-      toast.error(friendlyError(error))
-      return
+      toast.error(friendlyError(error));
+      return;
     }
-    refreshInvites()
+    refreshInvites();
     if (accept && data) {
-      const fresh = await createClient().rpc('my_channels', { p_community: community.id })
-      refreshChannels()
-      const ch = (fresh.data as Channel[] | null)?.find((c) => c.team_id === data)
-      if (ch) open(ch.id)
+      const fresh = await createClient().rpc("my_channels", {
+        p_community: community.id,
+      });
+      refreshChannels();
+      const ch = (fresh.data as Channel[] | null)?.find(
+        (c) => c.team_id === data,
+      );
+      if (ch) open(ch.id);
     }
   }
 
@@ -198,12 +270,15 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         {searching ? (
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search people and channels</span>
-            <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Escape' && closeSearch()}
+              onKeyDown={(e) => e.key === "Escape" && closeSearch()}
               onBlur={() => !query.trim() && closeSearch()}
               placeholder="Search"
               className="h-7 w-full rounded-md border border-transparent bg-sidebar-accent pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring"
@@ -255,21 +330,61 @@ export function BuddyList({ compact }: { compact?: boolean }) {
       <MeCard />
       {compact && <SessionBar />}
 
-      <nav className="quiet-scroll min-h-0 flex-1 overflow-y-auto pb-4" aria-label="Conversations">
-
+      <nav
+        className="quiet-scroll min-h-0 flex-1 overflow-y-auto pb-4"
+        aria-label="Conversations"
+      >
         {waiting.length > 0 && (
-          <Section label={`New messages · ${waiting.length}`}>{waiting.map(personRow)}</Section>
+          <Section label={`New messages · ${waiting.length}`}>
+            {waiting.map(personRow)}
+          </Section>
         )}
 
         {!q && (
           <div className="mt-1 flex flex-col gap-px">
-            <Row selected={active === VIEWS.opportunities} onClick={() => open(VIEWS.opportunities)} unread={0}>
-              <Radar className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="truncate text-[13px]">Opportunities</span>
+            <Row
+              selected={active === VIEWS.opportunities}
+              onClick={() => open(VIEWS.opportunities)}
+              unread={newOpportunities}
+              quiet
+              muted={settings.opportunities_muted}
+            >
+              <Radar
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <span
+                className={cn(
+                  "truncate text-[13px]",
+                  newOpportunities > 0 &&
+                    !settings.opportunities_muted &&
+                    "font-semibold text-foreground",
+                )}
+              >
+                Opportunities
+              </span>
             </Row>
-            <Row selected={active === VIEWS.calendar} onClick={() => open(VIEWS.calendar)} unread={0}>
-              <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="truncate text-[13px]">Calendar</span>
+            <Row
+              selected={active === VIEWS.calendar}
+              onClick={() => open(VIEWS.calendar)}
+              unread={newEvents}
+              quiet
+              muted={settings.calendar_muted}
+            >
+              <CalendarDays
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <span
+                className={cn(
+                  "truncate text-[13px]",
+                  newEvents > 0 &&
+                    !settings.calendar_muted &&
+                    "font-semibold text-foreground",
+                )}
+              >
+                Calendar
+              </span>
             </Row>
           </div>
         )}
@@ -277,17 +392,28 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         {invites.length > 0 && (
           <Section label="Team invites">
             {invites.map((inv) => (
-              <div key={inv.id} className="mx-2 flex items-center gap-2 rounded-md border bg-card px-2.5 py-2">
-                <TeamIcon visibility={inv.team?.visibility ?? null} className="size-3.5 shrink-0 text-muted-foreground" />
+              <div
+                key={inv.id}
+                className="mx-2 flex items-center gap-2 rounded-md border bg-card px-2.5 py-2"
+              >
+                <TeamIcon
+                  visibility={inv.team?.visibility ?? null}
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                />
                 <div className="min-w-0 flex-1 text-xs leading-relaxed">
-                  <span className="font-medium">{inv.team?.name ?? 'A team'}</span>
-                  <span className="text-muted-foreground"> from {inv.inviter?.display_name ?? 'a teammate'}</span>
+                  <span className="font-medium">
+                    {inv.team?.name ?? "A team"}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    from {inv.inviter?.display_name ?? "a teammate"}
+                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => respond(inv.id, true)}
                   className="flex size-6 items-center justify-center rounded bg-primary text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label={`Join ${inv.team?.name ?? 'team'}`}
+                  aria-label={`Join ${inv.team?.name ?? "team"}`}
                 >
                   <Check className="size-3.5" aria-hidden />
                 </button>
@@ -295,7 +421,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
                   type="button"
                   onClick={() => respond(inv.id, false)}
                   className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label={`Decline ${inv.team?.name ?? 'team'}`}
+                  aria-label={`Decline ${inv.team?.name ?? "team"}`}
                 >
                   <X className="size-3.5" aria-hidden />
                 </button>
@@ -307,9 +433,24 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         {visibleRooms.length > 0 && (
           <Section label="Channels">
             {visibleRooms.map((r) => (
-              <Row key={r.id} selected={active === r.id} onClick={() => open(r.id)} unread={r.unread} quiet muted={r.muted}>
-                <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className={cn('truncate font-mono text-[13px]', r.unread > 0 && !r.muted && 'font-semibold text-foreground')}>
+              <Row
+                key={r.id}
+                selected={active === r.id}
+                onClick={() => open(r.id)}
+                unread={r.unread}
+                quiet
+                muted={r.muted}
+              >
+                <Hash
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
+                <span
+                  className={cn(
+                    "truncate font-mono text-[13px]",
+                    r.unread > 0 && !r.muted && "font-semibold text-foreground",
+                  )}
+                >
                   {r.slug}
                 </span>
               </Row>
@@ -331,9 +472,24 @@ export function BuddyList({ compact }: { compact?: boolean }) {
           }
         >
           {visibleTeams.map((t) => (
-            <Row key={t.id} selected={active === t.id} onClick={() => open(t.id)} unread={t.unread} muted={t.muted}>
-              <TeamIcon visibility={t.team_visibility} logo={t.team_logo_url} className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className={cn('truncate text-[13px]', t.unread > 0 && !t.muted && 'font-semibold text-foreground')}>
+            <Row
+              key={t.id}
+              selected={active === t.id}
+              onClick={() => open(t.id)}
+              unread={t.unread}
+              muted={t.muted}
+            >
+              <TeamIcon
+                visibility={t.team_visibility}
+                logo={t.team_logo_url}
+                className="size-3.5 shrink-0 text-muted-foreground"
+              />
+              <span
+                className={cn(
+                  "truncate text-[13px]",
+                  t.unread > 0 && !t.muted && "font-semibold text-foreground",
+                )}
+              >
                 {t.team_name}
               </span>
             </Row>
@@ -346,10 +502,15 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             >
               <Compass className="size-3.5 shrink-0" aria-hidden />
               <span className="flex-1">
-                {teams.length === 0 && joinable === 0 ? 'Find or start a team' : 'Browse teams'}
+                {teams.length === 0 && joinable === 0
+                  ? "Find or start a team"
+                  : "Browse teams"}
               </span>
               {joinable > 0 && (
-                <span className="font-mono text-[11px]" aria-label={`${joinable} to join`}>
+                <span
+                  className="font-mono text-[11px]"
+                  aria-label={`${joinable} to join`}
+                >
                   {joinable}
                 </span>
               )}
@@ -357,80 +518,100 @@ export function BuddyList({ compact }: { compact?: boolean }) {
           )}
         </Section>
 
-        {arranged.groups.map(({ group: g, online, total }) => {
-          if (q && online.length === 0) return null
-          const expanded = !g.collapsed || !!q
-          return (
-            <Section
-              key={g.id}
-              label={`${g.name} · ${online.length}/${total}`}
-              collapsible
-              expanded={expanded}
-              onToggle={() => buddyGroups.setCollapsed(g.id, !g.collapsed)}
-              onDropPerson={(id) => groupOf.get(id) !== g.id && buddyGroups.moveTo(id, g.id)}
-              action={
-                <GroupMenu
-                  name={g.name}
-                  onRename={() => setNaming({ kind: 'rename', groupId: g.id, name: g.name })}
-                  onDelete={() => deleteGroup(g)}
-                />
-              }
-            >
-              {expanded && online.filter(notWaiting).map(personRow)}
-              {expanded && !q && online.length === 0 && (
-                <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
-                  {total === 0 ? 'Drag someone here, or use ··· on their name.' : 'Nobody in this group is around.'}
-                </p>
-              )}
-            </Section>
-          )
-        })}
-
-        <Section
-            label={`Online · ${here.length}`}
-          onDropPerson={(id) => groupOf.has(id) && buddyGroups.moveTo(id, null)}
-          action={
-            othersExist && (
-              <button
-                type="button"
-                onClick={() => setNaming({ kind: 'create', memberId: null })}
-                className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="New group"
-                title="New group"
-              >
-                <FolderPlus className="size-3.5" aria-hidden />
-              </button>
-            )
-          }
+        <div
+          role="group"
+          aria-label="People"
+          className="mt-4 flex flex-col border-t border-sidebar-border pt-1"
         >
-          {membersLoading && <PeopleSkeleton />}
-          {here.filter(notWaiting).map(personRow)}
-          {!membersLoading && here.length === 0 && othersExist && !q && (
-            <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">Nobody else is around right now.</p>
-          )}
-        </Section>
+          {arranged.groups.map(({ group: g, online, total }) => {
+            if (q && online.length === 0) return null;
+            const expanded = !g.collapsed || !!q;
+            return (
+              <Section
+                key={g.id}
+                label={`${g.name} · ${online.length}/${total}`}
+                collapsible
+                expanded={expanded}
+                onToggle={() => buddyGroups.setCollapsed(g.id, !g.collapsed)}
+                onDropPerson={(id) =>
+                  groupOf.get(id) !== g.id && buddyGroups.moveTo(id, g.id)
+                }
+                action={
+                  <GroupMenu
+                    name={g.name}
+                    onRename={() =>
+                      setNaming({ kind: "rename", groupId: g.id, name: g.name })
+                    }
+                    onDelete={() => deleteGroup(g)}
+                  />
+                }
+              >
+                {expanded && online.filter(notWaiting).map(personRow)}
+                {expanded && !q && online.length === 0 && (
+                  <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
+                    {total === 0
+                      ? "Drag someone here, or use ··· on their name."
+                      : "Nobody in this group is around."}
+                  </p>
+                )}
+              </Section>
+            );
+          })}
 
-        {away.length > 0 && (
           <Section
-            label={`Offline · ${away.length}`}
-            collapsible
-            expanded={showOffline || !!q}
-            onToggle={() => setShowOffline((v) => !v)}
+            label={`Online · ${here.length}`}
+            onDropPerson={(id) =>
+              groupOf.has(id) && buddyGroups.moveTo(id, null)
+            }
+            action={
+              othersExist && (
+                <button
+                  type="button"
+                  onClick={() => setNaming({ kind: "create", memberId: null })}
+                  className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="New group"
+                  title="New group"
+                >
+                  <FolderPlus className="size-3.5" aria-hidden />
+                </button>
+              )
+            }
           >
-            {(showOffline || q) && away.filter(notWaiting).map(personRow)}
+            {membersLoading && <PeopleSkeleton />}
+            {here.filter(notWaiting).map(personRow)}
+            {!membersLoading && here.length === 0 && othersExist && !q && (
+              <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
+                Nobody else is around right now.
+              </p>
+            )}
           </Section>
-        )}
 
-        {q && people.length === 0 && visibleRooms.length === 0 && visibleTeams.length === 0 && (
-          <p className="px-4 py-2 text-xs text-muted-foreground">{`No one matches "${query}".`}</p>
-        )}
+          {away.length > 0 && (
+            <Section
+              label={`Offline · ${away.length}`}
+              collapsible
+              expanded={showOffline || !!q}
+              onToggle={() => setShowOffline((v) => !v)}
+            >
+              {(showOffline || q) && away.filter(notWaiting).map(personRow)}
+            </Section>
+          )}
+        </div>
+
+        {q &&
+          people.length === 0 &&
+          visibleRooms.length === 0 &&
+          visibleTeams.length === 0 && (
+            <p className="px-4 py-2 text-xs text-muted-foreground">{`No one matches "${query}".`}</p>
+          )}
 
         {!membersLoading && !othersExist && !q && (
           <div className="mx-3 mt-2 flex flex-col gap-2 rounded-lg border border-dashed p-3">
             <p className="text-sm font-medium">{"It's just you so far."}</p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              {community.name} starts with whoever shows up. Send the invite link to another builder and you&apos;ll see
-              them here the moment they sign in.
+              {community.name} starts with whoever shows up. Send the invite
+              link to another builder and you&apos;ll see them here the moment
+              they sign in.
             </p>
             <button
               type="button"
@@ -460,10 +641,10 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         <button
           type="button"
           onClick={() => open(VIEWS.build)}
-          aria-current={active === VIEWS.build ? 'page' : undefined}
+          aria-current={active === VIEWS.build ? "page" : undefined}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-            active === VIEWS.build && 'text-foreground',
+            "inline-flex items-center gap-1.5 rounded text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+            active === VIEWS.build && "text-foreground",
           )}
         >
           <Hammer className="size-3.5" aria-hidden />
@@ -472,10 +653,18 @@ export function BuddyList({ compact }: { compact?: boolean }) {
       </div>
 
       <CreateTeamDialog open={creatingTeam} onOpenChange={setCreatingTeam} />
-      <BrowseTeamsDialog open={browsingTeams} onOpenChange={setBrowsingTeams} onCreate={() => setCreatingTeam(true)} />
-      <GroupNameDialog naming={naming} onClose={() => setNaming(null)} onSubmit={saveName} />
+      <BrowseTeamsDialog
+        open={browsingTeams}
+        onOpenChange={setBrowsingTeams}
+        onCreate={() => setCreatingTeam(true)}
+      />
+      <GroupNameDialog
+        naming={naming}
+        onClose={() => setNaming(null)}
+        onSubmit={saveName}
+      />
     </div>
-  )
+  );
 }
 
 function Section({
@@ -487,37 +676,39 @@ function Section({
   onToggle,
   onDropPerson,
 }: {
-  label: string
-  action?: React.ReactNode
-  children: React.ReactNode
-  collapsible?: boolean
-  expanded?: boolean
-  onToggle?: () => void
-  onDropPerson?: (userId: string) => void
+  label: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  collapsible?: boolean;
+  expanded?: boolean;
+  onToggle?: () => void;
+  onDropPerson?: (userId: string) => void;
 }) {
-  const [dropping, setDropping] = useState(false)
-  const accepts = (e: React.DragEvent) => !!onDropPerson && e.dataTransfer.types.includes(PERSON_DRAG_TYPE)
+  const [dropping, setDropping] = useState(false);
+  const accepts = (e: React.DragEvent) =>
+    !!onDropPerson && e.dataTransfer.types.includes(PERSON_DRAG_TYPE);
   return (
     <section
       className={cn(
-        'mt-3 flex flex-col gap-px rounded-md transition-colors first:mt-1',
-        dropping && 'bg-sidebar-accent/60 ring-1 ring-ring/40',
+        "mt-3 flex flex-col gap-px rounded-md transition-colors first:mt-1",
+        dropping && "bg-sidebar-accent/60 ring-1 ring-ring/40",
       )}
       onDragOver={(e) => {
-        if (!accepts(e)) return
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-        setDropping(true)
+        if (!accepts(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDropping(true);
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+          setDropping(false);
       }}
       onDrop={(e) => {
-        setDropping(false)
-        if (!accepts(e)) return
-        e.preventDefault()
-        const id = e.dataTransfer.getData(PERSON_DRAG_TYPE)
-        if (id) onDropPerson?.(id)
+        setDropping(false);
+        if (!accepts(e)) return;
+        e.preventDefault();
+        const id = e.dataTransfer.getData(PERSON_DRAG_TYPE);
+        if (id) onDropPerson?.(id);
       }}
     >
       <div className="group flex h-6 items-center justify-between pr-3 pl-4">
@@ -528,17 +719,25 @@ function Section({
             aria-expanded={expanded}
             className="-ml-1 inline-flex items-center gap-1 rounded font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <ChevronRight className={cn('size-3 transition-transform', expanded && 'rotate-90')} aria-hidden />
+            <ChevronRight
+              className={cn(
+                "size-3 transition-transform",
+                expanded && "rotate-90",
+              )}
+              aria-hidden
+            />
             {label}
           </button>
         ) : (
-          <h2 className="font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase">{label}</h2>
+          <h2 className="font-mono text-[10.5px] tracking-wider text-muted-foreground uppercase">
+            {label}
+          </h2>
         )}
         {action}
       </div>
       {children}
     </section>
-  )
+  );
 }
 
 function Row({
@@ -549,43 +748,45 @@ function Row({
   quiet,
   muted,
 }: {
-  children: React.ReactNode
-  selected: boolean
-  onClick: () => void
-  unread: number
-  quiet?: boolean
-  muted?: boolean
+  children: React.ReactNode;
+  selected: boolean;
+  onClick: () => void;
+  unread: number;
+  quiet?: boolean;
+  muted?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-current={selected ? 'page' : undefined}
+      aria-current={selected ? "page" : undefined}
       className={cn(
-        'mx-2 flex h-8 items-center gap-2 rounded-md px-2 text-left text-sidebar-foreground/85 transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-        selected && 'bg-sidebar-accent text-sidebar-foreground',
-        muted && 'opacity-60',
+        "mx-2 flex h-8 items-center gap-2 rounded-md px-2 text-left text-sidebar-foreground/85 transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        selected && "bg-sidebar-accent text-sidebar-foreground",
+        muted && "opacity-60",
       )}
     >
       {children}
       {unread > 0 && !muted && <UnreadBadge count={unread} quiet={quiet} />}
     </button>
-  )
+  );
 }
 
 function UnreadBadge({ count, quiet }: { count: number; quiet?: boolean }) {
-  const label = count >= 100 ? '99+' : String(count)
+  const label = count >= 100 ? "99+" : String(count);
   return (
     <span
       className={cn(
-        'ml-auto inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full px-1.5 font-mono text-[10.5px] font-semibold',
-        quiet ? 'bg-sidebar-accent text-foreground' : 'bg-primary text-primary-foreground',
+        "ml-auto inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-full px-1.5 font-mono text-[10.5px] font-semibold",
+        quiet
+          ? "bg-sidebar-accent text-foreground"
+          : "bg-primary text-primary-foreground",
       )}
       aria-label={`${label} unread`}
     >
       {label}
     </span>
-  )
+  );
 }
 
 function PersonRow({
@@ -600,68 +801,91 @@ function PersonRow({
   onOpen,
   menu,
 }: {
-  userId: string
-  name: string
-  avatarUrl: string | null
-  status: ShownStatus
-  statusText: string | null
-  lockedIn?: LockedIn
-  unread: number
-  selected: boolean
-  onOpen: () => void
-  menu: React.ReactNode
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  status: ShownStatus;
+  statusText: string | null;
+  lockedIn?: LockedIn;
+  unread: number;
+  selected: boolean;
+  onOpen: () => void;
+  menu: React.ReactNode;
 }) {
   const sub = lockedIn
-    ? `Locked in${statusText ? ` · ${statusText}` : ''}`
-    : statusText || (status === 'away' || status === 'dnd' ? STATUS_LABEL[status] : null)
-  const waiting = unread > 0 && !selected
+    ? `Locked in${statusText ? ` · ${statusText}` : ""}`
+    : statusText ||
+      (status === "away" || status === "dnd" ? STATUS_LABEL[status] : null);
+  const waiting = unread > 0 && !selected;
   return (
     <div
       draggable
       onDragStart={(e) => {
-        e.dataTransfer.setData(PERSON_DRAG_TYPE, userId)
-        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData(PERSON_DRAG_TYPE, userId);
+        e.dataTransfer.effectAllowed = "move";
       }}
       className={cn(
-        'group mx-2 flex items-center rounded-md transition-colors hover:bg-sidebar-accent',
-        selected && 'bg-sidebar-accent',
-        waiting && 'bg-primary/10 hover:bg-primary/15',
+        "group mx-2 flex items-center rounded-md transition-colors hover:bg-sidebar-accent",
+        selected && "bg-sidebar-accent",
+        waiting && "bg-primary/10 hover:bg-primary/15",
       )}
     >
       <button
         type="button"
         onClick={onOpen}
-        aria-current={selected ? 'page' : undefined}
-        aria-label={`Message ${name}, ${STATUS_LABEL[status]}${sub && sub !== STATUS_LABEL[status] ? `, ${sub}` : ''}${unread ? `, ${unread} unread` : ''}`}
+        aria-current={selected ? "page" : undefined}
+        aria-label={`Message ${name}, ${STATUS_LABEL[status]}${sub && sub !== STATUS_LABEL[status] ? `, ${sub}` : ""}${unread ? `, ${unread} unread` : ""}`}
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
-        <Avatar name={name} url={avatarUrl} size={28} status={status} lockedIn={!!lockedIn} />
+        <Avatar
+          name={name}
+          url={avatarUrl}
+          size={28}
+          status={status}
+          lockedIn={!!lockedIn}
+        />
         <span className="flex min-w-0 flex-1 flex-col">
           <span
             className={cn(
-              'truncate text-[13px] leading-tight',
-              status === 'offline' ? 'text-muted-foreground' : 'text-sidebar-foreground',
-              unread > 0 && 'font-semibold text-sidebar-foreground',
+              "truncate text-[13px] leading-tight",
+              status === "offline"
+                ? "text-muted-foreground"
+                : "text-sidebar-foreground",
+              unread > 0 && "font-semibold text-sidebar-foreground",
             )}
           >
             {name}
           </span>
           {waiting ? (
             <span className="truncate text-[11.5px] leading-tight font-medium text-primary">
-              {unread === 1 ? 'New message' : `${unread >= 100 ? '99+' : unread} new messages`}
+              {unread === 1
+                ? "New message"
+                : `${unread >= 100 ? "99+" : unread} new messages`}
             </span>
-          ) : sub && (
-            <span className={cn('flex min-w-0 items-center gap-1 text-[11.5px] leading-tight text-muted-foreground', status === 'offline' && 'opacity-70')}>
-              {lockedIn && <span className="size-1.5 shrink-0 rounded-full bg-gold" aria-hidden />}
-              <span className="truncate">{sub}</span>
-            </span>
+          ) : (
+            sub && (
+              <span
+                className={cn(
+                  "flex min-w-0 items-center gap-1 text-[11.5px] leading-tight text-muted-foreground",
+                  status === "offline" && "opacity-70",
+                )}
+              >
+                {lockedIn && (
+                  <span
+                    className="size-1.5 shrink-0 rounded-full bg-gold"
+                    aria-hidden
+                  />
+                )}
+                <span className="truncate">{sub}</span>
+              </span>
+            )
           )}
         </span>
         {unread > 0 && <UnreadBadge count={unread} />}
       </button>
       {menu}
     </div>
-  )
+  );
 }
 
 function PeopleSkeleton() {
@@ -674,5 +898,5 @@ function PeopleSkeleton() {
         </div>
       ))}
     </div>
-  )
+  );
 }

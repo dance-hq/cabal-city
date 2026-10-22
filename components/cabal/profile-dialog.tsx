@@ -25,7 +25,7 @@ import { CabalStar } from '@/components/brand/logo'
 import { useLockIns } from '@/hooks/use-lock-ins'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { IDENTITY_LABEL } from '@/lib/identity'
+import { IDENTITY_LABEL, orderedIdentities } from '@/lib/identity'
 import { nickColor } from '@/lib/nick-color'
 
 export function ProfileDialog() {
@@ -48,6 +48,7 @@ export function ProfileDialog() {
   const [reporting, setReporting] = useState(false)
   const profile = profileById(profileOpen)
   const member = members.find((m) => m.user_id === profileOpen)
+  const roles = orderedIdentities(profile?.identities)
   const self = profileOpen === userId
   const status = profileOpen ? statusOf(profileOpen) : 'offline'
   const isBlocked = !!profileOpen && blocked.has(profileOpen)
@@ -124,7 +125,7 @@ export function ProfileDialog() {
                         dotRingClassName="ring-popover"
                       />
                     </span>
-                    {(profile.identity || member?.role === 'admin') && (
+                    {(roles.length > 0 || member?.role === 'admin') && (
                       <div className="flex flex-wrap justify-end gap-1.5 pb-1">
                         {member?.role === 'admin' && (
                           <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium">
@@ -132,11 +133,14 @@ export function ProfileDialog() {
                             Cabal team
                           </span>
                         )}
-                        {profile.identity && (
-                          <span className="rounded-full border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                            {IDENTITY_LABEL[profile.identity]}
+                        {roles.map((r) => (
+                          <span
+                            key={r}
+                            className="rounded-full border px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                          >
+                            {IDENTITY_LABEL[r]}
                           </span>
-                        )}
+                        ))}
                       </div>
                     )}
                   </div>

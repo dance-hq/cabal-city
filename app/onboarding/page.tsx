@@ -29,7 +29,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   }
 
   const [{ data: profile }, { data: membership }] = await Promise.all([
-    supabase.from('profiles').select('username, display_name, identity, avatar_url').eq('id', user.id).single(),
+    supabase.from('profiles').select('username, display_name, avatar_url').eq('id', user.id).single(),
     supabase
       .from('community_members')
       .select('banned_at')
@@ -61,7 +61,6 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         initial={{
           display_name: profile?.display_name ?? '',
           username: profile?.username ?? null,
-          identity: profile?.identity ?? null,
           avatar_url: profile?.avatar_url ?? null,
         }}
       />

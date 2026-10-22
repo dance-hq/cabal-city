@@ -20,13 +20,13 @@ export async function loadBoot(): Promise<Boot> {
   const [{ data: profile }, { data: settings }, { data: membership }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url, company, bio, status_text, identity, links')
+      .select('id, username, display_name, avatar_url, company, bio, status_text, identities, links')
       .eq('id', user.id)
       .single(),
     supabase
       .from('user_settings')
       .select(
-        'availability, notify_dms, notify_mentions, notify_sound, lock_in_live, lock_in_board, welcome_seen, playbook_done, playbook_hidden',
+        'availability, notify_dms, notify_mentions, notify_sound, lock_in_live, lock_in_board, welcome_seen, playbook_done, playbook_hidden, opportunities_seen_at, calendar_seen_at, opportunities_muted, calendar_muted',
       )
       .eq('user_id', user.id)
       .single(),

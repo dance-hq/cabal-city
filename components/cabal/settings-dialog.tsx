@@ -92,7 +92,7 @@ function ProfileSettings() {
     company: me.company ?? '',
     bio: me.bio ?? '',
   })
-  const [identity, setIdentity] = useState<Identity | null>(me.identity)
+  const [identities, setIdentities] = useState<Identity[]>(me.identities ?? [])
   const [links, setLinks] = useState<string[]>(() => [...(me.links ?? []), '', '', ''].slice(0, Math.max(3, me.links?.length ?? 0)))
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -112,7 +112,7 @@ function ProfileSettings() {
       .update({
         display_name: fields.display_name.trim(),
         username: fields.username.trim(),
-        identity,
+        identities,
         company: fields.company.trim() || null,
         bio: fields.bio.trim() || null,
         links: cleaned.length ? cleaned : null,
@@ -198,7 +198,7 @@ function ProfileSettings() {
           </p>
         </div>
       </div>
-      <IdentityPicker value={identity} onChange={setIdentity} legend="Role" />
+      <IdentityPicker value={identities} onChange={setIdentities} legend="Role" />
       <div className="flex flex-col gap-2">
         <Label htmlFor="s-bio">What you&apos;re building</Label>
         <Textarea

@@ -11,3 +11,16 @@ export const IDENTITY_LABEL: Record<Identity, string> = {
   builder: 'Builder',
   investor: 'Investor',
 }
+
+// Roles in the order we always show them, without repeats or unknown values.
+export function orderedIdentities(list: readonly string[] | null | undefined): Identity[] {
+  const have = new Set(list ?? [])
+  return IDENTITIES.map((i) => i.value).filter((v) => have.has(v))
+}
+
+// "Founder · Builder", or '' when someone hasn't picked any.
+export function identityLabels(list: readonly string[] | null | undefined): string {
+  return orderedIdentities(list)
+    .map((i) => IDENTITY_LABEL[i])
+    .join(' · ')
+}

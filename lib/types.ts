@@ -12,7 +12,8 @@ export type Profile = {
   company: string | null
   bio: string | null
   status_text: string | null
-  identity: Identity | null
+  // Any of founder / builder / investor, or none.
+  identities: Identity[]
   links: string[] | null
 }
 
@@ -31,6 +32,12 @@ export type Settings = {
   playbook_done: string[]
   // The Playbook card is tucked away on Home.
   playbook_hidden: boolean
+  // When you last looked at Opportunities / Calendar (set by mark_board_seen).
+  opportunities_seen_at: string
+  calendar_seen_at: string
+  // No sidebar badge for that board.
+  opportunities_muted: boolean
+  calendar_muted: boolean
 }
 
 export type Community = {
