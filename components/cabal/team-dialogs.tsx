@@ -433,6 +433,7 @@ export function TeamManageDialog({
         {isOwner && (
           <TeamImagesEditor
             teamId={teamId}
+            teamName={channel.team_name}
             onChanged={() => {
               refreshChannels()
               void refreshTeamRooms(community.id)

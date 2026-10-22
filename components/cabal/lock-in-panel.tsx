@@ -332,11 +332,12 @@ export function WeekBoard({
   )
 }
 
-// The two choices, kept right where you'd wonder about them.
+// The board choice, kept right where you'd wonder about it. "Show me in
+// Locked in now" lives in Settings → Community only.
 function Prefs() {
   const { settings, updateSettings, community } = useCabal()
   const { mutate } = useSWRConfig()
-  async function set(patch: Partial<Pick<typeof settings, 'lock_in_live' | 'lock_in_board'>>) {
+  async function set(patch: Partial<Pick<typeof settings, 'lock_in_board'>>) {
     await updateSettings(patch)
     void refreshLockInHours(mutate)
     void mutate(lockInsKey(community.id))
@@ -349,12 +350,6 @@ function Prefs() {
         hint="Also shows your Lock in numbers on your profile."
         checked={settings.lock_in_board}
         onChange={(v) => set({ lock_in_board: v })}
-      />
-      <PrefRow
-        id="lock-in-live"
-        label="Show me in Locked in now"
-        checked={settings.lock_in_live}
-        onChange={(v) => set({ lock_in_live: v })}
       />
     </div>
   )

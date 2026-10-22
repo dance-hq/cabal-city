@@ -108,7 +108,7 @@ export function TeamPicks() {
       <ul className="flex flex-col gap-2">
         {picks.map((r) => (
           <li key={r.id} className="flex flex-col overflow-hidden rounded-lg border bg-card">
-            {r.banner_url && isOwnTeamImageUrl(r.banner_url) && <TeamBanner url={r.banner_url} className="h-16" />}
+            {r.banner_url && isOwnTeamImageUrl(r.banner_url) && <TeamBanner url={r.banner_url} />}
             <div className="flex items-start gap-3 px-3.5 py-3">
               <TeamMark logo={r.logo_url} visibility={r.visibility} size={36} />
               <div className="flex min-w-0 flex-1 flex-col gap-1">

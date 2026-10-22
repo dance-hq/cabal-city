@@ -12,6 +12,14 @@ export type CalendarEvent = {
 
 export type PendingEvent = CalendarEvent & { submitted_by: string | null; created_at: string }
 
+// Every Cabal event is in Chicago, so a venue that only names the city adds
+// nothing on screen. It stays in the saved event for calendar files and shares.
+const CITY_ONLY = /^\s*chicago\s*(,?\s*(il|illinois)\.?)?\s*$/i
+
+export function place(venue: string): string | null {
+  return CITY_ONLY.test(venue) ? null : venue.trim() || null
+}
+
 // Events without an end time are treated as this long.
 export const DEFAULT_LENGTH_MS = 3 * 60 * 60 * 1000
 

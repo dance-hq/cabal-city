@@ -82,6 +82,14 @@ export function TeamImageCropper({
               objectFit={banner ? 'horizontal-cover' : 'contain'}
               showGrid={false}
               zoomSpeed={0.3}
+              keyboardStep={10}
+              style={{
+                cropAreaStyle: {
+                  border: '2px solid rgb(255 255 255 / 0.9)',
+                  boxShadow: '0 0 0 9999em rgb(0 0 0 / 0.62)',
+                  borderRadius: banner ? 6 : 10,
+                },
+              }}
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onCropComplete={(next, nextPixels) => {
