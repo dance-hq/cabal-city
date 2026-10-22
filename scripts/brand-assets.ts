@@ -92,16 +92,22 @@ const star = (cx: number, cy: number, r: number, fill: string = BRAND.star) =>
 const svg = (w: number, h: number, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${body}</svg>`
 
-// The app icon is the 🔮 (Noto Emoji art, Apache 2.0, assets/brand/crystal-ball.svg);
-// the star stays the logo on the site, in the logo files and in the tray.
+// The website keeps the star (browser tab, home screen). The app icon is the 🔮
+// (Noto Emoji art, Apache 2.0, assets/brand/crystal-ball.svg); the star also stays
+// the logo in the logo files and in the tray.
+const starTile = (size: number, { radius = 0.225, starScale = 0.31 } = {}) =>
+  svg(
+    size,
+    size,
+    `<rect width="${size}" height="${size}" rx="${size * radius}" fill="${BRAND.ink}"/>` +
+      star(size / 2, size / 2, size * starScale),
+  )
+
 const ballSvg = readFileSync(out('assets/brand/crystal-ball.svg'), 'utf8').replace(/<!--[\s\S]*?-->\s*/g, '')
 const ball = (x: number, y: number, size: number) =>
   ballSvg.replace('<svg ', `<svg x="${x}" y="${y}" width="${size}" height="${size}" `)
 
-// The ball on its own, edge to edge, for browser tabs.
-const ballIcon = (size: number) => svg(size, size, ball(0, 0, size))
-
-// The ball on the ink tile, for home screens and the desktop app. `pad` leaves room
+// The ball on the ink tile, for the app's own icons and the desktop app. `pad` leaves room
 // around the tile (macOS expects its icons inset inside the 1024 canvas).
 const ballTile = (size: number, { pad = 0, radius = 0.225, ballScale = 0.72 } = {}) => {
   const inner = size - pad * 2
@@ -137,11 +143,13 @@ const write = (file: string, text: string) => {
   writeFileSync(out(file), text)
 }
 
-// --- browser + home screen -------------------------------------------------------
-const favicon = ballIcon(32)
+// --- website: browser tab + home screen --------------------------------------------
+const favicon = starTile(32, { radius: 0.25, starScale: 0.36 })
 write('public/icon.svg', favicon)
 png('public/icon-32.png', favicon, 32)
-png('public/apple-icon.png', ballTile(180, { radius: 0 }), 180) // iOS rounds it
+png('public/apple-icon.png', starTile(180, { radius: 0, starScale: 0.3 }), 180) // iOS rounds it
+
+// --- app ---------------------------------------------------------------------------
 png('public/cabal-icon.png', ballTile(256), 256)
 
 // --- downloadable logo files -------------------------------------------------------
