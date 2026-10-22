@@ -8,6 +8,7 @@ import { Avatar } from './avatar'
 import { MessageText } from './message-text'
 import { LongTextCard } from './long-text'
 import { MessageFiles } from './message-files'
+import { LinkPreview } from './link-preview'
 import { ReportDialog } from './moderation'
 import { useCabal } from './store'
 import { useE2ee } from './e2ee-provider'
@@ -282,6 +283,7 @@ export function MessageList({
                               />
                             </span>
                             <MessageFiles m={m} />
+                            {!m.files && !m.long_text && !m.sealed && <LinkPreview body={m.body} />}
                           </>
                         )}
                         <SendState
@@ -348,6 +350,9 @@ export function MessageList({
                                 onUnlock={() => setUnlockOpen(true)}
                               />
                               <MessageFiles m={m} />
+                              {channel.kind === 'team' && !m.files && !m.long_text && !m.sealed && (
+                                <LinkPreview body={m.body} />
+                              )}
                             </>
                           )}
                         </div>
