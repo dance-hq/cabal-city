@@ -74,8 +74,8 @@ export default async function Home() {
             ) : (
               <span className={OPEN_SOURCE}>open source</span>
             )}{' '}
-            home for Chicago&rsquo;s builders. Find people working on interesting things,
-            see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
+            home for Chicago&rsquo;s builders and supporters. Find people working on interesting
+            things, see who&rsquo;s around, and build alongside them.
           </p>
           <div className="grid grid-cols-2 gap-2.5 pt-2 sm:flex sm:flex-wrap sm:items-center">
             {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
