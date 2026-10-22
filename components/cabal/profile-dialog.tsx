@@ -12,6 +12,7 @@ import { LockInProfile } from './lock-in-profile'
 import { ReportDialog, setBlocked } from './moderation'
 import { STATUS_LABEL } from './status-dot'
 import { useCabal } from './store'
+import { InviteToTeamButton } from './team-invite'
 import { useWorkSession } from './work-session'
 import { CabalStar } from '@/components/brand/logo'
 import { useLockIns } from '@/hooks/use-lock-ins'
@@ -158,6 +159,7 @@ export function ProfileDialog() {
                       <MessageSquare aria-hidden />
                       Message
                     </Button>
+                    {!isBlocked && <InviteToTeamButton personId={profile.id} name={profile.display_name ?? 'them'} />}
                     <Button
                       variant="ghost"
                       size="sm"

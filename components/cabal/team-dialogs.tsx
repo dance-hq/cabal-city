@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { mutate as mutateGlobal } from 'swr'
-import { Loader2, Lock, Search, Users } from 'lucide-react'
+import { Loader2, Lock, Search, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -13,6 +13,7 @@ import { Avatar } from './avatar'
 import { useCabal } from './store'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
+import { isMakersTeam } from '@/lib/config'
 import type { Channel, TeamRoom, TeamVisibility } from '@/lib/types'
 
 const teamRoomsKey = (communityId: string) => ['team-rooms', communityId] as const
@@ -68,7 +69,37 @@ export async function openTeam(communityId: string, teamId: string, openChannel:
   if (ch) openChannel(ch.id)
 }
 
-function activeLabel(iso: string | null) {
+// "Founded by Ada", "Ada & Grace", "Ada and 2 others", with their faces.
+export function Founders({ ownerIds }: { ownerIds: string[] }) {
+  const { profileById } = useCabal()
+  const owners = ownerIds.map((id) => profileById(id)).filter((p): p is NonNullable<typeof p> => !!p?.display_name)
+  if (owners.length === 0) return null
+  const names =
+    owners.length === 1
+      ? owners[0].display_name
+      : owners.length === 2
+        ? `${owners[0].display_name} & ${owners[1].display_name}`
+        : `${owners[0].display_name} and ${owners.length - 1} others`
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <span className="flex shrink-0 -space-x-1.5" aria-hidden>
+        {owners.slice(0, 3).map((p) => (
+          <span key={p.id} className="rounded-full ring-2 ring-card">
+            <Avatar name={p.display_name ?? ''} url={p.avatar_url} size={18} />
+          </span>
+        ))}
+      </span>
+      <span className="truncate">Founded by {names}</span>
+    </span>
+  )
+}
+
+// A quiet nod to the team that makes Cabal.
+export function MakersTag() {
+  return <span className="font-mono text-[10.5px] tracking-wider text-mark uppercase">Makes Cabal</span>
+}
+
+export function activeLabel(iso: string | null) {
   if (!iso) return 'no messages yet'
   const minutes = Math.round((Date.now() - Date.parse(iso)) / 60_000)
   if (minutes < 2) return 'active now'
@@ -98,6 +129,7 @@ export function BrowseTeamsDialog({
     .filter((r) => !q || r.name.toLowerCase().includes(q))
     .sort((a, b) => {
       if (a.joined !== b.joined) return a.joined ? 1 : -1
+      if (isMakersTeam(a.name) !== isMakersTeam(b.name)) return isMakersTeam(a.name) ? -1 : 1
       return (Date.parse(b.last_message_at ?? b.created_at) || 0) - (Date.parse(a.last_message_at ?? a.created_at) || 0)
     })
 
@@ -152,11 +184,19 @@ export function BrowseTeamsDialog({
             {list.map((r) => (
               <li key={r.id} className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-accent">
                 <TeamIcon visibility={r.visibility} className="size-4 shrink-0 text-muted-foreground" />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium">{r.name}</span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="truncate text-sm font-medium">{r.name}</span>
+                    {isMakersTeam(r.name) && <MakersTag />}
+                  </span>
                   {r.welcome && (
                     <span className="line-clamp-2 text-xs leading-relaxed text-pretty text-foreground/80">
                       {r.welcome.replace(/\s+/g, ' ')}
+                    </span>
+                  )}
+                  {r.owner_ids?.length > 0 && (
+                    <span className="flex min-w-0 text-xs text-muted-foreground">
+                      <Founders ownerIds={r.owner_ids} />
                     </span>
                   )}
                   <span className="truncate text-xs text-muted-foreground">
@@ -279,17 +319,18 @@ export function TeamManageDialog({
   onOpenChange,
   channel,
   onEditWelcome,
+  onInvite,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   channel: Channel
   onEditWelcome?: () => void
+  onInvite?: () => void
 }) {
-  const { community, userId, members, profileById, refreshChannels, open: openChannel } = useCabal()
+  const { community, userId, profileById, refreshChannels, open: openChannel } = useCabal()
   const teamId = channel.team_id!
   const isOwner = channel.team_role === 'owner'
   const isPublic = channel.team_visibility === 'public'
-  const [query, setQuery] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [name, setName] = useState(channel.team_name ?? '')
   const [wasOpen, setWasOpen] = useState(open)
@@ -308,17 +349,6 @@ export function TeamManageDialog({
     if (m.error) throw m.error
     return { members: (m.data ?? []) as TeamMember[], invites: (i.data ?? []) as PendingInvite[] }
   })
-
-  const inTeam = new Set(team.data?.members.map((m) => m.user_id))
-  const invited = new Set(team.data?.invites.map((i) => i.user_id))
-  const q = query.trim().toLowerCase()
-  const candidates = members.filter(
-    (m) =>
-      !inTeam.has(m.user_id) &&
-      !invited.has(m.user_id) &&
-      q.length > 0 &&
-      (m.profile.display_name?.toLowerCase().includes(q) || m.profile.username?.toLowerCase().includes(q)),
-  )
 
   async function run(id: string, fn: () => PromiseLike<{ error: unknown }>, done?: string) {
     setBusyId(id)
@@ -427,50 +457,18 @@ export function TeamManageDialog({
           </div>
         )}
 
-        {isOwner && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="team-invite-search">Invite a teammate</Label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
-              <Input
-                id="team-invite-search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search community members"
-                className="pl-8"
-              />
-            </div>
-            {q && (
-              <ul className="flex max-h-40 flex-col overflow-y-auto rounded-md border">
-                {candidates.length === 0 && <li className="px-3 py-2 text-xs text-muted-foreground">No matching members.</li>}
-                {candidates.map((m) => (
-                  <li key={m.user_id} className="flex items-center gap-2 px-3 py-1.5">
-                    <Avatar name={m.profile.display_name ?? ''} url={m.profile.avatar_url} size={22} />
-                    <span className="min-w-0 flex-1 truncate text-sm">
-                      {m.profile.display_name}{' '}
-                      <span className="font-mono text-xs text-muted-foreground">@{m.profile.username}</span>
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      aria-label={`Invite ${m.profile.display_name} (@${m.profile.username})`}
-                      disabled={busyId === m.user_id}
-                      onClick={async () => {
-                        const ok = await run(
-                          m.user_id,
-                          () => supabase.rpc('invite_to_team', { p_team: teamId, p_user: m.user_id }),
-                          `Invited ${m.profile.display_name}`,
-                        )
-                        if (ok) setQuery('')
-                      }}
-                    >
-                      Invite
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        {onInvite && (isOwner || isPublic) && (
+          <Button
+            variant="secondary"
+            className="self-start"
+            onClick={() => {
+              onOpenChange(false)
+              onInvite()
+            }}
+          >
+            <UserPlus aria-hidden />
+            Invite people
+          </Button>
         )}
 
         <div className="flex flex-col gap-1">

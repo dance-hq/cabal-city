@@ -29,6 +29,7 @@ import type {
   Profile,
   Settings,
   ShownStatus,
+  TeamVisibility,
 } from '@/lib/types'
 
 export type Boot = {
@@ -45,7 +46,7 @@ export type InviteRow = {
   id: string
   team_id: string
   created_at: string
-  team: { name: string } | null
+  team: { name: string; visibility: TeamVisibility } | null
   inviter: { display_name: string | null; username: string | null } | null
 }
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'offline'
@@ -154,7 +155,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   const invitesQuery = useSWR(['invites', userId], async () => {
     const { data, error } = await supabase
       .from('team_invites')
-      .select('id, team_id, created_at, team:teams(name), inviter:profiles!team_invites_invited_by_fkey(display_name, username)')
+      .select('id, team_id, created_at, team:teams(name, visibility), inviter:profiles!team_invites_invited_by_fkey(display_name, username)')
       .eq('user_id', userId)
       .order('created_at')
     if (error) throw error
@@ -218,10 +219,47 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
     [lastOpenKey, popout],
   )
 
+  // A team invite that arrives while you're here gets a one-tap Join, so you
+  // don't have to spot it in the buddy list.
+  const announceInvite = useCallback(
+    async (inviteId: string) => {
+      const list = await mutateInvites()
+      const inv = list?.find((i) => i.id === inviteId)
+      if (!inv || popout) return
+      toast(`${inv.inviter?.display_name ?? 'Someone'} invited you to ${inv.team?.name ?? 'a team'}`, {
+        duration: 20_000,
+        closeButton: true,
+        action: {
+          label: 'Join',
+          onClick: async () => {
+            const { data: teamId, error } = await supabase.rpc('respond_team_invite', { p_invite: inv.id, p_accept: true })
+            void mutateInvites()
+            if (error) {
+              toast.error(friendlyError(error))
+              return
+            }
+            const fresh = await supabase.rpc('my_channels', { p_community: community.id })
+            void mutateChannels()
+            const ch = (fresh.data as Channel[] | null)?.find((c) => c.team_id === teamId)
+            if (ch) open(ch.id)
+          },
+        },
+      })
+    },
+    [mutateInvites, mutateChannels, popout, supabase, community.id, open],
+  )
+
   const restored = useRef<string | null>(null)
   useEffect(() => {
     if (popout) return
     let c = new URLSearchParams(window.location.search).get('c')
+    // A team invite link carried through sign-up (see /join/[code]).
+    if (!c) {
+      try {
+        c = sessionStorage.getItem('cabal:open')
+        sessionStorage.removeItem('cabal:open')
+      } catch {}
+    }
     if (!c) {
       try {
         c = localStorage.getItem(lastOpenKey)
@@ -648,8 +686,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
 
   // Realtime callbacks read the latest handlers through a ref, so the socket
   // subscription is created once per user/community and never churns.
-  const handlers = useRef({ handleIncoming, refreshMembers, refreshInvites, refreshChannels, loadPresence })
-  handlers.current = { handleIncoming, refreshMembers, refreshInvites, refreshChannels, loadPresence }
+  const handlers = useRef({ handleIncoming, refreshMembers, refreshInvites, announceInvite, refreshChannels, loadPresence })
+  handlers.current = { handleIncoming, refreshMembers, refreshInvites, announceInvite, refreshChannels, loadPresence }
 
   useEffect(() => {
     let wasLive = false
@@ -703,7 +741,10 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'team_invites', filter: `user_id=eq.${userId}` },
-          () => h().refreshInvites(),
+          (p) => {
+            if (p.eventType === 'INSERT') void h().announceInvite((p.new as { id: string }).id)
+            else h().refreshInvites()
+          },
         )
         .on(
           'postgres_changes',

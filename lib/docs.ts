@@ -212,12 +212,15 @@ export const PERMISSIONS: Fact[] = [
   },
   {
     label: 'Public teams',
-    body: 'Anyone in the community who joins, including history from before they joined.',
-    sources: [{ path: 'supabase/migrations/0004_open_team_rooms.sql' }],
+    body: 'Anyone in the community who joins, including history from before they joined. Any member can invite others; an invite just puts the team in front of them.',
+    sources: [
+      { path: 'supabase/migrations/0004_open_team_rooms.sql' },
+      { path: 'supabase/migrations/0022_team_invites_and_founders.sql' },
+    ],
   },
   {
     label: 'Invite-only teams',
-    body: 'Team members only. Community admins aren’t let in unless they’re on the team.',
+    body: 'Team members only. Only owners can invite, since the invite is what grants access. Community admins aren’t let in unless they’re on the team.',
   },
   {
     label: 'Direct messages',

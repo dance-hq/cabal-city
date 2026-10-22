@@ -20,6 +20,7 @@ import { LockedInList, WeekBoard } from './lock-in-panel'
 import { MESSAGE_COLUMNS, useCabal } from './store'
 import { useE2ee } from './e2ee-provider'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
+import { TeamPicks } from './team-picks'
 
 const RECENT = 6
 
@@ -69,6 +70,7 @@ export function Home() {
       <div className="quiet-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid max-w-4xl gap-8 px-5 py-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10">
           <div className="flex min-w-0 flex-col gap-8">
+            <TeamPicks />
             <section className="flex flex-col gap-2">
               <LockedInList />
               {lockIns.size === 0 && (

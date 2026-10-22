@@ -657,7 +657,9 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     // Listed for everyone, but you join before you read or post.
     const listed = await outsider.db.rpc('community_teams', { p_community: communityId })
     const entry = (listed.data as { id: string; joined: boolean; member_count: number }[]).find((t) => t.id === openTeam)
-    expect(entry).toMatchObject({ joined: false, member_count: 1 })
+    expect(entry).toMatchObject({ joined: false, member_count: 1, owner_ids: [ada.id] })
+    // Not on the team yet, so no inviting people to it.
+    expect((await outsider.db.rpc('invite_to_team', { p_team: openTeam, p_user: grace.id })).error).not.toBeNull()
     expect((await outsider.db.from('messages').select('id').eq('channel_id', ch!.id)).data).toEqual([])
     expect((await outsider.db.from('messages').insert({ channel_id: ch!.id, author_id: outsider.id, body: 'x' })).error).not.toBeNull()
 
@@ -667,6 +669,12 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     const history = await outsider.db.from('messages').select('body').eq('channel_id', ch!.id)
     expect(history.data?.map((m) => m.body)).toContain(hello)
     expect((await outsider.db.from('messages').insert({ channel_id: ch!.id, author_id: outsider.id, body: 'hi all' })).error).toBeNull()
+
+    // Any member of a public team can invite; the invitee sees who asked.
+    expect((await outsider.db.rpc('invite_to_team', { p_team: openTeam, p_user: grace.id })).error).toBeNull()
+    const { data: graceInvite } = await grace.db.from('team_invites').select('id, invited_by').eq('team_id', openTeam).single()
+    expect(graceInvite?.invited_by).toBe(outsider.id)
+    expect((await grace.db.rpc('respond_team_invite', { p_invite: graceInvite!.id, p_accept: false })).error).toBeNull()
     // Joining twice is harmless and doesn't post a second notice.
     expect((await outsider.db.rpc('join_team', { p_team: openTeam })).error).toBeNull()
     const notices = await ada.db.from('messages').select('body').eq('channel_id', ch!.id).eq('kind', 'system').like('body', '%joined.')
@@ -692,6 +700,8 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     const read = await grace.db.from('messages').select('body').eq('channel_id', teamChannelId)
     expect(read.data?.some((m) => m.body.startsWith('secret plan'))).toBe(true)
     expect((await grace.db.from('messages').insert({ channel_id: teamChannelId, author_id: grace.id, body: 'on it' })).error).toBeNull()
+    // On an invite-only team, members can't invite; the invite is the access.
+    expect((await grace.db.rpc('invite_to_team', { p_team: teamId, p_user: outsider.id })).error).not.toBeNull()
 
     // A member can't remove the owner; the owner can remove the member.
     expect((await grace.db.rpc('remove_team_member', { p_team: teamId, p_user: ada.id })).error).not.toBeNull()

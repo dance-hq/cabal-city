@@ -9,7 +9,6 @@ import {
   Hammer,
   Hash,
   Link2,
-  Lock,
   Plus,
   Radar,
   Search,
@@ -275,7 +274,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
           <Section label="Team invites">
             {invites.map((inv) => (
               <div key={inv.id} className="mx-2 flex items-center gap-2 rounded-md border bg-card px-2.5 py-2">
-                <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <TeamIcon visibility={inv.team?.visibility ?? null} className="size-3.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1 text-xs leading-relaxed">
                   <span className="font-medium">{inv.team?.name ?? 'A team'}</span>
                   <span className="text-muted-foreground"> from {inv.inviter?.display_name ?? 'a teammate'}</span>

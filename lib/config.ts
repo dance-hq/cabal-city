@@ -23,6 +23,13 @@ export const config = {
   communitySlug: (process.env.NEXT_PUBLIC_CABAL_COMMUNITY ?? '').trim() || 'chicago',
   appUrl: normalizeAppUrl(process.env.NEXT_PUBLIC_CABAL_APP_URL),
   githubRepo: normalizeGithubRepo(process.env.NEXT_PUBLIC_CABAL_GITHUB_REPO),
+  // The team that makes Cabal. Recommended first to new people, with a small
+  // "makes Cabal" note. Matched by name; leave empty to turn the nod off.
+  makersTeam: (process.env.NEXT_PUBLIC_CABAL_MAKERS_TEAM ?? 'Dance Technologies').trim(),
+}
+
+export function isMakersTeam(name: string | null | undefined) {
+  return !!config.makersTeam && !!name && name.trim().toLowerCase() === config.makersTeam.toLowerCase()
 }
 
 export const githubUrl = config.githubRepo ? `https://github.com/${config.githubRepo}` : ''

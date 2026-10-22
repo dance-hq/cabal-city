@@ -5,10 +5,17 @@ import { getCommunity } from '@/lib/community'
 
 export const metadata: Metadata = { title: 'You’re invited' }
 
-export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
-  const { code } = await params
+export default async function JoinPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ code: string }>
+  searchParams: Promise<{ c?: string }>
+}) {
+  const [{ code }, { c }] = await Promise.all([params, searchParams])
   const community = await getCommunity()
   const safeCode = /^[a-f0-9]{16,64}$/.test(code) ? code : ''
+  const team = c && /^[0-9a-f-]{36}$/i.test(c) ? c : undefined
 
   return (
     <AuthShell>
@@ -20,8 +27,9 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Cabal is a small instant messenger. See who&apos;s around, send a message, or drop into a channel.
+          {team && ' Once you’re in, you’ll land on the team that invited you.'}
         </p>
-        <JoinButton code={safeCode} />
+        <JoinButton code={safeCode} openAfter={team} />
       </div>
     </AuthShell>
   )

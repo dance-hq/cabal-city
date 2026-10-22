@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Bell, BellOff, Hash, Link2, MoreHorizontal, Settings2, Users } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, Hash, Link2, MoreHorizontal, Settings2, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { LockInControl } from './session-bar'
 import { STATUS_LABEL } from './status-dot'
 import { TeamIcon, TeamManageDialog } from './team-dialogs'
 import { TeamWelcome } from './team-welcome'
+import { InviteToTeamDialog, TeamInviteNudge, canInvite } from './team-invite'
 import { useCabal } from './store'
 import { useE2ee } from './e2ee-provider'
 import { DmEncryptionNotice, EncryptionBadge, dmSendBlock, usePeerEncryption } from './e2ee-dm'
@@ -112,6 +113,8 @@ function OpenConversation({
   const [floatingOpen, setFloatingOpen] = useState(false)
   const [managing, setManaging] = useState(false)
   const [editingWelcome, setEditingWelcome] = useState(false)
+  const [inviting, setInviting] = useState(false)
+  const invitable = canInvite(channel)
   const hasPanel = channel.kind !== 'dm'
   const panelOpen = hasPanel && (docked ? dockedOpen : floatingOpen)
 
@@ -224,6 +227,16 @@ function OpenConversation({
             </div>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
+            {invitable && (
+              <button
+                type="button"
+                onClick={() => setInviting(true)}
+                className="mr-1 inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <UserPlus className="size-3.5" aria-hidden />
+                Invite
+              </button>
+            )}
             {channel.kind !== 'dm' && (
               <IconButton
                 label={`Copy link to ${channel.kind === 'room' ? `#${channel.slug}` : channel.team_name}`}
@@ -282,6 +295,7 @@ function OpenConversation({
             onEditingChange={setEditingWelcome}
           />
         )}
+        {invitable && <TeamInviteNudge channel={channel} onInvite={() => setInviting(true)} />}
 
         <MessageList
           channel={channel}
@@ -346,18 +360,29 @@ function OpenConversation({
       {panelOpen && !docked && (
         <div className="absolute inset-0 z-10 bg-background/50" onClick={() => setFloatingOpen(false)} aria-hidden />
       )}
-      {panelOpen && <PeoplePanel channel={channel} {...people} onClose={docked ? undefined : () => setFloatingOpen(false)} />}
+      {panelOpen && (
+        <PeoplePanel
+          channel={channel}
+          {...people}
+          onClose={docked ? undefined : () => setFloatingOpen(false)}
+          onInvite={invitable ? () => setInviting(true) : undefined}
+        />
+      )}
 
       {channel.kind === 'team' && channel.team_id && (
-        <TeamManageDialog
-          open={managing}
-          onOpenChange={setManaging}
-          channel={channel}
-          onEditWelcome={() => {
-            setManaging(false)
-            setEditingWelcome(true)
-          }}
-        />
+        <>
+          <TeamManageDialog
+            open={managing}
+            onOpenChange={setManaging}
+            channel={channel}
+            onEditWelcome={() => {
+              setManaging(false)
+              setEditingWelcome(true)
+            }}
+            onInvite={() => setInviting(true)}
+          />
+          <InviteToTeamDialog open={inviting} onOpenChange={setInviting} channel={channel} />
+        </>
       )}
     </div>
   )

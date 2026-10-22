@@ -50,6 +50,8 @@ export type TeamRoom = {
   last_message_at: string | null
   created_at: string
   welcome: string | null
+  // Who started it, oldest owner first. Readable before you join.
+  owner_ids: string[]
 }
 
 export type Channel = {
