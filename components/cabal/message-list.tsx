@@ -199,7 +199,7 @@ export function MessageList({
           <ConversationStart channel={channel} empty={messages.length === 0} />
         )}
 
-        {messages.map((m) => {
+        {messages.filter((m) => !(m.kind === 'system' && m.deleted_at)).map((m) => {
           const day = dayKey(m.created_at)
           const newDay = day !== lastDay
           lastDay = day
@@ -237,7 +237,7 @@ export function MessageList({
                 </div>
               )}
               {m.kind === 'system' ? (
-                <SystemLine message={m} irc={irc} />
+                <SystemLine message={m} irc={irc} onRemove={irc && isAdmin ? () => remove(m) : undefined} />
               ) : (
                 <div
                   className={cn(
@@ -487,9 +487,34 @@ function SendState({ m, onRetry, onDiscard }: { m: Message; onRetry: () => void;
   )
 }
 
-function SystemLine({ message, irc }: { message: Message; irc: boolean }) {
+// Join notices carry the name someone signed up with, so admins can take one
+// down if a name slips past the filters. The line disappears for everyone.
+function SystemLine({ message, irc, onRemove }: { message: Message; irc: boolean; onRemove?: () => void }) {
   return (
-    <div className={cn('flex items-baseline gap-3 py-1', !irc && 'my-1 justify-center')}>
+    <div
+      className={cn(
+        'flex items-baseline gap-3 py-1',
+        !irc && 'my-1 justify-center',
+        onRemove && 'group relative -mx-2 rounded-md px-2 hover:bg-accent/50',
+      )}
+    >
+      {onRemove && (
+        <div className="absolute top-0.5 right-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex size-6 items-center justify-center rounded border bg-popover text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Notice actions"
+            >
+              <MoreHorizontal className="size-3.5" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onClick={onRemove}>
+                Remove notice
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
       {irc && (
         <time
           dateTime={message.created_at}
