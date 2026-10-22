@@ -43,6 +43,12 @@ export function useWorkSession() {
   return s
 }
 
+// For things that also show in the desktop chat window, which has no session
+// of its own (the main window runs it).
+export function useWorkSessionIfAny() {
+  return useContext(Ctx)
+}
+
 const BEAT_MS = 60_000
 const AWAY_NOTE_MS = 5 * 60_000
 
