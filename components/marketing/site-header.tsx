@@ -1,7 +1,5 @@
 import Link from 'next/link'
-import { GithubIcon } from '@/components/brand/github-icon'
 import { CabalWordmark } from '@/components/brand/logo'
-import { githubUrl } from '@/lib/config'
 import { cn } from '@/lib/utils'
 
 export function SiteHeader({ current }: { current?: string }) {
@@ -23,12 +21,6 @@ export function SiteHeader({ current }: { current?: string }) {
         <a href="/#download" className="hidden hover:text-foreground sm:inline">
           Download
         </a>
-        {githubUrl && (
-          <a href={githubUrl} className="hidden items-center gap-1.5 hover:text-foreground md:inline-flex">
-            <GithubIcon className="size-4" aria-hidden />
-            GitHub
-          </a>
-        )}
         <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
           Sign in
         </Link>
