@@ -171,7 +171,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
 
   function deleteGroup(g: BuddyGroup) {
     buddyGroups.deleteGroup(g.id)
-    toast.message(`Deleted ${g.name}`, { description: 'Everyone in it is back in Here now.' })
+    toast.message(`Deleted ${g.name}`, { description: 'Everyone in it is back in Online.' })
   }
   const visibleRooms = rooms.filter((r) => !q || r.slug?.includes(q))
   const visibleTeams = teams.filter((t) => !q || t.team_name?.toLowerCase().includes(q))
@@ -387,7 +387,7 @@ export function BuddyList({ compact }: { compact?: boolean }) {
         })}
 
         <Section
-          label={`Here now · ${here.length}`}
+            label={`Online · ${here.length}`}
           onDropPerson={(id) => groupOf.has(id) && buddyGroups.moveTo(id, null)}
           action={
             othersExist && (
