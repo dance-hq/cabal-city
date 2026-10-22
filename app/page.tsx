@@ -26,7 +26,7 @@ const PLATFORM_BUTTON =
   'group flex items-center gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:gap-3 sm:pr-4'
 
 const OPEN_SOURCE =
-  'rounded-sm text-foreground underline decoration-primary decoration-[1.5px] underline-offset-4 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+  'rounded-sm font-medium text-foreground underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 const GITHUB_TILE =
   'group flex items-center gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-foreground/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none col-span-2 sm:gap-3 sm:pr-4'
@@ -68,7 +68,7 @@ export default async function Home() {
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
             Cabal is an{' '}
             {githubUrl ? (
-              <a href={githubUrl} className={`${OPEN_SOURCE} hover:decoration-foreground`}>
+              <a href={githubUrl} className={`${OPEN_SOURCE} hover:underline`}>
                 open source
               </a>
             ) : (
