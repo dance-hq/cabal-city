@@ -97,10 +97,10 @@ export function useCabal() {
 
 // Places in the main pane that aren't conversations. They share `active` with
 // channel ids so back buttons, the URL and "reopen where you were" just work.
-export const VIEWS = { opportunities: 'opportunities', build: 'build' } as const
+export const VIEWS = { opportunities: 'opportunities', calendar: 'calendar', build: 'build' } as const
 export type View = (typeof VIEWS)[keyof typeof VIEWS]
 export function isView(id: string | null | undefined): id is View {
-  return id === VIEWS.opportunities || id === VIEWS.build
+  return id === VIEWS.opportunities || id === VIEWS.calendar || id === VIEWS.build
 }
 
 export const messagesKey = (channelId: string) => ['messages', channelId] as const

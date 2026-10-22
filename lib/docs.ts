@@ -354,6 +354,12 @@ export const DATA_MODEL: Fact[] = [
     sources: [{ path: FEEDBACK }, { path: BOARD }],
   },
   {
+    label: 'Calendar',
+    value: 'calendar_events',
+    body: 'Upcoming events per community, entered and shown in the community’s `time_zone`. Admins publish directly; members send events in and an admin checks them first.',
+    sources: [{ path: 'supabase/migrations/0026_calendar.sql', proves: ['create table public.calendar_events'] }],
+  },
+  {
     label: 'Encryption',
     value: 'e2ee_keys · e2ee_backups · e2ee_device_requests · messages.sealed · message_files.sealed',
     body: 'Public keys, recovery-key-locked backups and in-flight device approvals. See End-to-end encryption below.',

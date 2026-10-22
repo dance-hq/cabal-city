@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { SWRConfig } from 'swr'
 import { CabalProvider, VIEWS, useCabal, type Boot } from './store'
 import { Opportunities } from './opportunities'
+import { Calendar } from './calendar'
 import { BuildCabal } from './build-cabal'
 import { BuddyList } from './buddy-list'
 import { Conversation } from './conversation'
@@ -80,6 +81,7 @@ function Layout() {
 
 function MainPane({ active, compact }: { active: string; compact?: boolean }) {
   if (active === VIEWS.opportunities) return <Opportunities compact={compact} />
+  if (active === VIEWS.calendar) return <Calendar compact={compact} />
   if (active === VIEWS.build) return <BuildCabal compact={compact} />
   return <Conversation compact={compact} />
 }

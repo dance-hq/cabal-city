@@ -111,7 +111,7 @@ export function Founders({ ownerIds }: { ownerIds: string[] }) {
 
 // A quiet nod to the team that makes Cabal.
 export function MakersTag() {
-  return <span className="font-mono text-[10.5px] tracking-wider text-mark uppercase">Makes Cabal</span>
+  return <span className="font-mono text-[10.5px] tracking-wider text-mark uppercase">Founding team</span>
 }
 
 export function activeLabel(iso: string | null) {

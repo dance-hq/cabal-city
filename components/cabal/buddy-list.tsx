@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
+  CalendarDays,
   Check,
   ChevronRight,
   Compass,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { CabalStar } from '@/components/brand/logo'
 import { Avatar } from './avatar'
 import { MeCard } from './me-card'
 import { SessionBar } from './session-bar'
@@ -213,9 +215,10 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             type="button"
             onClick={() => open(null)}
             title="Home"
-            className="-ml-1 truncate rounded px-1 font-mono text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="-ml-1 flex min-w-0 items-center gap-1.5 rounded px-1 font-mono text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {community.name}
+            <CabalStar className="size-3.5" />
+            <span className="truncate">{community.name}</span>
           </button>
         )}
         <div className="flex shrink-0 items-center gap-0.5">
@@ -265,6 +268,10 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             <Row selected={active === VIEWS.opportunities} onClick={() => open(VIEWS.opportunities)} unread={0}>
               <Radar className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <span className="truncate text-[13px]">Opportunities</span>
+            </Row>
+            <Row selected={active === VIEWS.calendar} onClick={() => open(VIEWS.calendar)} unread={0}>
+              <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate text-[13px]">Calendar</span>
             </Row>
           </div>
         )}

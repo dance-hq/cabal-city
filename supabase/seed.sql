@@ -1,6 +1,10 @@
 -- First community for this deployment. Change these values (and
 -- NEXT_PUBLIC_CABAL_COMMUNITY) to run Cabal for your own community.
 -- Safe to run more than once.
+--
+-- The four default rooms (#introductions, #cabal-chat, #launches, #asks)
+-- are added automatically when a community is created; see
+-- public.default_rooms() (latest in migrations/0027_remove_irl.sql). Add any extra rooms below.
 
 insert into public.communities (slug, name, description, join_policy)
 values (
@@ -10,13 +14,3 @@ values (
   'open'
 )
 on conflict (slug) do nothing;
-
-insert into public.channels (community_id, kind, slug, name, topic, position)
-select c.id, 'room', r.slug, r.slug, r.topic, r.position
-from public.communities c
-cross join (values
-  ('cabal-chat', 'The main hangout. Say what you''re working on.', 0),
-  ('introductions', 'New here? Tell people who you are and what you''re building.', 1)
-) as r (slug, topic, position)
-where c.slug = 'chicago'
-on conflict do nothing;

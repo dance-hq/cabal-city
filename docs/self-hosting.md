@@ -14,7 +14,7 @@ Cabal uses Supabase only for Postgres, Auth and Realtime. It doesn't need Storag
 
 ## 2. Your community
 
-Edit `supabase/seed.sql`: the slug, name, description, join policy and starting rooms. Then run `pnpm db:seed` and set `NEXT_PUBLIC_CABAL_COMMUNITY` to the same slug.
+Edit `supabase/seed.sql`: the slug, name, description and join policy. Every community gets the four default rooms (#introductions, #cabal-chat, #launches, #asks) automatically; add any extra rooms in the seed. Then run `pnpm db:seed` and set `NEXT_PUBLIC_CABAL_COMMUNITY` to the same slug.
 
 Join policies:
 
