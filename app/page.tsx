@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 }
 
 const PLATFORM_BUTTON =
-  'inline-flex items-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-primary-foreground/10 focus-visible:bg-primary-foreground/15 focus-visible:outline-none sm:px-5'
+  'group inline-flex h-12 items-center gap-2.5 rounded-lg border bg-card px-4 text-sm font-medium transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:px-5'
 
 export default async function Home() {
   const community = await getCommunity()
@@ -59,16 +59,16 @@ export default async function Home() {
             Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
-          <div className="flex flex-col gap-3 pt-2">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 pt-4">
+            <p id="download-label" className="font-mono text-xs text-muted-foreground">
+              Download the desktop app
+            </p>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
               {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
-              <nav
-                aria-label="Download Cabal"
-                className="inline-flex h-11 divide-x divide-primary-foreground/20 overflow-hidden rounded-lg bg-primary text-primary-foreground"
-              >
+              <nav aria-labelledby="download-label" className="flex flex-wrap gap-2.5">
                 {platforms.map(({ name, href, Icon }) => (
                   <a key={name} href={href} aria-label={`Download for ${name}`} className={PLATFORM_BUTTON}>
-                    <Icon className="size-4" />
+                    <Icon className="size-4 text-primary transition-colors group-hover:text-primary-foreground" />
                     {name}
                   </a>
                 ))}
@@ -76,7 +76,7 @@ export default async function Home() {
               {githubUrl && (
                 <a
                   href={githubUrl}
-                  className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex items-center gap-2 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   <GithubIcon className="size-4" />
                   View on GitHub
@@ -84,7 +84,7 @@ export default async function Home() {
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              Free desktop app.{' '}
+              Free, always. Also available:{' '}
               <a
                 href="#download"
                 className="rounded text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
