@@ -1,0 +1,4 @@
+node_modules
+out/frames
+out/stills
+public/audio/*.wav
