@@ -5,11 +5,18 @@ export type TeamImageKind = 'logo' | 'banner'
 const BUCKET = 'team-images'
 const INPUT_MAX_BYTES = 20 * 1024 * 1024
 const OUTPUT_MAX_BYTES = 3 * 1024 * 1024
-// Logos are square; banners are cut to 4:1 so every team's header lines up.
+// One shape per kind, used for saving, cropping and every place it's shown, so
+// what an owner picks in the cropper is exactly what members see.
+export const TEAM_IMAGE_ASPECT: Record<TeamImageKind, number> = { logo: 1, banner: 6 }
 const SIZE: Record<TeamImageKind, { width: number; height: number }> = {
   logo: { width: 512, height: 512 },
-  banner: { width: 1600, height: 400 },
+  banner: { width: 2400, height: 400 },
 }
+// Below this many source pixels across, the picture is stretched on a big screen.
+export const SHARP_WIDTH: Record<TeamImageKind, number> = { logo: 200, banner: 1200 }
+
+// The part of the (orientation-corrected) image to keep, in its own pixels.
+export type CropArea = { x: number; y: number; width: number; height: number }
 
 export class TeamImageError extends Error {}
 
@@ -17,9 +24,24 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Prom
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality))
 }
 
-// Redrawn on this device: cropped to shape from the middle, shrunk, and left
-// without the camera/location data a photo carries.
-export async function prepareTeamImage(file: File, kind: TeamImageKind): Promise<Blob> {
+// Keeps the chosen part at exactly the kind's shape and inside the picture.
+export function fitCrop(crop: CropArea | null | undefined, imageWidth: number, imageHeight: number, ratio: number): CropArea {
+  let width = crop ? crop.width : imageWidth
+  let height = crop ? crop.height : imageHeight
+  width = Math.max(1, Math.min(width, imageWidth))
+  height = Math.max(1, Math.min(height, imageHeight))
+  if (width / height > ratio) width = height * ratio
+  else height = width / ratio
+  const cx = crop ? crop.x + crop.width / 2 : imageWidth / 2
+  const cy = crop ? crop.y + crop.height / 2 : imageHeight / 2
+  const x = Math.min(Math.max(0, cx - width / 2), imageWidth - width)
+  const y = Math.min(Math.max(0, cy - height / 2), imageHeight - height)
+  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }
+}
+
+// Redrawn on this device: cut to the chosen part (the middle if none), shrunk,
+// and left without the camera/location data a photo carries.
+export async function prepareTeamImage(file: File, kind: TeamImageKind, crop?: CropArea | null): Promise<Blob> {
   if (!file.type.startsWith('image/')) throw new TeamImageError('Pick an image file.')
   if (file.size > INPUT_MAX_BYTES) throw new TeamImageError('Pick an image under 20 MB.')
   let bitmap: ImageBitmap
@@ -30,13 +52,7 @@ export async function prepareTeamImage(file: File, kind: TeamImageKind): Promise
   }
   try {
     const target = SIZE[kind]
-    const ratio = target.width / target.height
-    let sw = bitmap.width
-    let sh = bitmap.height
-    if (sw / sh > ratio) sw = Math.round(sh * ratio)
-    else sh = Math.round(sw / ratio)
-    const sx = Math.round((bitmap.width - sw) / 2)
-    const sy = Math.round((bitmap.height - sh) / 2)
+    const { x: sx, y: sy, width: sw, height: sh } = fitCrop(crop, bitmap.width, bitmap.height, TEAM_IMAGE_ASPECT[kind])
     const scale = Math.min(1, target.width / sw)
     const canvas = document.createElement('canvas')
     canvas.width = Math.max(1, Math.round(sw * scale))
