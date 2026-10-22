@@ -23,6 +23,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Fails on a known high or critical advisory in anything that ships.
+      - run: pnpm audit --prod --audit-level high
       - run: pnpm typecheck
       # Live-database tests run only when a separate test project is configured as
       # repository secrets. Pull requests from forks never receive these secrets.
