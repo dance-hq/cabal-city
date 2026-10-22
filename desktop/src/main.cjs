@@ -845,6 +845,11 @@ app.on('window-all-closed', () => {
 })
 
 app.whenReady().then(() => {
+  // Windows saves the file path for "Launch at login". Re-save it so it follows
+  // the app when the file changes (Cabal.exe became cabal-desktop.exe).
+  if (process.platform === 'win32' && app.isPackaged && settings.launchAtLogin) {
+    app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] })
+  }
   Menu.setApplicationMenu(appMenu())
   lockDownSession()
   createTray()

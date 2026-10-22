@@ -36,8 +36,13 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "artifactName": "Cabal-${version}-mac-${arch}.${ext}"
     },
-    "win": { "target": [{ "target": "nsis", "arch": ["x64", "arm64"] }] },
-    "nsis": { "oneClick": true, "perMachine": false, "artifactName": "Cabal-${version}-windows-setup.${ext}" },
+    "win": { "executableName": "cabal-desktop", "target": [{ "target": "nsis", "arch": ["x64", "arm64"] }] },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "include": "build/installer.nsh",
+      "artifactName": "Cabal-${version}-windows-setup.${ext}"
+    },
     "linux": {
       "target": ["AppImage", "deb"],
       "category": "Network;Chat",

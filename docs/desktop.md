@@ -59,4 +59,4 @@ macOS auto-update only works for signed builds. That's an Apple rule.
 | `WINDOWS_PUBLISHER_NAME` | variable | The name on the certificate, exactly as validated (e.g. `Dance Technologies Inc.`) |
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | secrets | An app registration with the *Artifact Signing Certificate Profile Signer* role on the profile |
 
-Setting `AZURE_SIGNING_ENDPOINT` turns signing on. From then on, a release with any of the others missing, or one whose `Cabal.exe` doesn't come out validly signed by that publisher, fails before anything is uploaded. Signed installs only accept updates signed by the same publisher, so never go back to unsigned or change the publisher name.
+Setting `AZURE_SIGNING_ENDPOINT` turns signing on. From then on, a release with any of the others missing, or one whose `cabal-desktop.exe` doesn't come out validly signed by that publisher, fails before anything is uploaded. Signed installs only accept updates signed by the same publisher, so never go back to unsigned or change the publisher name.
