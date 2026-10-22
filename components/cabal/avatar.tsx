@@ -17,6 +17,7 @@ export function Avatar({
   status,
   lockedIn,
   className,
+  dotRingClassName,
 }: {
   name: string
   url?: string | null
@@ -25,6 +26,8 @@ export function Avatar({
   // Draws the gold ring around the avatar (see .locked-in in globals.css).
   lockedIn?: boolean
   className?: string
+  // The status dot is ringed in the color of whatever the avatar sits on.
+  dotRingClassName?: string
 }) {
   const dim = status === 'offline'
   const ring = size >= 48 ? 2.5 : size >= 26 ? 2 : 1.5
@@ -58,8 +61,12 @@ export function Avatar({
       {status && (
         <StatusDot
           status={status}
-          className="absolute -right-0.5 -bottom-0.5 z-[1] ring-2 ring-sidebar"
-          size={size >= 40 ? 12 : 9}
+          className={cn(
+            'absolute z-[1]',
+            size >= 64 ? 'right-0.5 bottom-0.5 ring-[3px]' : '-right-0.5 -bottom-0.5 ring-2',
+            dotRingClassName ?? 'ring-sidebar',
+          )}
+          size={size >= 64 ? 16 : size >= 40 ? 12 : 9}
         />
       )}
     </span>

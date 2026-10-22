@@ -34,20 +34,14 @@ export function LockInProfile({ personId, self }: { personId: string; self: bool
         <p className="text-sm leading-relaxed text-muted-foreground">No sessions yet. Tap Lock in when you start working.</p>
       ) : (
         <>
-          <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm leading-relaxed">
-            <span className="whitespace-nowrap">
-              <span className="font-mono font-medium tabular-nums">{hours(stats.weekSeconds)}</span>
-              <span className="text-muted-foreground"> this week</span>
-            </span>
-            <span className="whitespace-nowrap">
-              <span className="font-mono font-medium tabular-nums">{hours(stats.allSeconds)}</span>
-              <span className="text-muted-foreground"> all time</span>
-            </span>
-            <span className="whitespace-nowrap text-muted-foreground">
-              {stats.sessions} session{stats.sessions === 1 ? '' : 's'}
-            </span>
-          </p>
-          <WeekStrip stats={stats} className="max-w-56" />
+          <div className="flex flex-col gap-3 rounded-lg border p-3">
+            <dl className="grid grid-cols-3 gap-3">
+              <Figure value={hours(stats.weekSeconds)} label="This week" />
+              <Figure value={hours(stats.allSeconds)} label="All time" />
+              <Figure value={String(stats.sessions)} label={stats.sessions === 1 ? 'Session' : 'Sessions'} />
+            </dl>
+            <WeekStrip stats={stats} />
+          </div>
         </>
       )}
       {self && stats.recent.length > 0 && (
@@ -72,6 +66,15 @@ export function LockInProfile({ personId, self }: { personId: string; self: bool
         <p className="text-xs leading-relaxed text-muted-foreground">Only you see this. You can share it from the Lock in menu.</p>
       )}
     </section>
+  )
+}
+
+function Figure({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col-reverse gap-0.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-mono text-lg leading-none font-semibold tabular-nums">{value}</dd>
+    </div>
   )
 }
 
