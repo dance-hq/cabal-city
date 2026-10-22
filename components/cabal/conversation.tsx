@@ -325,7 +325,7 @@ function OpenConversation({
         <Composer
           channelId={channel.id}
           placeholder={placeholder}
-          onSend={(body) => send(channel.id, body)}
+          onSend={(body, files) => send(channel.id, body, undefined, files)}
           onTyping={ping}
           onStopTyping={stop}
           disabled={isBlocked || !!dmBlock}

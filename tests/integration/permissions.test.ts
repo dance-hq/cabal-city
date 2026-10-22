@@ -13,13 +13,17 @@ import {
   newDeviceOffer,
   newKeyPair,
   newRecoveryKey,
+  openFile,
+  openFileMeta,
   openLongText,
   openMessage,
   packKeyring,
+  sealFile,
   sealLongText,
   sealMessage,
 } from '@/lib/e2ee/crypto'
 import { charCount, longBody, packPreview, previewOf, unpackPreview } from '@/lib/long-text'
+import { attachmentPath } from '@/lib/attachments'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -33,6 +37,7 @@ const tag = Math.random().toString(36).slice(2, 8)
 const slug = `cabal-test-${tag}`
 const admin = run ? createClient(url!, service!, { auth: { persistSession: false } }) : (null as never)
 const people: Person[] = []
+const uploads: string[] = []
 let communityId = ''
 
 async function person(name: string): Promise<Person> {
@@ -115,6 +120,7 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
   })
 
   afterAll(async () => {
+    if (uploads.length) await admin.storage.from('attachments').remove(uploads)
     // Rooms, teams, DMs, members and their messages all go with the community.
     await admin.from('communities').delete().eq('slug', slug)
     for (const p of people) {
@@ -720,6 +726,111 @@ describe.skipIf(!run)('permissions and messaging (live database)', () => {
     await grace.db.rpc('presence_heartbeat', { p_session: session, p_community: communityId })
     await grace.db.rpc('presence_leave', { p_session: session })
     expect((await ada.db.from('presence_sessions').select('id').eq('user_id', grace.id)).data).toEqual([])
+  })
+
+  it('shares a photo in a room only once a message claims it, and stops when it is deleted', async () => {
+    const { data: lobby } = await grace.db.from('channels').select('id').eq('community_id', communityId).eq('slug', 'lobby').single()
+    const id = crypto.randomUUID()
+    const fileId = crypto.randomUUID()
+    const path = attachmentPath(lobby!.id, id, fileId)
+    uploads.push(path)
+    const photo = new Blob([crypto.getRandomValues(new Uint8Array(2048))], { type: 'image/png' })
+    expect((await grace.db.storage.from('attachments').upload(path, photo, { contentType: 'image/png' })).error).toBeNull()
+
+    // Nobody else can read it until a message claims it.
+    expect((await ada.db.storage.from('attachments').createSignedUrl(path, 60)).error).not.toBeNull()
+
+    // A message can't claim files that never arrived.
+    const missing = await grace.db.rpc('send_message_with_files', {
+      p_id: crypto.randomUUID(),
+      p_channel: lobby!.id,
+      p_body: 'look',
+      p_sealed: null,
+      p_files: [{ id: crypto.randomUUID(), path: `${lobby!.id}/x/y`, kind: 'image', mime: 'image/png', name: 'a.png' }],
+    })
+    expect(missing.error).not.toBeNull()
+    // Nor can a plain insert say it has files.
+    expect((await grace.db.from('messages').insert({ channel_id: lobby!.id, author_id: grace.id, body: 'hi', files: 1 })).error).not.toBeNull()
+
+    const sent = await grace.db
+      .rpc('send_message_with_files', {
+        p_id: id,
+        p_channel: lobby!.id,
+        p_body: '',
+        p_sealed: null,
+        p_files: [{ id: fileId, path, kind: 'image', mime: 'image/png', name: 'board.png', width: 40, height: 30 }],
+      })
+      .select('id, body, files')
+      .single()
+    expect(sent.error).toBeNull()
+    expect(sent.data).toMatchObject({ body: '', files: 1 })
+
+    const rows = await ada.db.from('message_files').select('path, bytes, kind, name').eq('message_id', id)
+    expect(rows.data).toEqual([{ path, bytes: 2048, kind: 'image', name: 'board.png' }])
+    const link = await ada.db.storage.from('attachments').createSignedUrl(path, 60)
+    expect(link.error).toBeNull()
+    expect((await fetch(link.data!.signedUrl)).status).toBe(200)
+
+    expect((await grace.db.rpc('delete_message', { p_message: id })).error).toBeNull()
+    expect((await ada.db.from('message_files').select('id').eq('message_id', id)).data).toEqual([])
+    expect((await ada.db.storage.from('attachments').createSignedUrl(path, 60)).error).not.toBeNull()
+  })
+
+  it('sends a DM photo the server stores but cannot read', async () => {
+    const mine = keys.get(ada.id)!
+    const theirs = keys.get(grace.id)!
+    const id = crypto.randomUUID()
+    const fileId = crypto.randomUUID()
+    const ctx = { channelId: dmId, messageId: id, authorId: ada.id, sk: mine.id, rk: theirs.id }
+    const conversation = await conversationKey(mine.pair.privateKey, theirs.pair.publicKey)
+    const bytes = crypto.getRandomValues(new Uint8Array(4096))
+    const meta = { name: 'secret-plan.jpg', mime: 'image/jpeg', kind: 'image' as const, width: 800, height: 600 }
+    const file = await sealFile(conversation, ctx, fileId, bytes, meta)
+    const path = attachmentPath(dmId, id, fileId)
+    uploads.push(path)
+
+    // Encrypted files must be stored as opaque bytes.
+    const asPhoto = await ada.db.storage
+      .from('attachments')
+      .upload(path, new Blob([file.cipher], { type: 'image/jpeg' }), { contentType: 'image/jpeg' })
+    expect(asPhoto.error).toBeNull()
+    const refused = await ada.db.rpc('send_message_with_files', {
+      p_id: id,
+      p_channel: dmId,
+      p_body: '',
+      p_sealed: await sealMessage(conversation, ctx, ''),
+      p_files: [{ id: fileId, path, sealed: file.sealed }],
+    })
+    expect(refused.error).not.toBeNull()
+    await ada.db.storage.from('attachments').remove([path])
+
+    const up = await ada.db.storage
+      .from('attachments')
+      .upload(path, new Blob([file.cipher], { type: 'application/octet-stream' }), { contentType: 'application/octet-stream' })
+    expect(up.error).toBeNull()
+    const sent = await ada.db.rpc('send_message_with_files', {
+      p_id: id,
+      p_channel: dmId,
+      p_body: '',
+      p_sealed: await sealMessage(conversation, ctx, 'the plan'),
+      p_files: [{ id: fileId, path, sealed: file.sealed }],
+    })
+    expect(sent.error).toBeNull()
+
+    const row = await grace.db.from('message_files').select('id, kind, mime, name, sealed').eq('message_id', id).single()
+    expect(row.data).toMatchObject({ kind: null, mime: null, name: null })
+    expect(JSON.stringify(row.data)).not.toContain('secret-plan')
+
+    const download = await grace.db.storage.from('attachments').download(path)
+    expect(download.error).toBeNull()
+    const g = keys.get(grace.id)!
+    const theirConversation = await conversationKey(g.pair.privateKey, mine.pair.publicKey)
+    const opened = await openFileMeta(theirConversation, ctx, fileId, row.data!.sealed)
+    expect(opened).toMatchObject(meta)
+    expect(await openFile(theirConversation, ctx, fileId, opened, new Uint8Array(await download.data!.arrayBuffer()))).toEqual(bytes)
+
+    expect((await outsider.db.storage.from('attachments').download(path)).error).not.toBeNull()
+    expect((await outsider.db.from('message_files').select('id').eq('message_id', id)).data).toEqual([])
   })
 
   it('blocks DMs between people who blocked each other', async () => {

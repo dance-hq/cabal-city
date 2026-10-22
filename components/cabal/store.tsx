@@ -16,11 +16,13 @@ import { personLabel } from '@/lib/mentions'
 import { mentions, plainText } from '@/lib/text'
 import { charCount, isLong, previewOf, titleOf } from '@/lib/long-text'
 import { linkLabel } from '@/lib/channel-links'
+import { AttachmentError, attachmentPath, filesLabel, releaseLocal, removeUploads, upload } from '@/lib/attachments'
 import { useE2ee } from './e2ee-provider'
 import type {
   Availability,
   Channel,
   Community,
+  LocalFile,
   Message,
   PresenceSession,
   Profile,
@@ -71,7 +73,7 @@ type Store = {
   openDm(userId: string): Promise<void>
   markRead(channelId: string): void
   outbox: Record<string, Message[]>
-  send(channelId: string, body: string, retryId?: string): Promise<boolean>
+  send(channelId: string, body: string, retryId?: string, files?: LocalFile[]): Promise<boolean>
   discard(channelId: string, id: string): void
   refreshChannels(): void
   refreshMembers(): void
@@ -100,7 +102,7 @@ export function isView(id: string | null | undefined): id is View {
 }
 
 export const messagesKey = (channelId: string) => ['messages', channelId] as const
-export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, long_text, long_chars, created_at, deleted_at'
+export const MESSAGE_COLUMNS = 'id, channel_id, author_id, kind, body, sealed, long_text, long_chars, files, created_at, deleted_at'
 
 // Keeps a conversation in time order when an incoming message took a moment to open.
 function insertInOrder(list: Message[], m: Message): Message[] {
@@ -276,10 +278,12 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   // --- sending ----------------------------------------------------------------
 
   const send = useCallback(
-    async (channelId: string, text: string, retryId?: string) => {
+    async (channelId: string, text: string, retryId?: string, attachments?: LocalFile[]) => {
       const id = retryId ?? crypto.randomUUID()
+      const files = attachments ?? []
       // Too big to read comfortably inline: sent whole, shown as a card that opens in a reader.
-      const long = isLong(text)
+      // (The composer sends files and a long text as two messages.)
+      const long = files.length === 0 && isLong(text)
       const body = long ? previewOf(text) : text
       const longFields = long ? { long_text: true, long_chars: charCount(text), long_body: text } : {}
       const draft: Message = {
@@ -289,6 +293,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
         kind: 'user',
         body,
         ...longFields,
+        ...(files.length ? { files: files.length, local_files: files } : {}),
         created_at: new Date().toISOString(),
         deleted_at: null,
         pending: true,
@@ -303,7 +308,64 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       // Direct messages are sealed here, on this device; the server only ever sees the sealed text.
       const dm = live.current.channels.find((c) => c.id === channelId)?.kind === 'dm'
       const peer = live.current.channels.find((c) => c.id === channelId)?.other_user_id ?? null
+      let uploaded: string[] = []
       const insert = async () => {
+        if (files.length) {
+          // Each attempt uploads under fresh ids, so a retry never meets half of an earlier one.
+          removeUploads(uploaded)
+          const ids = files.map(() => crypto.randomUUID())
+          const paths = ids.map((fid) => attachmentPath(channelId, id, fid))
+          uploaded = paths
+          if (dm) {
+            const sealed = await e2ee.sealWithFiles(
+              channelId,
+              id,
+              peer ?? '',
+              body,
+              await Promise.all(
+                files.map(async (f, i) => ({
+                  id: ids[i],
+                  bytes: new Uint8Array(await f.blob.arrayBuffer()),
+                  meta: { name: f.name, mime: f.mime, kind: f.kind, width: f.width, height: f.height },
+                })),
+              ),
+            )
+            await Promise.all(
+              sealed.files.map((f, i) =>
+                upload(paths[i], new Blob([new Uint8Array(f.cipher)], { type: 'application/octet-stream' }), 'application/octet-stream'),
+              ),
+            )
+            return supabase
+              .rpc('send_message_with_files', {
+                p_id: id,
+                p_channel: channelId,
+                p_body: '',
+                p_sealed: sealed.message,
+                p_files: sealed.files.map((f, i) => ({ id: ids[i], path: paths[i], sealed: f.sealed })),
+              })
+              .select(MESSAGE_COLUMNS)
+              .single()
+          }
+          await Promise.all(files.map((f, i) => upload(paths[i], f.blob, f.mime)))
+          return supabase
+            .rpc('send_message_with_files', {
+              p_id: id,
+              p_channel: channelId,
+              p_body: body,
+              p_sealed: null,
+              p_files: files.map((f, i) => ({
+                id: ids[i],
+                path: paths[i],
+                kind: f.kind,
+                mime: f.mime,
+                name: f.name,
+                width: f.width,
+                height: f.height,
+              })),
+            })
+            .select(MESSAGE_COLUMNS)
+            .single()
+        }
         if (long) {
           // One call writes the preview and the full text together, or neither.
           const sealed = dm ? await e2ee.sealLong(channelId, id, peer ?? '', text) : null
@@ -334,12 +396,14 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
           result = await insert()
         }
       } catch (err) {
+        removeUploads(uploaded)
         fail()
-        toast.error(friendlyError(err))
+        toast.error(err instanceof AttachmentError ? err.message : friendlyError(err))
         return false
       }
       const { data, error } = result
       if (error && error.code !== '23505') {
+        removeUploads(uploaded)
         fail()
         if (error.code === 'P0429' || error.code === 'P0409' || error.code === '22023') toast.error(error.message)
         return false
@@ -347,12 +411,14 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       if (data) {
         const row = data as Message
         const sent: Message = { ...row, ...(dm ? { body, e2ee: 'ok' as const } : {}), ...longFields }
+        // The sender keeps showing the pictures from memory; nothing to download back.
+        if (files.length) sent.local_files = files
         mutate(
           messagesKey(channelId),
           (cur?: Message[]) => {
             if (!cur) return cur
             // Realtime may have delivered it first; keep this device's full copy of a long message.
-            if (long && cur.some((m) => m.id === id)) return cur.map((m) => (m.id === id ? { ...m, ...sent } : m))
+            if ((long || files.length) && cur.some((m) => m.id === id)) return cur.map((m) => (m.id === id ? { ...m, ...sent } : m))
             return insertInOrder(cur, sent)
           },
           { revalidate: false },
@@ -366,7 +432,10 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   )
 
   const discard = useCallback((channelId: string, id: string) => {
-    setOutbox((o) => ({ ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }))
+    setOutbox((o) => {
+      releaseLocal((o[channelId] ?? []).find((m) => m.id === id)?.local_files)
+      return { ...o, [channelId]: (o[channelId] ?? []).filter((m) => m.id !== id) }
+    })
   }, [])
 
   // --- settings ---------------------------------------------------------------
@@ -544,6 +613,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
           body:
   m.sealed && m.e2ee !== 'ok'
   ? 'New encrypted message'
+  : !m.body && m.files
+  ? filesLabel(m.files)
   : m.long_text
   ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels), people)}`
   : plainText(m.body, linkLabel(live.current.channels), people),

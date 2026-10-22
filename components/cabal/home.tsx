@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { compareByPresence } from '@/lib/presence'
 import { ago } from '@/lib/time'
 import { plainText } from '@/lib/text'
+import { filesLabel } from '@/lib/attachments'
 import { linkLabel } from '@/lib/channel-links'
 import { personLabel } from '@/lib/mentions'
 import { useLockIns } from '@/hooks/use-lock-ins'
@@ -206,6 +207,8 @@ function Recent({ channels, loading, now }: { channels: Channel[]; loading: bool
                             {!dm || author === 'You' ? `${author ?? 'Someone'}: ` : ''}
                             {m.sealed && m.e2ee !== 'ok' ? (
                               <span className="italic">Encrypted message</span>
+                            ) : !m.body && m.files ? (
+                              <span className="italic">{filesLabel(m.files)}</span>
                             ) : (
                               plainText(m.body, linkLabel(all), personLabel(profileById))
                             )}

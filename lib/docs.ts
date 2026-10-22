@@ -116,8 +116,13 @@ export const STACK: Fact[] = [
   {
     label: 'Files',
     value: 'Supabase Storage',
-    body: 'One `avatars` bucket. A storage policy limits each user to writing inside their own folder.',
-    sources: [{ path: 'lib/avatar.ts' }, { path: SCHEMA, proves: ['(storage.foldername(name))[1] = auth.uid()::text'] }],
+    body: 'A public `avatars` bucket, where each user writes only inside their own folder, and a private `attachments` bucket for photos and videos. An attachment is readable only once a message claims it, and only by people who can read that conversation, through short-lived signed links. Photos are redrawn on the sender’s device first, which drops location and camera details.',
+    sources: [
+      { path: 'lib/avatar.ts' },
+      { path: SCHEMA, proves: ['(storage.foldername(name))[1] = auth.uid()::text'] },
+      { path: 'lib/attachments.ts', proves: ['createSignedUrls', "imageOrientation: 'from-image'"] },
+      { path: 'supabase/migrations/0021_message_files.sql', proves: ['public.can_read_attachment(name)'] },
+    ],
   },
   {
     label: 'Email',
@@ -614,6 +619,7 @@ export const KEY_CARE: Fact[] = [
 
 export const ENCRYPTION_SCOPE: string[] = [
   'Rooms and team channels aren’t end-to-end encrypted. They’re protected by TLS and RLS, and the people who run a Cabal server can read them.',
+  'Photos and videos in direct messages are encrypted on your device before they upload, each under its own key, with their name and type sealed alongside. Their size isn’t hidden.',
   'Metadata isn’t hidden: who talks to whom, when, and the padded size of each message all pass through the server so delivery and unread counts work.',
   'Keys live only on your devices and in your recovery-key backup. Lose every device and the recovery key, and nobody can recover those messages. Clearing a browser’s site data deletes its keys.',
 ]
