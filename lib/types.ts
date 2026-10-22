@@ -25,6 +25,12 @@ export type Settings = {
   lock_in_live: boolean
   // Be on the weekly board and share my Lock in numbers on my profile.
   lock_in_board: boolean
+  // The one-time welcome has been shown.
+  welcome_seen: boolean
+  // Playbook items ticked by hand (see lib/playbook.ts).
+  playbook_done: string[]
+  // The Playbook card is tucked away on Home.
+  playbook_hidden: boolean
 }
 
 export type Community = {

@@ -14,6 +14,7 @@ import { LockInControl } from './session-bar'
 import { STATUS_LABEL } from './status-dot'
 import { TeamIcon, TeamManageDialog } from './team-dialogs'
 import { TeamWelcome } from './team-welcome'
+import { LaunchesNote } from './playbook'
 import { InviteToTeamDialog, TeamInviteNudge, canInvite } from './team-invite'
 import { useCabal } from './store'
 import { useE2ee } from './e2ee-provider'
@@ -300,6 +301,7 @@ function OpenConversation({
           />
         )}
         {invitable && <TeamInviteNudge channel={channel} onInvite={() => setInviting(true)} />}
+        {channel.kind === 'room' && channel.slug === 'launches' && <LaunchesNote />}
 
         <MessageList
           channel={channel}

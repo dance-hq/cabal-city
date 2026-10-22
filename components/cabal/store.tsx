@@ -85,6 +85,8 @@ type Store = {
   showProfile(id: string | null): void
   settingsOpen: boolean
   setSettingsOpen(open: boolean): void
+  playbookOpen: boolean
+  setPlaybookOpen(open: boolean): void
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -130,6 +132,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   const [outbox, setOutbox] = useState<Record<string, Message[]>>({})
   const [profileOpen, showProfile] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [playbookOpen, setPlaybookOpen] = useState(false)
   const [sessions, setSessions] = useState<Map<string, PresenceSession>>(new Map())
   const [now, setNow] = useState(() => Date.now())
 
@@ -892,6 +895,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
     showProfile,
     settingsOpen,
     setSettingsOpen,
+    playbookOpen,
+    setPlaybookOpen,
   }
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
