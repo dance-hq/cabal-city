@@ -30,10 +30,21 @@ export const CUE = {
   cal: { header: 6, rows: [16, 34], add: 66, headline: 12, sub: 50 },
   open: { headline: 8, typeFrom: 24, license: 66, sub: 76 },
   // Finale: star windows light from the middle out, the hit turns them red.
-  finale: { gather: 18, hit: 120, solid: 128, shrink: 142, word: 150, tagline: 186, stripes: 214, place: 228 },
+  finale: { gather: 18, hit: 120, solid: 128, shrink: 140, word: 164, tagline: 194, stripes: 218, place: 232 },
 } as const
 
 export const FOCUS_TEXT = 'Pricing page for the beta'
+
+// The teaser is a cut of the master: [source start, source end] pairs played
+// back to back. Picture and sound both read this list.
+export const TEASER_CUTS: [number, number][] = [
+  [84, 150],
+  [196, 300],
+  // 465 keeps the music on the beat across the next join (540 → 1260 is 48 beats).
+  [465, 540],
+  [1260, 1440],
+]
+export const TEASER_LENGTH = TEASER_CUTS.reduce((n, [a, b]) => n + b - a, 0)
 
 // Noise: when each notification lands (scene-local), denser toward the cut.
 export const NOISE_COUNT = 46

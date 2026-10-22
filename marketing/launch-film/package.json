@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "studio": "remotion studio src/index.ts",
-    "score": "node scripts/score.mjs",
+    "studio": "node scripts/score.ts && remotion studio src/index.ts",
+    "score": "node scripts/score.ts",
     "render": "node scripts/render.mjs"
   },
   "dependencies": {

@@ -9,7 +9,9 @@ import { OpenSource } from './scenes/open-source'
 import { Opportunities } from './scenes/opportunities'
 import { Together } from './scenes/together'
 import { C } from './theme'
-import { SCENES, type SceneName } from './timeline'
+import { SCENES, TEASER_CUTS, type SceneName } from './timeline'
+
+export { TEASER_LENGTH } from './timeline'
 
 const PARTS: Record<SceneName, () => React.JSX.Element> = {
   noise: Noise,
@@ -41,27 +43,16 @@ export function FilmPicture() {
   )
 }
 
-export function Film({ audio }: { audio: string }) {
+export function Film({ audio }: { audio: string | null }) {
   return (
     <>
       <FilmPicture />
-      <Audio src={staticFile(audio)} />
+      {audio ? <Audio src={staticFile(audio)} /> : null}
     </>
   )
 }
 
-// A cut of the master: [source start, source end] pairs played back to back,
-// each starting on its own frame of the master's clock.
-export const TEASER_CUTS: [number, number][] = [
-  [84, 150],
-  [196, 300],
-  [470, 540],
-  [1260, 1440],
-]
-
-export const TEASER_LENGTH = TEASER_CUTS.reduce((n, [a, b]) => n + b - a, 0)
-
-export function Teaser({ audio }: { audio: string }) {
+export function Teaser({ audio }: { audio: string | null }) {
   let at = 0
   return (
     <AbsoluteFill style={{ background: C.ink }}>
@@ -76,7 +67,7 @@ export function Teaser({ audio }: { audio: string }) {
           </Sequence>
         )
       })}
-      <Audio src={staticFile(audio)} />
+      {audio ? <Audio src={staticFile(audio)} /> : null}
     </AbsoluteFill>
   )
 }

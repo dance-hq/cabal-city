@@ -29,7 +29,7 @@ export function Finale() {
   const small = { cx: left + STAR_X * k, cy: top + STAR_Y * k, r: STAR_R * k }
 
   const solid = p(f, c.solid, 8)
-  const shrink = p(f, c.shrink, 34, inOut)
+  const shrink = p(f, c.shrink, 26, inOut)
   const cx = mix(big.cx, small.cx, shrink)
   const cy = mix(big.cy, small.cy, shrink)
   const r = mix(big.r, small.r, shrink)
