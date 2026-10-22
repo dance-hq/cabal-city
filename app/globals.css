@@ -171,6 +171,12 @@
   html {
     @apply bg-background;
   }
+  /* The homepage's Download button glides down to the downloads section. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:has(#download) {
+      scroll-behavior: smooth;
+    }
+  }
   body {
     @apply bg-background text-foreground font-sans;
   }

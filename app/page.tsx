@@ -7,7 +7,6 @@ import { onlineCount } from '@/lib/online-count'
 import { latestRelease } from '@/lib/releases'
 import { githubUrl } from '@/lib/config'
 import { GithubIcon } from '@/components/brand/github-icon'
-import { AppleIcon, WindowsIcon } from '@/components/brand/platform-icons'
 import { ChicagoFlag } from '@/components/marketing/chicago-flag'
 import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
@@ -22,14 +21,14 @@ export const metadata: Metadata = {
   openGraph: { type: 'website', siteName: 'cabal.city', description: SITE_DESCRIPTION, locale: 'en_US', url: '/' },
 }
 
-const PLATFORM_BUTTON =
-  'group flex items-center gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:gap-3 sm:pr-4'
+const PRIMARY_BUTTON =
+  'inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none'
+
+const OUTLINE_BUTTON =
+  'inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 const OPEN_SOURCE =
   'rounded-sm font-medium text-foreground underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
-
-const GITHUB_TILE =
-  'group flex items-center gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-foreground/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none col-span-2 sm:gap-3 sm:pr-4'
 
 const SECONDARY_LINK =
   'group inline-flex items-center gap-1.5 rounded text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
@@ -37,14 +36,6 @@ const SECONDARY_LINK =
 export default async function Home() {
   const community = await getCommunity()
   const [release, online] = await Promise.all([latestRelease(), community ? onlineCount(community.id) : null])
-  // Straight to the installer when the release has one (Mac = Apple Silicon); otherwise the
-  // downloads section further down, which also has Linux.
-  const installer = (files: 'windows' | 'mac') =>
-    (release.state === 'ready' && release[files][0]?.url) || '#download'
-  const platforms = [
-    { name: 'Windows', href: installer('windows'), Icon: WindowsIcon },
-    { name: 'Mac', href: installer('mac'), Icon: AppleIcon },
-  ]
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -78,39 +69,19 @@ export default async function Home() {
             things, see who&rsquo;s around, and build alongside them.
           </p>
           <div className="flex flex-col items-start gap-4 pt-2">
-          <div className="grid w-full grid-cols-2 gap-2.5 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-            {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
-            {platforms.map(({ name, href, Icon }) => (
-              <a key={name} href={href} className={PLATFORM_BUTTON}>
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                  <Icon className="size-5" />
-                </span>
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-mono text-xs text-muted-foreground">Download for</span>
-                  <span className="text-base font-semibold leading-tight">{name}</span>
-                </span>
-                <ArrowDownToLine
-                  className="ml-3 hidden size-4 text-muted-foreground transition-colors group-hover:text-primary sm:block"
-                  aria-hidden
-                />
+            <div className="flex flex-wrap gap-3">
+              {/* A plain anchor: next/link ignores a click when the URL already ends in #download. */}
+              <a href="#download" className={PRIMARY_BUTTON}>
+                <ArrowDownToLine className="size-4" aria-hidden />
+                Download
               </a>
-            ))}
-            {githubUrl && (
-              <a href={githubUrl} className={GITHUB_TILE}>
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-foreground">
-                  <GithubIcon className="size-5" />
-                </span>
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-mono text-xs text-muted-foreground">View on</span>
-                  <span className="text-base font-semibold leading-tight">GitHub</span>
-                </span>
-                <ArrowUpRight
-                  className="ml-3 hidden size-4 text-muted-foreground transition-colors group-hover:text-foreground sm:block"
-                  aria-hidden
-                />
-              </a>
-            )}
-          </div>
+              {githubUrl && (
+                <a href={githubUrl} className={OUTLINE_BUTTON}>
+                  <GithubIcon className="size-4" aria-hidden />
+                  View on GitHub
+                </a>
+              )}
+            </div>
             <Link href="/login" className={`${SECONDARY_LINK} text-foreground`}>
               Or open Cabal in your browser
               <ArrowUpRight
