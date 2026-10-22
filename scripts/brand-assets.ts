@@ -92,15 +92,25 @@ const star = (cx: number, cy: number, r: number, fill: string = BRAND.star) =>
 const svg = (w: number, h: number, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${body}</svg>`
 
-// A rounded tile with the star, the app icon. `pad` leaves room around the tile
-// (macOS expects its icons inset inside the 1024 canvas).
-const tile = (size: number, { pad = 0, radius = 0.225, starScale = 0.31 } = {}) => {
+// The app icon is the 🔮 (Noto Emoji art, Apache 2.0, assets/brand/crystal-ball.svg);
+// the star stays the logo on the site, in the logo files and in the tray.
+const ballSvg = readFileSync(out('assets/brand/crystal-ball.svg'), 'utf8').replace(/<!--[\s\S]*?-->\s*/g, '')
+const ball = (x: number, y: number, size: number) =>
+  ballSvg.replace('<svg ', `<svg x="${x}" y="${y}" width="${size}" height="${size}" `)
+
+// The ball on its own, edge to edge, for browser tabs.
+const ballIcon = (size: number) => svg(size, size, ball(0, 0, size))
+
+// The ball on the ink tile, for home screens and the desktop app. `pad` leaves room
+// around the tile (macOS expects its icons inset inside the 1024 canvas).
+const ballTile = (size: number, { pad = 0, radius = 0.225, ballScale = 0.72 } = {}) => {
   const inner = size - pad * 2
+  const b = inner * ballScale
   return svg(
     size,
     size,
     `<rect x="${pad}" y="${pad}" width="${inner}" height="${inner}" rx="${inner * radius}" fill="${BRAND.ink}"/>` +
-      star(size / 2, size / 2, inner * starScale),
+      ball((size - b) / 2, (size - b) / 2, b),
   )
 }
 
@@ -128,18 +138,18 @@ const write = (file: string, text: string) => {
 }
 
 // --- browser + home screen -------------------------------------------------------
-const favicon = tile(32, { radius: 0.25, starScale: 0.36 })
+const favicon = ballIcon(32)
 write('public/icon.svg', favicon)
 png('public/icon-32.png', favicon, 32)
-png('public/apple-icon.png', tile(180, { radius: 0, starScale: 0.3 }), 180) // iOS rounds it
-png('public/cabal-icon.png', tile(256), 256)
+png('public/apple-icon.png', ballTile(180, { radius: 0 }), 180) // iOS rounds it
+png('public/cabal-icon.png', ballTile(256), 256)
 
 // --- downloadable logo files -------------------------------------------------------
 write('public/brand/cabal-city-on-dark.svg', lockupSvg(BRAND.cityOnInk, BRAND.paper, BRAND.ink))
 write('public/brand/cabal-city-on-light.svg', lockupSvg(BRAND.cityOnPaper, BRAND.ink, BRAND.paper))
 write('public/brand/cabal-city-transparent.svg', lockupSvg(BRAND.cityOnPaper, BRAND.ink))
-write('public/brand/app-icon.svg', tile(512))
-png('public/brand/app-icon.png', tile(512), 1024)
+write('public/brand/app-icon.svg', ballTile(512))
+png('public/brand/app-icon.png', ballTile(512), 1024)
 png(
   'public/brand/avatar.png',
   svg(400, 400, `<circle cx="200" cy="200" r="200" fill="${BRAND.ink}"/>${star(200, 200, 118)}`),
@@ -147,7 +157,7 @@ png(
 )
 
 // --- desktop app -------------------------------------------------------------------
-png('desktop/build/icon.png', tile(1024, { pad: 100, radius: 0.225, starScale: 0.31 }), 1024)
+png('desktop/build/icon.png', ballTile(1024, { pad: 100, radius: 0.225 }), 1024)
 const trayStar = (fill: string) => svg(32, 32, star(16, 16, 15.5, fill))
 png('desktop/build/tray.png', trayStar(BRAND.star), 16)
 png('desktop/build/tray@2x.png', trayStar(BRAND.star), 32)

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { CabalStar } from '@/components/brand/logo'
 import { Avatar } from './avatar'
 import { MeCard } from './me-card'
 import { SessionBar } from './session-bar'
@@ -214,9 +215,10 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             type="button"
             onClick={() => open(null)}
             title="Home"
-            className="-ml-1 truncate rounded px-1 font-mono text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="-ml-1 flex min-w-0 items-center gap-1.5 rounded px-1 font-mono text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {community.name}
+            <CabalStar className="size-3.5" />
+            <span className="truncate">{community.name}</span>
           </button>
         )}
         <div className="flex shrink-0 items-center gap-0.5">
