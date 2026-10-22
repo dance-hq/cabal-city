@@ -10,6 +10,7 @@ import { HEARTBEAT_MS } from '@/lib/config'
 import { desktop } from '@/lib/desktop'
 import { friendlyError } from '@/lib/errors'
 import { playChime, showNotification } from '@/lib/notify'
+import { showDmToast } from './dm-toast'
 import { foldPresence, type UserPresence } from '@/lib/presence'
 import { listenForPopouts, viewedInPopout } from '@/lib/popout'
 import { personLabel } from '@/lib/mentions'
@@ -183,6 +184,8 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   // Keep the newest values reachable from long-lived realtime callbacks.
   const live = useRef({ channels, profiles, settings, me, active, visible: true })
   live.current = { ...live.current, channels, profiles, settings, me, active }
+  // Who last DMed you while Cabal was in the background (drives the tab title).
+  const [attention, setAttention] = useState<string | null>(null)
 
   // SWR's bound mutate functions are stable; the query objects are not.
   const mutateChannels = channelsQuery.mutate
@@ -255,6 +258,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   const readTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const markRead = useCallback(
     (channelId: string) => {
+      toast.dismiss(`dm:${channelId}`)
       mutate(
         ['channels', community.id],
         (cur?: Channel[]) => cur?.map((c) => (c.id === channelId ? { ...c, unread: 0, last_read_at: new Date().toISOString() } : c)),
@@ -608,19 +612,34 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
       const people = personLabel((id) => live.current.profiles.get(id))
       if ((isDm && s.notify_dms) || (isMention && s.notify_mentions)) {
         const where = channel.kind === 'room' ? `#${channel.slug}` : channel.team_name ?? 'your team'
-        showNotification({
-          title: isDm ? authorName : `${authorName} in ${where}`,
-          body:
-  m.sealed && m.e2ee !== 'ok'
-  ? 'New encrypted message'
-  : !m.body && m.files
-  ? filesLabel(m.files)
-  : m.long_text
-  ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels), people)}`
-  : plainText(m.body, linkLabel(live.current.channels), people),
-          tag: m.channel_id,
-          onClick: () => open(m.channel_id),
-        })
+        const preview =
+          m.sealed && m.e2ee !== 'ok'
+            ? 'New encrypted message'
+            : !m.body && m.files
+              ? filesLabel(m.files)
+              : m.long_text
+                ? `Long message: ${titleOf(m.body) ?? plainText(m.body, linkLabel(live.current.channels), people)}`
+                : plainText(m.body, linkLabel(live.current.channels), people)
+        if (isDm && live.current.visible) {
+          // Looking at Cabal, just somewhere else: say so inside the app, where
+          // it can't be missed (system notifications are easy to miss or blocked).
+          showDmToast({
+            channelId: m.channel_id,
+            name: authorName,
+            avatarUrl: author?.avatar_url ?? null,
+            preview,
+            count: Math.max(1, counted ? channel.unread : channel.unread + 1),
+            onOpen: () => open(m.channel_id),
+          })
+        } else {
+          showNotification({
+            title: isDm ? `${authorName} messaged you` : `${authorName} in ${where}`,
+            body: preview,
+            tag: m.channel_id,
+            onClick: () => open(m.channel_id),
+          })
+          if (isDm) setAttention(authorName)
+        }
         if (s.notify_sound) playChime()
       }
     },
@@ -745,6 +764,7 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
     const update = () => {
       const onScreen = document.visibilityState === 'visible'
       live.current.visible = onScreen && document.hasFocus()
+      if (live.current.visible) setAttention(null)
       if (onScreen && live.current.active) {
         const c = live.current.channels.find((x) => x.id === live.current.active)
         if (c && c.unread > 0) markRead(c.id)
@@ -767,8 +787,22 @@ export function CabalProvider({ boot, popout = false, children }: { boot: Boot; 
   useEffect(() => {
     if (popout) return
     desktop()?.setBadge(unreadDms)
-    document.title = unreadDms > 0 ? `(${unreadDms}) Cabal` : 'Cabal'
-  }, [unreadDms, popout])
+    const counted = unreadDms > 0 ? `(${unreadDms}) Cabal` : 'Cabal'
+    document.title = counted
+    // While you're away, the tab takes turns saying who wrote, so a DM stands
+    // out in a row of tabs. It stops the moment you come back.
+    if (!attention || unreadDms === 0) return
+    const call = `${attention} messaged you`
+    let flip = false
+    const timer = window.setInterval(() => {
+      flip = !flip
+      document.title = flip ? call : counted
+    }, 1500)
+    return () => {
+      window.clearInterval(timer)
+      document.title = counted
+    }
+  }, [unreadDms, popout, attention])
 
   useEffect(() => desktop()?.onNavigate((target) => open(target)), [open])
 

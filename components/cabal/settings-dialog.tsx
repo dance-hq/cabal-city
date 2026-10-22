@@ -295,7 +295,7 @@ function NotificationSettings() {
       <Toggle
         id="n-dms"
         label="Direct messages"
-        hint="A notification for each new direct message."
+        hint="A card in the corner while you're in Cabal, or a system notification when it's in the background."
         checked={settings.notify_dms}
         onChange={(v) => updateSettings({ notify_dms: v })}
       />
