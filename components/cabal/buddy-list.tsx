@@ -518,77 +518,85 @@ export function BuddyList({ compact }: { compact?: boolean }) {
           )}
         </Section>
 
-        {arranged.groups.map(({ group: g, online, total }) => {
-          if (q && online.length === 0) return null;
-          const expanded = !g.collapsed || !!q;
-          return (
-            <Section
-              key={g.id}
-              label={`${g.name} · ${online.length}/${total}`}
-              collapsible
-              expanded={expanded}
-              onToggle={() => buddyGroups.setCollapsed(g.id, !g.collapsed)}
-              onDropPerson={(id) =>
-                groupOf.get(id) !== g.id && buddyGroups.moveTo(id, g.id)
-              }
-              action={
-                <GroupMenu
-                  name={g.name}
-                  onRename={() =>
-                    setNaming({ kind: "rename", groupId: g.id, name: g.name })
-                  }
-                  onDelete={() => deleteGroup(g)}
-                />
-              }
-            >
-              {expanded && online.filter(notWaiting).map(personRow)}
-              {expanded && !q && online.length === 0 && (
-                <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
-                  {total === 0
-                    ? "Drag someone here, or use ··· on their name."
-                    : "Nobody in this group is around."}
-                </p>
-              )}
-            </Section>
-          );
-        })}
-
-        <Section
-          label={`Online · ${here.length}`}
-          onDropPerson={(id) => groupOf.has(id) && buddyGroups.moveTo(id, null)}
-          action={
-            othersExist && (
-              <button
-                type="button"
-                onClick={() => setNaming({ kind: "create", memberId: null })}
-                className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="New group"
-                title="New group"
-              >
-                <FolderPlus className="size-3.5" aria-hidden />
-              </button>
-            )
-          }
+        <div
+          role="group"
+          aria-label="People"
+          className="mt-4 flex flex-col border-t border-sidebar-border pt-1"
         >
-          {membersLoading && <PeopleSkeleton />}
-          {here.filter(notWaiting).map(personRow)}
-          {!membersLoading && here.length === 0 && othersExist && !q && (
-            <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
-              Nobody else is around right now.
-            </p>
-          )}
-        </Section>
+          {arranged.groups.map(({ group: g, online, total }) => {
+            if (q && online.length === 0) return null;
+            const expanded = !g.collapsed || !!q;
+            return (
+              <Section
+                key={g.id}
+                label={`${g.name} · ${online.length}/${total}`}
+                collapsible
+                expanded={expanded}
+                onToggle={() => buddyGroups.setCollapsed(g.id, !g.collapsed)}
+                onDropPerson={(id) =>
+                  groupOf.get(id) !== g.id && buddyGroups.moveTo(id, g.id)
+                }
+                action={
+                  <GroupMenu
+                    name={g.name}
+                    onRename={() =>
+                      setNaming({ kind: "rename", groupId: g.id, name: g.name })
+                    }
+                    onDelete={() => deleteGroup(g)}
+                  />
+                }
+              >
+                {expanded && online.filter(notWaiting).map(personRow)}
+                {expanded && !q && online.length === 0 && (
+                  <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
+                    {total === 0
+                      ? "Drag someone here, or use ··· on their name."
+                      : "Nobody in this group is around."}
+                  </p>
+                )}
+              </Section>
+            );
+          })}
 
-        {away.length > 0 && (
           <Section
-            label={`Offline · ${away.length}`}
-            collapsible
-            expanded={showOffline || !!q}
-            onToggle={() => setShowOffline((v) => !v)}
+            label={`Online · ${here.length}`}
+            onDropPerson={(id) =>
+              groupOf.has(id) && buddyGroups.moveTo(id, null)
+            }
+            action={
+              othersExist && (
+                <button
+                  type="button"
+                  onClick={() => setNaming({ kind: "create", memberId: null })}
+                  className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="New group"
+                  title="New group"
+                >
+                  <FolderPlus className="size-3.5" aria-hidden />
+                </button>
+              )
+            }
           >
-            {(showOffline || q) && away.filter(notWaiting).map(personRow)}
+            {membersLoading && <PeopleSkeleton />}
+            {here.filter(notWaiting).map(personRow)}
+            {!membersLoading && here.length === 0 && othersExist && !q && (
+              <p className="px-4 py-1 text-xs leading-relaxed text-muted-foreground">
+                Nobody else is around right now.
+              </p>
+            )}
           </Section>
-        )}
+
+          {away.length > 0 && (
+            <Section
+              label={`Offline · ${away.length}`}
+              collapsible
+              expanded={showOffline || !!q}
+              onToggle={() => setShowOffline((v) => !v)}
+            >
+              {(showOffline || q) && away.filter(notWaiting).map(personRow)}
+            </Section>
+          )}
+        </div>
 
         {q &&
           people.length === 0 &&
