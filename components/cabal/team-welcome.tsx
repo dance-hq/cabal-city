@@ -163,7 +163,7 @@ export function TeamWelcome({
       aria-label={text ? 'Welcome note' : `${channel.team_name} banner`}
       className={cn('shrink-0 border-b', hasArt ? 'bg-background' : 'bg-card/40')}
     >
-      {banner && <TeamBanner url={banner} className="h-20 sm:h-28" />}
+      {banner && <TeamBanner url={banner} className="max-h-48" />}
       <div className={cn('px-4 pb-3', banner ? 'pt-0' : 'pt-2.5')}>
         <div className={cn('flex gap-2', hasArt ? 'items-end' : 'items-center')}>
           {hasArt ? (

@@ -19,6 +19,7 @@ import {
 } from '@/lib/team-images'
 import type { TeamVisibility } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { TeamImageCropper } from './team-image-cropper'
 
 export type TeamImages = { logo_url: string | null; banner_url: string | null }
 
@@ -235,6 +236,15 @@ export function TeamImagesEditor({
       </div>
       {picker('logo', logoInput)}
       {picker('banner', bannerInput)}
+      <TeamImageCropper
+        file={picked?.file ?? null}
+        kind={picked?.kind ?? 'banner'}
+        teamName={teamName}
+        logo={logo}
+        busy={busy !== null}
+        onCancel={() => setPicked(null)}
+        onSave={(crop) => picked && void save(picked.kind, picked.file, crop)}
+      />
     </div>
   )
 }

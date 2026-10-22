@@ -5,6 +5,7 @@ import {
   fromLocal,
   groupByDay,
   happeningNow,
+  place,
   timeRange,
   toIcs,
   toLocalRange,
@@ -12,6 +13,17 @@ import {
 } from '@/lib/calendar'
 
 const TZ = 'America/Chicago'
+
+describe('place', () => {
+  it('hides a venue that only names the city', () => {
+    for (const v of ['Chicago', 'Chicago, IL', 'chicago il', 'Chicago, Illinois', ' Chicago, IL. ']) expect(place(v)).toBeNull()
+  })
+  it('keeps a real venue', () => {
+    expect(place('Ferris, 1 N Ada St')).toBe('Ferris, 1 N Ada St')
+    expect(place('Chicago Athletic Association')).toBe('Chicago Athletic Association')
+    expect(place('Online')).toBe('Online')
+  })
+})
 const event = (over: Partial<CalendarEvent> = {}): CalendarEvent => ({
   id: 'e1',
   title: 'Demo night',

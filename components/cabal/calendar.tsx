@@ -12,6 +12,7 @@ import {
   happeningNow,
   shareText,
   timeRange,
+  place,
   toIcs,
   zoneCity,
   type CalendarEvent,
@@ -205,15 +206,21 @@ function EventRow({
             e.title
           )}
         </h3>
-        {e.host && (
+        {(e.host || place(e.venue) || (now && e.ends_at)) && (
           <p className="text-[13px] leading-relaxed text-muted-foreground">
-            Hosted by <span className="font-medium text-foreground">{e.host}</span>
+            {[
+              e.host && (
+                <span key="host">
+                  Hosted by <span className="font-medium text-foreground">{e.host}</span>
+                </span>
+              ),
+              place(e.venue) && <span key="place">{place(e.venue)}</span>,
+              now && e.ends_at && <span key="until">until {clock(e.ends_at, e.time_zone)}</span>,
+            ]
+              .filter(Boolean)
+              .flatMap((part, i) => (i ? [<span key={`dot-${i}`} aria-hidden> · </span>, part] : [part]))}
           </p>
         )}
-        <p className="text-[13px] leading-relaxed text-muted-foreground">
-          {e.venue}
-          {now && e.ends_at && <> · until {clock(e.ends_at, e.time_zone)}</>}
-        </p>
         {e.summary && <p className="text-sm leading-relaxed text-pretty">{e.summary}</p>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
           {e.url && (
