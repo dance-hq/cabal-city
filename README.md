@@ -8,7 +8,7 @@ Join it at **[www.cabal.city](https://www.cabal.city)**, or get the [desktop app
 
 - **Who's around.** See who's online, who's busy and what they're working on. Invisible really means invisible: other people get no presence at all from you.
 - **Direct messages.** Click anyone's name.
-- **Rooms.** `#lobby` and `#introductions` to start, IRC-style: compact lines, join notices, a list of who's in the room.
+- **Rooms.** `#cabal-chat` and `#introductions` to start, IRC-style: compact lines, join notices, a list of who's in the room.
 - **Private teams.** A channel for your startup or crew. Only invited members can read it, and that's enforced by the database, not by hiding buttons.
 - **Desktop app.** A small Electron shell for macOS, Windows and Linux with a tray icon, an unread badge, a show/hide shortcut and an option to start when you log in.
 

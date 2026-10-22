@@ -59,7 +59,7 @@ function escape(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-// Turns "#lobby" and "#Dance Technologies" into stored links on send.
+// Turns "#cabal-chat" and "#Dance Technologies" into stored links on send.
 // `picked` (name → id) comes from the suggestions you chose, so it wins when
 // two teams share a name. Otherwise only names that match exactly one channel
 // become links; anything else stays as you typed it.

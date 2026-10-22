@@ -119,7 +119,7 @@ export default async function Home() {
                 Say what you&apos;re working on and choose when you&apos;re around, away, or heads-down with
                 notifications muted. Cabal never watches your keyboard or screen.
               </Feature>
-              <Feature title="Help each other ship" mono="#lobby">
+              <Feature title="Help each other ship" mono="#cabal-chat">
                 Share what you&apos;re launching, ask for feedback, and make the intro someone needs. Start a team
                 room for your crew. Build your thing, just not alone.
               </Feature>
