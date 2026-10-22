@@ -1,8 +1,7 @@
-// Writes public/audio/score.wav (the master) and public/audio/teaser.wav (cut
-// from the master with TEASER_CUTS). Everything is synthesized here, so the
-// film carries no licensed audio. Run: node scripts/score.ts
+// Writes public/audio/score.wav. Everything is synthesized here, so the film
+// carries no licensed audio. Run: node scripts/score.ts
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { BAR, BEAT, CUE, FPS, PRESS, SCENES, TEASER_CUTS, TOTAL, noiseTimes } from '../src/timeline.ts'
+import { BAR, BEAT, CUE, FPS, PRESS, SCENES, TOTAL, noiseTimes } from '../src/timeline.ts'
 
 const RATE = 44100
 const LEN = Math.ceil((TOTAL / FPS) * RATE) + RATE
@@ -167,6 +166,11 @@ for (let b = 0; b < bars; b++) {
 
 // ── Scene accents ─────────────────────────────────────────────────────────────
 for (let i = 0; i < 7; i++) tick(after('together', CUE.together.rowsFrom + i * CUE.together.rowEvery), 0.12, 0.2)
+// #launches: each message lands with a soft note that climbs as support builds.
+for (const [i, f] of [CUE.help.launch, CUE.help.reply1, CUE.help.reply2, CUE.help.reply3].entries()) {
+  tick(after('help', f), 0.12, 0.15)
+  pluck(hz([79, 81, 84, 88][i]), after('help', f) + 0.02, 0.045, i % 2 ? 0.3 : -0.3)
+}
 tick(after('opps', CUE.opps.pick), 0.2)
 pluck(hz(84), after('opps', CUE.opps.toast), 0.07)
 pluck(hz(91), after('opps', CUE.opps.toast) + 0.08, 0.05)
@@ -255,21 +259,4 @@ function wav(left: Float32Array, right: Float32Array, frames: number) {
 
 mkdirSync(new URL('../public/audio/', import.meta.url), { recursive: true })
 writeFileSync(new URL('../public/audio/score.wav', import.meta.url), wav(L, R, end))
-
-// Teaser: the same cuts as the picture, sample-for-frame, with 8 ms fades at
-// each join so nothing clicks. Length matches the picture exactly.
-const tl: number[] = []
-const tr: number[] = []
-const edge = at(0.008)
-TEASER_CUTS.forEach(([a, b], c) => {
-  const s = at(sec(a))
-  const e = at(sec(b))
-  for (let k = s; k < e; k++) {
-    const i = k - s
-    const g = Math.min(1, c > 0 ? i / edge : 1, c < TEASER_CUTS.length - 1 ? (e - k) / edge : 1)
-    tl.push(L[k] * g)
-    tr.push(R[k] * g)
-  }
-})
-writeFileSync(new URL('../public/audio/teaser.wav', import.meta.url), wav(Float32Array.from(tl), Float32Array.from(tr), tl.length))
-console.log(`score ${(end / RATE).toFixed(2)}s, teaser ${(tl.length / RATE).toFixed(2)}s, peak ${peak.toFixed(3)}`)
+console.log(`score ${(end / RATE).toFixed(2)}s, peak ${peak.toFixed(3)}`)

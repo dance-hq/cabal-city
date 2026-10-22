@@ -37,7 +37,10 @@ export function finaleStar(f: Format) {
   return { cx, cy, r, pts: starPolygon(cx, cy, r) }
 }
 
-const TONES = [C.gold, C.goldLight, '#EADFC4']
+// Lit windows: the locked-in gold, then warm and plain window light, so the
+// city reads as night rather than as a gold brand color.
+const TONES = [C.gold, '#F3E6C8', C.text]
+const UNLIT = C.card
 
 function layout(f: Format): Win[] {
   const star = finaleStar(f)
@@ -155,7 +158,7 @@ export function City() {
           const red = w.star ? hit : 0
           const dx = w.star ? (PITCH_X - WIN_W + 1) * grow : 0
           const dy = w.star ? (PITCH_Y - WIN_H + 1) * grow : 0
-          const fill = b > 0 ? (red > 0 ? (red > 0.5 ? C.star : TONES[w.tone]) : TONES[w.tone]) : '#16181B'
+          const fill = b > 0 ? (red > 0 ? (red > 0.5 ? C.star : TONES[w.tone]) : TONES[w.tone]) : UNLIT
           const hidden = f >= CUE.finale.hit && !w.star
           if (hidden) return null
           return (
@@ -177,7 +180,7 @@ export function City() {
                 width={WIN_W + dx}
                 height={WIN_H + dy}
                 rx={1.5}
-                fill={b > 0.02 ? fill : '#16181B'}
+                fill={b > 0.02 ? fill : UNLIT}
                 opacity={b > 0.02 ? 0.25 + 0.75 * b : 1}
               />
             </g>

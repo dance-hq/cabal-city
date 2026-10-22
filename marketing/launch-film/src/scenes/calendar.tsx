@@ -35,7 +35,7 @@ const DAYS = [
 export function Calendar() {
   const frame = useCurrentFrame()
   const fmt = useFormat()
-  const S = fmt.portrait ? 1.85 : 1.66
+  const S = fmt.portrait ? 1.95 : 1.66
   const W = 520
   const add = p(frame, c.add, 4) * (1 - p(frame, c.add + 6, 10))
   const added = p(frame, c.add + 2, 6)
@@ -96,7 +96,7 @@ export function Calendar() {
 
   const words = (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: fmt.portrait ? 'center' : 'flex-start' }}>
-      <Words text={'Then meet\nin real life.'} frame={frame} at={c.headline} size={fmt.portrait ? 104 : 104} align={fmt.portrait ? 'center' : 'left'} />
+      <Words text={'Then meet up\nin Chicago.'} frame={frame} at={c.headline} size={104} align={fmt.portrait ? 'center' : 'left'} />
       <Words
         text={'Breakfasts, demo nights and launches,\non one shared calendar.'}
         frame={frame}

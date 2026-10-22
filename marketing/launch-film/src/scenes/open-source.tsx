@@ -48,7 +48,7 @@ export function OpenSource() {
         </Zoom>
       </div>
       <Words
-        text={'Built in Chicago.\nReady for your city.'}
+        text={'Made in Chicago.\nBuilt in the open.'}
         frame={frame}
         at={c.sub}
         size={fmt.portrait ? 48 : 44}

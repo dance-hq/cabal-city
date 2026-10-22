@@ -1,26 +1,28 @@
-// Cabal's own dark theme (app/globals.css .dark + lib/brand.ts), as hex.
+// Cabal's dark theme, converted exactly from the oklch tokens in
+// app/globals.css (.dark) plus the logo colors in lib/brand.ts. Change a
+// token there, convert it, and paste it here: no film-only colors.
 export const C = {
-  ink: '#0D0E10',
-  surface: '#141518',
-  card: '#191A1D',
-  popover: '#1C1D20',
-  accent: '#25262A',
-  line: '#2B2C30',
-  text: '#ECEDEF',
-  muted: '#A2A5AC',
-  dim: '#6B6E75',
-  city: '#8B8D93',
+  ink: '#0F1113', // --background
+  surface: '#0F1113', // panes sit on the background
+  card: '#16171A', // --card
+  popover: '#181A1C', // --popover
+  accent: '#212326', // --accent
+  line: '#27292C', // --border
+  text: '#E9EBEE', // --foreground
+  muted: '#989CA2', // --muted-foreground
+  dim: '#6B6E75', // BRAND.cityOnPaper
+  city: '#8B8D93', // BRAND.cityOnInk
   paper: '#FCFAF6',
-  // The locked-in ring.
-  gold: '#DDA53B',
-  goldLight: '#F2C66B',
-  flag: '#36B3E2',
-  flagInk: '#0D0E10',
-  star: '#F22A33',
+  // The locked-in ring (--gold).
+  gold: '#EBBD57',
+  flag: '#4EC0ED', // --flag
+  flagInk: '#0D0E10', // --flag-foreground
+  star: '#F22A33', // --brand-star
+  online: '#58CD78', // --online
 } as const
 
 // Other people's names in the dark theme (--nick-1..6).
-export const NICK = ['#E3C88F', '#AAD3A6', '#9FD2CA', '#C9BEEA', '#E8B7D0', '#EDBD9B'] as const
+export const NICK = ['#E3BE80', '#9ECC9E', '#89CDC3', '#BEB1E9', '#E5A3C8', '#EBAF86'] as const
 
 export const SANS = 'Geist, system-ui, sans-serif'
 export const MONO = '"Geist Mono", ui-monospace, monospace'

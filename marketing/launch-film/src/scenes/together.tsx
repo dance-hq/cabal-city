@@ -10,12 +10,12 @@ const LEN = SCENES.together[1] - SCENES.together[0]
 // "Locked in now", sorted by who started first (lock-in-panel.tsx).
 // Illustrative demo members.
 export const LOCKED_IN = [
-  { name: 'Lena Kowalski', on: 'Heads down', time: '2h 05m' },
+  { name: 'Lena Kowalski', on: 'Launch prep for Tuesday', time: '2h 05m' },
   { name: 'Maya Okafor', on: 'Pitch deck for Thursday', time: '1h 12m' },
   { name: 'Dev Patel', on: 'Shipping the iOS build', time: '48m' },
   { name: 'Marcus Reed', on: 'Customer interviews, round 3', time: '35m' },
   { name: 'Ana Ruiz', on: 'Onboarding flow for clinics', time: '22m' },
-  { name: 'Jordan Lee', on: 'Grant application', time: '9m' },
+  { name: 'Jordan Lee', on: 'Product Hunt assets', time: '9m' },
   { name: 'Sam Rivera', on: FOCUS_TEXT, time: '0m', you: true },
 ]
 
@@ -88,7 +88,7 @@ export function Together() {
         }}
       >
         <Words
-          text={fmt.portrait ? 'Everyone’s building\nsomething different.' : 'Everyone’s building something different.'}
+          text={fmt.portrait ? 'All over Chicago,\npeople are shipping.' : 'All over Chicago, people are shipping.'}
           frame={frame}
           at={c.captionA}
           size={fmt.portrait ? 84 : 80}
@@ -96,13 +96,13 @@ export function Together() {
           dim={p(frame, c.captionB, 14)}
         />
         <Words
-          text="Nobody’s building alone."
+          text="It’s contagious."
           frame={frame}
           at={c.captionB}
-          size={fmt.portrait ? 84 : 80}
+          size={fmt.portrait ? 96 : 88}
           align="center"
-          color={C.goldLight}
-          style={{ marginTop: 14 }}
+          color={C.gold}
+          style={{ marginTop: 18 }}
         />
       </AbsoluteFill>
     </AbsoluteFill>

@@ -1,14 +1,10 @@
-// Renders every cut into out/. The score is regenerated first so picture and
-// sound always come from the same timeline. Pass names to render a subset:
-//   node scripts/render.mjs teaser launch-vertical
+// Renders the film into out/. The score is regenerated first so picture and
+// sound always come from the same timeline: node scripts/render.mjs
 import { execFileSync } from 'node:child_process'
 import { availableParallelism } from 'node:os'
 
 const CUTS = {
-  launch: 'cabal-launch-16x9.mp4',
-  'launch-vertical': 'cabal-launch-9x16.mp4',
-  teaser: 'cabal-teaser-16x9.mp4',
-  'teaser-vertical': 'cabal-teaser-9x16.mp4',
+  launch: 'cabal-launch-chicago-9x16.mp4',
 }
 
 const wanted = process.argv.slice(2)
