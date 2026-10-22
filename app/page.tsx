@@ -23,6 +23,9 @@ export const metadata: Metadata = {
 const PLATFORM_BUTTON =
   'inline-flex items-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-primary-foreground/10 focus-visible:bg-primary-foreground/15 focus-visible:outline-none sm:px-5'
 
+const OPEN_SOURCE =
+  'font-medium text-foreground underline decoration-online decoration-2 underline-offset-4 transition-colors'
+
 export default async function Home() {
   const community = await getCommunity()
   const [release, online] = await Promise.all([latestRelease(), community ? onlineCount(community.id) : null])
@@ -56,7 +59,15 @@ export default async function Home() {
             Chicago builders, it&apos;s time to lock in.
           </h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground text-pretty">
-            Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
+            Cabal is an{' '}
+            {githubUrl ? (
+              <a href={githubUrl} className={`${OPEN_SOURCE} hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm`}>
+                open-source
+              </a>
+            ) : (
+              <span className={OPEN_SOURCE}>open-source</span>
+            )}{' '}
+            home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
           <div className="flex flex-col gap-3 pt-2">
