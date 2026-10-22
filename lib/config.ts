@@ -24,7 +24,7 @@ export const config = {
   appUrl: normalizeAppUrl(process.env.NEXT_PUBLIC_CABAL_APP_URL),
   githubRepo: normalizeGithubRepo(process.env.NEXT_PUBLIC_CABAL_GITHUB_REPO),
   // The team that makes Cabal. Recommended first to new people, with a small
-  // "makes Cabal" note. Matched by name; leave empty to turn the nod off.
+  // "Founding team" tag. Matched by name; leave empty to turn the nod off.
   makersTeam: (process.env.NEXT_PUBLIC_CABAL_MAKERS_TEAM ?? 'Dance Technologies').trim(),
 }
 
