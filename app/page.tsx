@@ -77,7 +77,8 @@ export default async function Home() {
             home for Chicago&rsquo;s builders and supporters. Find people working on interesting
             things, see who&rsquo;s around, and build alongside them.
           </p>
-          <div className="grid grid-cols-2 gap-2.5 pt-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="flex flex-col items-start gap-4 pt-2">
+          <div className="grid w-full grid-cols-2 gap-2.5 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
             {platforms.map(({ name, href, Icon }) => (
               <a key={name} href={href} className={PLATFORM_BUTTON}>
@@ -109,10 +110,8 @@ export default async function Home() {
                 />
               </a>
             )}
-            <Link
-              href="/login"
-              className={`${SECONDARY_LINK} col-span-2 pt-2 text-foreground sm:ml-3 sm:pt-0`}
-            >
+          </div>
+            <Link href="/login" className={`${SECONDARY_LINK} text-foreground`}>
               Or open Cabal in your browser
               <ArrowUpRight
                 className="size-4 text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
