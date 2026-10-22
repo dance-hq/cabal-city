@@ -26,7 +26,7 @@ const PLATFORM_BUTTON =
   'group flex flex-col items-start gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:flex-row sm:items-center sm:gap-3 sm:pr-4'
 
 const OPEN_SOURCE =
-  'rounded-sm font-medium text-foreground underline decoration-primary decoration-2 underline-offset-[5px] transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+  'rounded-sm underline decoration-primary/70 decoration-1 underline-offset-4 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 const GITHUB_BUTTON =
   'inline-flex h-10 items-center gap-2 rounded-lg border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
@@ -70,10 +70,10 @@ export default async function Home() {
             Cabal is an{' '}
             {githubUrl ? (
               <a href={githubUrl} className={`${OPEN_SOURCE} hover:decoration-foreground`}>
-                open-source
+                open source
               </a>
             ) : (
-              <span className={OPEN_SOURCE}>open-source</span>
+              <span className={OPEN_SOURCE}>open source</span>
             )}{' '}
             home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
