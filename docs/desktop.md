@@ -38,12 +38,25 @@ You can also run the workflow by hand from the Actions tab. That keeps the insta
 
 ### Signing (optional)
 
-Unsigned builds work, but macOS Gatekeeper and Windows SmartScreen warn on first open. To sign, add these repository secrets:
+Unsigned builds work, but macOS Gatekeeper and Windows SmartScreen warn on first open.
+
+**macOS.** Add these repository secrets:
 
 | Secret | For |
 | --- | --- |
 | `MAC_CERTIFICATE_P12_BASE64`, `MAC_CERTIFICATE_PASSWORD` | Developer ID Application certificate |
 | `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | macOS notarization |
-| `WINDOWS_CERTIFICATE_PFX_BASE64`, `WINDOWS_CERTIFICATE_PASSWORD` | Windows code signing |
 
 macOS auto-update only works for signed builds. That's an Apple rule.
+
+**Windows** signs with [Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/) (formerly Trusted Signing). No certificate file ever sits on the build machine. Set these on the repository:
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `AZURE_SIGNING_ENDPOINT` | variable | Your signing account's region endpoint, e.g. `https://eus.codesigning.azure.net/` |
+| `AZURE_SIGNING_ACCOUNT` | variable | Signing account name |
+| `AZURE_SIGNING_PROFILE` | variable | Certificate profile name |
+| `WINDOWS_PUBLISHER_NAME` | variable | The name on the certificate, exactly as validated (e.g. `Dance Technologies Inc.`) |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | secrets | An app registration with the *Artifact Signing Certificate Profile Signer* role on the profile |
+
+Setting `AZURE_SIGNING_ENDPOINT` turns signing on. From then on, a release with any of the others missing, or one whose `Cabal.exe` doesn't come out validly signed by that publisher, fails before anything is uploaded. Signed installs only accept updates signed by the same publisher, so never go back to unsigned or change the publisher name.
