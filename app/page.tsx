@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { ArrowDownToLine, ArrowUpRight } from 'lucide-react'
 import { getCommunity } from '@/lib/community'
 import { onlineCount } from '@/lib/online-count'
 import { latestRelease } from '@/lib/releases'
@@ -21,7 +23,10 @@ export const metadata: Metadata = {
 }
 
 const PLATFORM_BUTTON =
-  'group inline-flex h-12 items-center gap-2.5 rounded-lg border bg-card px-4 text-sm font-medium transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:px-5'
+  'group flex flex-col items-start gap-2.5 rounded-xl border bg-card p-2.5 transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:flex-row sm:items-center sm:gap-3 sm:pr-4'
+
+const SECONDARY_LINK =
+  'group inline-flex items-center gap-1.5 rounded text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 export default async function Home() {
   const community = await getCommunity()
@@ -59,39 +64,48 @@ export default async function Home() {
             Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
-          <div className="flex flex-col gap-3 pt-4">
-            <p id="download-label" className="font-mono text-xs text-muted-foreground">
-              Download the desktop app
-            </p>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-              {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
-              <nav aria-labelledby="download-label" className="flex flex-wrap gap-2.5">
-                {platforms.map(({ name, href, Icon }) => (
-                  <a key={name} href={href} aria-label={`Download for ${name}`} className={PLATFORM_BUTTON}>
-                    <Icon className="size-4 text-primary transition-colors group-hover:text-primary-foreground" />
-                    {name}
-                  </a>
-                ))}
-              </nav>
-              {githubUrl && (
-                <a
-                  href={githubUrl}
-                  className="inline-flex items-center gap-2 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                  <GithubIcon className="size-4" />
-                  View on GitHub
+          <div className="flex flex-col gap-5 pt-4">
+            {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
+            <nav aria-label="Download the desktop app" className="grid grid-cols-3 gap-2.5 sm:flex sm:flex-wrap">
+              {platforms.map(({ name, href, Icon }) => (
+                <a key={name} href={href} className={PLATFORM_BUTTON}>
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      <span className="sm:hidden">Get it for</span>
+                      <span className="hidden sm:inline">Download for</span>
+                    </span>
+                    <span className="text-base font-semibold leading-tight">{name}</span>
+                  </span>
+                  <ArrowDownToLine
+                    className="ml-3 hidden size-4 text-muted-foreground transition-colors group-hover:text-primary sm:block"
+                    aria-hidden
+                  />
                 </a>
+              ))}
+            </nav>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <Link href="/login" className={`${SECONDARY_LINK} text-foreground`}>
+                Or open Cabal in your browser
+                <ArrowUpRight
+                  className="size-4 text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
+                  aria-hidden
+                />
+              </Link>
+              {githubUrl && (
+                <>
+                  <span aria-hidden className="hidden text-muted-foreground/50 sm:inline">
+                    ·
+                  </span>
+                  <a href={githubUrl} className={`${SECONDARY_LINK} text-muted-foreground hover:text-foreground`}>
+                    <GithubIcon className="size-4" />
+                    View on GitHub
+                  </a>
+                </>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              Free, always. Also available:{' '}
-              <a
-                href="#download"
-                className="rounded text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Intel Mac and .deb builds
-              </a>
-            </p>
           </div>
         </section>
 
