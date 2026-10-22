@@ -14,7 +14,7 @@ export default function PrivacyPage() {
     <LegalPage
       current="/privacy"
       title="What Cabal collects"
-      summary="Cabal only keeps what it needs to run a messenger: your account, your profile, and your messages. No ads, no analytics, no selling data, no watching what you do on your computer."
+      summary="Cabal only keeps what it needs to run a messenger: your account, your profile, your messages and the things you choose to share. Direct messages are end-to-end encrypted. No ads, no analytics, no selling data, no watching what you do on your computer."
     >
       <LegalSection title="What we store">
         <ul>
@@ -22,22 +22,29 @@ export default function PrivacyPage() {
             <strong>Your email address</strong>, to send you sign-in codes. It isn&apos;t shown to other people.
           </li>
           <li>
-            <strong>Your profile</strong>: the username, display name, photo, company, bio and status line you choose
-            to add. Other signed-in members can see these.
+            <strong>Your profile</strong>: your name and @username, your role (founder, builder or investor), and
+            the photo, company, what you&apos;re building, bio, up to four links and status line you choose to add.
+            Other signed-in members can see these.
           </li>
           <li>
-            <strong>Your messages</strong> in rooms, team rooms and direct messages, plus when each was sent. Direct
-            messages are stored end-to-end encrypted, so we hold them but can&apos;t read them. If you delete a
-            message, its text is erased and only a &ldquo;deleted&rdquo; marker remains.
+            <strong>Your messages</strong> in rooms, team rooms and direct messages, plus when each was sent and who
+            you mentioned. Direct messages are stored end-to-end encrypted, so we hold them but can&apos;t read
+            them. If you delete a message, its text is erased, its photos and videos can no longer be opened, and
+            only a &ldquo;deleted&rdquo; marker remains.
+          </li>
+          <li>
+            <strong>Photos and videos you attach</strong>, with their file name, type, size and dimensions. In
+            direct messages they&apos;re encrypted on your device before they upload, along with their name and type,
+            so we can&apos;t open them; we can still see how big they are.
           </li>
           <li>
             <strong>Your public encryption key</strong>, so people can send you encrypted direct messages, and a
-            backup of your private keys that only your recovery key can open. We never have your private keys or
-            your recovery key.
+            backup of your private keys that only your recovery key can open. Your private keys stay on your own
+            devices. We never have them or your recovery key.
           </li>
           <li>
             <strong>How you use conversations</strong>: which ones you&apos;ve read up to where, which you&apos;ve
-            muted, the teams you&apos;re in, and the people you&apos;ve blocked.
+            muted, the teams you&apos;re in, your buddy groups and the people you&apos;ve blocked.
           </li>
           <li>
             <strong>Your status</strong> (online, away, do not disturb) and which room you have open, so your buddy
@@ -45,18 +52,22 @@ export default function PrivacyPage() {
             nothing.
           </li>
           <li>
-            <strong>Lock-in sessions</strong>: when you lock in, plus when each session started, paused and ended,
-            and a check-in about once a minute while one runs. While one runs, people in the community see that
-            you&apos;re locked in and for how long, unless you&apos;re invisible.
+            <strong>Lock-in sessions</strong>: when each one started, paused and ended, a check-in about once a
+            minute while one runs, what you said you&apos;re focused on if you add it, and any note you add when you
+            finish. We add these up into your hours for each week.
           </li>
           <li>
-            <strong>Your settings</strong>: notification preferences on our server; theme and window preferences
-            on your own device.
+            <strong>Build Cabal</strong>: ideas you post on the board, your comments, which ideas you&apos;ve voted
+            for, opportunities you save and opportunities you suggest.
+          </li>
+          <li>
+            <strong>Your settings</strong>: notification and lock-in preferences on our server; theme and window
+            preferences on your own device.
           </li>
           <li>
             <strong>Reports</strong> you file, including a short excerpt of the reported message and your reason. When
-            you report a direct message, your app shares the key to that one message so it can be checked; the rest
-            of the conversation stays encrypted.
+            you report a direct message, your app shares the key to that one message so its text can be checked;
+            the rest of the conversation, and any photos or videos, stay encrypted.
           </li>
           <li>
             <strong>Feedback</strong> you send, and, if you leave &ldquo;Include app details&rdquo; on, the page you
@@ -72,9 +83,16 @@ export default function PrivacyPage() {
       <LegalSection title="What we don't collect">
         <ul>
           <li>No analytics, advertising or tracking scripts, and no cookies apart from the one that keeps you signed in.</li>
-          <li>No keyboard, mouse or screen activity. &ldquo;Away&rdquo; is something you choose, never something we detect.
-            A lock-in timer pauses on its own only when Cabal is closed or your computer sleeps.</li>
-          <li>No contacts, location or files from your computer.</li>
+          <li>
+            No keyboard, mouse or screen activity. &ldquo;Away&rdquo; is something you choose, never something we
+            detect. A lock-in timer pauses on its own only when Cabal is closed or your computer sleeps, and any one
+            session counts for at most 8 hours.
+          </li>
+          <li>No contacts or location, and nothing from your computer apart from the files you choose to attach.</li>
+          <li>
+            Photos are redrawn on your device before they upload, which removes location and camera details. Videos
+            are sent exactly as they are, so if a video might hold your location, remove it before you share.
+          </li>
         </ul>
       </LegalSection>
 
@@ -86,22 +104,39 @@ export default function PrivacyPage() {
             Invite-only teams: only the people on that team.
           </li>
           <li>
-            Direct messages: only the two people in the conversation. They&apos;re end-to-end encrypted, so neither
-            community admins nor the team that runs cabal.city can read them.
+            Direct messages, and the photos and videos in them: only the two people in the conversation.
+            They&apos;re end-to-end encrypted, so neither community admins nor the team that runs cabal.city can
+            read them.
+          </li>
+          <li>
+            Photos and videos in rooms and teams: the same people who can read that conversation. They&apos;re kept
+            private and opened through links that expire after a short time.
+          </li>
+          <li>
+            Lock-ins: while one runs, people in the community see that you&apos;re locked in, for how long and your
+            focus if you added one, unless you&apos;re invisible or have turned off &ldquo;Show me in Locked in
+            now&rdquo;. Your weekly hours appear on the board and your profile only if you turn on &ldquo;Show my
+            hours on the weekly board&rdquo; (it starts off). Notes and your list of past sessions are only ever shown
+            to you.
+          </li>
+          <li>
+            The Build Cabal board: ideas, comments and who posted them are visible to members of every Cabal
+            community on cabal.city. Vote totals are shown, but not who voted. Opportunities you save are only
+            visible to you; ones you suggest go to community admins.
           </li>
           <li>
             Reports: the person who filed them and community admins. Admins can also remove members from the
             community.
           </li>
-          <li>Feedback: the person who sent it and community admins.</li>
+          <li>Feedback and bug reports: the person who sent them and community admins.</li>
         </ul>
         <p>
           Direct messages are end-to-end encrypted on your device; we can see who messaged whom and when, but not
           what was said. Messages that were sent before encryption arrived stay as they were. Room and team
-          messages are encrypted in transit and stored on our database, but they aren&apos;t end-to-end encrypted:
-          the small team that operates cabal.city could technically access them, and only does so to keep the
-          service running or when the law requires it. Profile photos are stored at public web addresses, so anyone
-          with the exact link can open one.
+          messages, and their photos and videos, are encrypted in transit and stored on our servers, but they
+          aren&apos;t end-to-end encrypted: the small team that operates cabal.city could technically access them,
+          and only does so to keep the service running or when the law requires it. Profile photos are stored at
+          public web addresses, so anyone with the exact link can open one.
         </p>
       </LegalSection>
 
@@ -109,7 +144,8 @@ export default function PrivacyPage() {
         <p>We never sell your information. We share it only with the companies that run parts of Cabal for us:</p>
         <ul>
           <li>
-            <strong>Supabase</strong> stores the database, sign-in and profile photos.
+            <strong>Supabase</strong> stores the database, sign-in, profile photos and the photos and videos you
+            share.
           </li>
           <li>
             <strong>Vercel</strong> hosts the website and keeps short-lived request logs (such as IP address and
@@ -130,19 +166,31 @@ export default function PrivacyPage() {
       <LegalSection title="Keeping and deleting your data">
         <p>
           We keep your account until you delete it. To delete it, open <strong>Settings → App → Delete account</strong>.
-          That removes your email, profile, photo, feedback and every message you wrote, right away. Teams you own pass to their
-          longest-standing member. Messages other people sent you stay with them.
+          That removes, right away, your email, profile, photo, encryption keys and backup, every message you wrote
+          along with the photos and videos in them, your lock-in history, your ideas, comments and votes, your saved
+          opportunities and your feedback. Teams you own pass to their longest-standing member. Messages other people
+          sent you stay with them, and opportunities you suggested stay without your name.
         </p>
         <p>
           Reports other people filed about you are kept for moderation, without being linked to your account. Deleted
           data can remain in routine database backups until they roll over.
+        </p>
+        <p>
+          Your encryption keys also live in your browser or the desktop app on each device. Clearing that
+          site&apos;s data removes them from that device; if you lose every device and your recovery key, nobody,
+          including us, can recover your encrypted messages.
         </p>
       </LegalSection>
 
       <LegalSection title="Your choices">
         <ul>
           <li>Change or remove anything on your profile at any time.</li>
-          <li>Go invisible to stop sharing your status completely.</li>
+          <li>Go invisible to stop sharing your status and lock-ins completely.</li>
+          <li>
+            Choose whether you appear in &ldquo;Locked in now&rdquo; and on the weekly board, in{' '}
+            <strong>Settings → Community</strong>.
+          </li>
+          <li>Delete any message you sent, including its photos and videos.</li>
           <li>Block someone to stop them messaging you.</li>
           <li>
             Ask for a copy of your data, a correction or a deletion
@@ -152,7 +200,8 @@ export default function PrivacyPage() {
                 by emailing <a href={`mailto:${email}`}>{email}</a>
               </>
             ) : null}
-            . We&apos;ll reply within 30 days.
+            . We&apos;ll reply within 30 days. We can&apos;t include the contents of encrypted direct messages,
+            because we can&apos;t read them.
           </li>
         </ul>
       </LegalSection>
@@ -168,7 +217,8 @@ export default function PrivacyPage() {
           {githubUrl ? (
             <>
               {' '}
-              Cabal is open source, so you can also <a href={githubUrl}>read the code</a> that handles your data.
+              Cabal is open source, so you can also <a href={githubUrl}>read the code</a> that handles your data, and
+              the <Link href="/docs">developer docs</Link> link each claim to the file that makes it true.
             </>
           ) : null}{' '}
           See also our <Link href="/terms">terms</Link>.

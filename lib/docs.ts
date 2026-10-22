@@ -58,6 +58,7 @@ const BOARD = 'supabase/migrations/0014_build_cabal_opportunities.sql'
 const LOCK_IN = 'supabase/migrations/0009_lock_in.sql'
 const RESUME = 'supabase/migrations/0010_lock_in_auto_resume.sql'
 const HOURS = 'supabase/migrations/0020_lock_in_hours.sql'
+const FILES = 'supabase/migrations/0021_message_files.sql'
 const STORE = 'components/cabal/store.tsx'
 const E2EE = 'lib/e2ee/crypto.ts'
 const E2EE_SESSION = 'lib/e2ee/session.ts'
@@ -116,12 +117,12 @@ export const STACK: Fact[] = [
   {
     label: 'Files',
     value: 'Supabase Storage',
-    body: 'A public `avatars` bucket, where each user writes only inside their own folder, and a private `attachments` bucket for photos and videos. An attachment is readable only once a message claims it, and only by people who can read that conversation, through short-lived signed links. Photos are redrawn on the sender’s device first, which drops location and camera details.',
+    body: 'A public `avatars` bucket, where each user writes only inside their own folder, and a private `attachments` bucket for photos and videos. Other people can read an attachment only once a message claims it, and only if they can read that conversation, through short-lived signed links. Photos are redrawn on the sender’s device first, which drops location and camera details.',
     sources: [
       { path: 'lib/avatar.ts' },
       { path: SCHEMA, proves: ['(storage.foldername(name))[1] = auth.uid()::text'] },
       { path: 'lib/attachments.ts', proves: ['createSignedUrls', "imageOrientation: 'from-image'"] },
-      { path: 'supabase/migrations/0021_message_files.sql', proves: ['public.can_read_attachment(name)'] },
+      { path: FILES, proves: ['public.can_read_attachment(name)'] },
     ],
   },
   {
@@ -133,8 +134,12 @@ export const STACK: Fact[] = [
   {
     label: 'Desktop',
     value: 'Electron',
-    body: 'Loads the hosted app and adds a tray icon, an unread badge, a lock-in timer overlay and automatic updates from GitHub Releases on Windows and Linux.',
-    sources: [{ path: 'desktop/src/main.cjs' }, { path: 'docs/desktop.md' }],
+    body: 'Loads the hosted app and adds a tray icon, an unread badge, a lock-in timer overlay, floating chat windows opened from its buddy list, and automatic updates from GitHub Releases on Windows and Linux. A chat window loads `/app/chat/[userId]`, which runs the client in `popout` mode: no presence, notifications or badge of its own, so one person never counts as two windows.',
+    sources: [
+      { path: 'desktop/src/main.cjs', proves: ['function openChat(userId)'] },
+      { path: STORE, proves: ['popout = false'] },
+      { path: 'docs/desktop.md' },
+    ],
   },
 ]
 
@@ -231,9 +236,24 @@ export const PERMISSIONS: Fact[] = [
     ],
   },
   {
+    label: 'Photos and videos',
+    body: 'The people who can read the conversation they were sent in. Uploads go to `<channel>/<message>/<file>`, and nobody but the uploader can open one until a `message_files` row claims it.',
+    sources: [{ path: FILES, proves: ['create or replace function public.can_read_attachment', 'owner_id = auth.uid()::text or public.can_read_attachment(name)'] }],
+  },
+  {
     label: 'Presence and lock-ins',
-    body: 'People in your community. `invisible` deletes your presence rows instead of hiding them, so there is nothing to read.',
-    sources: [{ path: LOCK_IN, proves: ["coalesce(us.availability, 'online') <> 'invisible'"] }],
+    body: 'People in your community. `invisible` deletes your presence rows instead of hiding them, so there is nothing to read. “Locked in now” also skips anyone who turned off `lock_in_live`.',
+    sources: [
+      { path: LOCK_IN, proves: ["coalesce(us.availability, 'online') <> 'invisible'"] },
+      { path: HOURS, proves: ['coalesce(us.lock_in_live, true)'] },
+    ],
+  },
+  {
+    label: 'Lock-in hours',
+    body: 'Weekly totals appear on the board and on your profile only after you turn on `lock_in_board`, which starts off. Session notes and your list of recent sessions are returned only to you.',
+    sources: [
+      { path: HOURS, proves: ['add column lock_in_board boolean not null default false', 'Recent sessions (with notes) are only ever returned to their owner.'] },
+    ],
   },
   {
     label: 'Build Cabal board',
@@ -271,10 +291,20 @@ export const DATA_MODEL: Fact[] = [
   {
     label: 'Conversations',
     value: 'channels · dm_participants · messages · channel_reads · reports',
-    body: '`channels.kind` is `room`, `team` or `dm`. `my_channels()` returns your channels with unread counts. Links to channels are stored as `<#channel-id>`, so renames never break them.',
+    body: '`channels.kind` is `room`, `team` or `dm`. `my_channels()` returns your channels with unread counts. Links to channels are stored as `<#channel-id>` and mentions as `<@user-id>`, so renames never break them.',
     sources: [
       { path: SCHEMA, proves: ["kind in ('room', 'team', 'dm')"] },
       { path: 'supabase/migrations/0015_linkable_channels.sql' },
+      { path: 'lib/text.ts', proves: ['return `<@${userId.toLowerCase()}>`'] },
+    ],
+  },
+  {
+    label: 'Attachments',
+    value: 'message_files · messages.files · storage: attachments',
+    body: 'One row per photo or video, with its path, kind and size. `messages.files` is the count, and a deferred trigger refuses a message whose rows don’t match it. A guard on each row reads the size from the stored object rather than trusting the client. In a DM the file name and type live in `message_files.sealed`.',
+    sources: [
+      { path: FILES, proves: ['create table public.message_files', 'create constraint trigger messages_files_present', "new.bytes := coalesce((obj.metadata ->> 'size')::bigint, 0);"] },
+      { path: 'lib/attachments.ts' },
     ],
   },
   {
@@ -322,7 +352,7 @@ export const DATA_MODEL: Fact[] = [
   },
   {
     label: 'Encryption',
-    value: 'e2ee_keys · e2ee_backups · e2ee_device_requests · messages.sealed',
+    value: 'e2ee_keys · e2ee_backups · e2ee_device_requests · messages.sealed · message_files.sealed',
     body: 'Public keys, recovery-key-locked backups and in-flight device approvals. See End-to-end encryption below.',
     sources: [{ path: E2EE_SCHEMA }],
   },
@@ -450,6 +480,10 @@ export const JOURNEYS: Journey[] = [
         sources: [{ path: E2EE_SCHEMA, proves: ['new.created_at := now();'] }],
       },
       {
+        text: 'With photos or videos, the client uploads each file first (encrypted on the device in a DM), then calls `send_message_with_files()`, which writes the message and its file rows in one transaction.',
+        sources: [{ path: STORE, proves: ["rpc('send_message_with_files'"] }, { path: FILES, proves: ['create or replace function public.send_message_with_files('] }],
+      },
+      {
         text: 'Realtime delivers the `INSERT` to everyone RLS lets read it. Recipients open sealed messages locally.',
         sources: [{ path: STORE }],
       },
@@ -464,8 +498,12 @@ export const JOURNEYS: Journey[] = [
     title: 'Lock in',
     steps: [
       {
-        text: '`lock_in()` opens a `work_sessions` row with the server’s clock, so a refresh never resets the timer.',
-        sources: [{ path: LOCK_IN, proves: ['create function public.lock_in'] }],
+        text: '`lock_in()` opens a `work_sessions` row with the server’s clock, so a refresh never resets the timer. Calling it again returns the open session (or resumes a paused one) instead of starting a second.',
+        sources: [{ path: LOCK_IN, proves: ['create function public.lock_in'] }, { path: HOURS, proves: ['create or replace function public.lock_in('] }],
+      },
+      {
+        text: 'An optional focus can be set while it runs with `edit_lock_in()`. Ending goes through `finish_lock_in()`, which returns the session so the app can offer `note_lock_in()` for a short note.',
+        sources: [{ path: LOCK_IN, proves: ['create function public.edit_lock_in'] }, { path: HOURS, proves: ['create function public.finish_lock_in()', 'create function public.note_lock_in'] }],
       },
       {
         text: 'While Cabal is open, the client calls `lock_in_beat()` once a minute.',
@@ -476,8 +514,12 @@ export const JOURNEYS: Journey[] = [
         sources: [{ path: RESUME, proves: ["interval '5 minutes'"] }],
       },
       {
-        text: 'A session paused for more than 3 hours closes, saved with the time it actually ran.',
-        sources: [{ path: RESUME, proves: ["interval '3 hours'"] }],
+        text: 'A session paused for more than 3 hours closes, saved with the time it actually ran. Any one session counts for at most 8 hours; a timer left running past that is saved at 8 and closed.',
+        sources: [{ path: RESUME, proves: ["interval '3 hours'"] }, { path: HOURS, proves: ['v_limit constant integer := 8 * 3600;'] }],
+      },
+      {
+        text: 'Hours count in the week a session ends, starting Monday at midnight in the community’s `time_zone`. Sessions under a minute don’t count.',
+        sources: [{ path: HOURS, proves: ['create function public.lock_in_period_start'] }, { path: 'tests/unit/lock-in-hours.test.ts' }],
       },
     ],
   },
@@ -547,6 +589,12 @@ export const PRIMITIVES: Fact[] = [
     sources: [{ path: E2EE, proves: ["'cabal-dm-long-v1'"] }, { path: 'lib/long-text.ts', proves: ['export function packPreview'] }],
   },
   {
+    label: 'Files',
+    value: 'HKDF → AES-256-GCM per file',
+    body: 'Info `file:<message id>:<file id>` under the conversation key, so each photo or video has its own key. The file is sealed whole and uploaded as `application/octet-stream`; its name, type and dimensions are padded and sealed separately (`cabal-dm-file-meta-v1`), and both are bound to the message, author and file id.',
+    sources: [{ path: E2EE, proves: ['`file:${ctx.messageId}:${fileId}`', "'cabal-dm-file-v1'", "'cabal-dm-file-meta-v1'"] }],
+  },
+  {
     label: 'Envelope',
     value: '{ v, sk, rk, iv, ct }',
     body: 'Stored in `messages.sealed` with an empty `body`. The insert trigger checks its exact shape and that `sk` and `rk` are the sender’s and recipient’s current keys; a stale key is refused, and the client fetches the new one and resends.',
@@ -602,7 +650,7 @@ export const KEY_CARE: Fact[] = [
   },
   {
     label: 'Reporting',
-    body: 'The reporter’s client sends only that message’s key. The server opens the stored ciphertext with it before filing, so a report can’t put words in anyone’s mouth, and the rest of the conversation stays sealed.',
+    body: 'The reporter’s client sends only that message’s key. The server opens the stored ciphertext with it before filing, so a report can’t put words in anyone’s mouth, and the rest of the conversation stays sealed. File keys aren’t shared, so a report carries the text only.',
     sources: [{ path: 'app/api/reports/sealed/route.ts', proves: ['openWithMessageKey'] }],
   },
   {
@@ -630,7 +678,7 @@ export const TESTING: Fact[] = [
   {
     label: 'Unit',
     value: 'tests/unit/',
-    body: 'Encryption round trips and tamper cases, recovery-key parsing, presence, usernames, text handling and the sign-in route. No database needed.',
+    body: 'Encryption round trips and tamper cases, recovery-key parsing, attachments, lock-in weeks, mentions, long messages, presence, usernames, text handling and the sign-in route. No database needed.',
     sources: [{ path: 'tests/unit/e2ee.test.ts', proves: ["fails if it's moved to another message, author or conversation"] }],
   },
   {
