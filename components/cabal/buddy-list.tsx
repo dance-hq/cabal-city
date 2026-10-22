@@ -58,7 +58,6 @@ export function BuddyList({ compact }: { compact?: boolean }) {
     channels,
     userId,
     statusOf,
-    presence,
     active,
     open,
     openDm,
@@ -302,29 +301,14 @@ export function BuddyList({ compact }: { compact?: boolean }) {
 
         {visibleRooms.length > 0 && (
           <Section label="Channels">
-            {visibleRooms.map((r) => {
-              // Other people only: counting yourself made a bare "1" that read as unread.
-              const here = [...presence].filter(([id, p]) => id !== userId && p.rooms.has(r.id)).length
-              const hereLabel = `${here} ${here === 1 ? 'person' : 'people'} here now`
-              return (
-                <Row key={r.id} selected={active === r.id} onClick={() => open(r.id)} unread={r.unread} quiet muted={r.muted}>
-                  <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className={cn('truncate font-mono text-[13px]', r.unread > 0 && !r.muted && 'font-semibold text-foreground')}>
-                    {r.slug}
-                  </span>
-                  {here > 0 && (
-                    <span
-                      className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground"
-                      title={hereLabel}
-                      aria-label={hereLabel}
-                    >
-                      <span className="size-1.5 rounded-full bg-online" aria-hidden />
-                      {here}
-                    </span>
-                  )}
-                </Row>
-              )
-            })}
+            {visibleRooms.map((r) => (
+              <Row key={r.id} selected={active === r.id} onClick={() => open(r.id)} unread={r.unread} quiet muted={r.muted}>
+                <Hash className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <span className={cn('truncate font-mono text-[13px]', r.unread > 0 && !r.muted && 'font-semibold text-foreground')}>
+                  {r.slug}
+                </span>
+              </Row>
+            ))}
           </Section>
         )}
 

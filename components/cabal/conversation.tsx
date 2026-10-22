@@ -263,12 +263,11 @@ function OpenConversation({
             {muteButton}
             {hasPanel && (
               <IconButton
-                label={`${people.online.length} online. ${panelOpen ? 'Hide' : 'Show'} members`}
+                label={`${panelOpen ? 'Hide' : 'Show'} members`}
                 onClick={togglePanel}
                 pressed={panelOpen}
               >
                 <Users className="size-4" aria-hidden />
-                <span className="font-mono text-[11px]">{people.online.length}</span>
               </IconButton>
             )}
             {popout ? (
