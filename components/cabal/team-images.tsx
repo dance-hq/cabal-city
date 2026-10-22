@@ -164,7 +164,7 @@ export function TeamImagesEditor({
         <span className="text-sm font-medium">Logo and banner</span>
         <p className="text-xs leading-relaxed text-muted-foreground">
           Shown at the top of the team, in the sidebar and in the Teams list. After you pick a picture you can drag
-          and zoom to choose the part that shows.
+          and zoom to choose the part that shows. Animated GIFs stay animated.
         </p>
         <p className="text-xs leading-relaxed text-muted-foreground">
           <span className="font-medium text-foreground">Banner</span> {recommendedSize('banner')} (6:1)

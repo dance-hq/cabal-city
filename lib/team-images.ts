@@ -1,3 +1,4 @@
+import { MAX_GIF_FRAMES, decodeGif, encodeGif, type GifPicture } from '@/lib/animated-gif'
 import { createClient } from '@/lib/supabase/client'
 
 export type TeamImageKind = 'logo' | 'banner'
@@ -44,11 +45,53 @@ export function fitCrop(crop: CropArea | null | undefined, imageWidth: number, i
   return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }
 }
 
+// Animated GIFs are saved smaller than stills: every frame counts toward the size.
+const GIF_SIZE: Record<TeamImageKind, { width: number; height: number }> = {
+  logo: { width: 512, height: 512 },
+  banner: { width: 1200, height: 200 },
+}
+const GIF_MAX_BYTES = 8 * 1024 * 1024
+// Pixels across all frames; past this the browser stalls while preparing it.
+const GIF_PIXEL_BUDGET = 48_000_000
+
+const nextPaint = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+// Animated GIFs stay animated: every frame is cut and shrunk the same way a
+// still is. Returns null for a GIF with a single frame (saved like any still).
+async function prepareAnimatedGif(file: File, kind: TeamImageKind, crop?: CropArea | null): Promise<Blob | null> {
+  let picture: GifPicture
+  try {
+    picture = decodeGif(await file.arrayBuffer())
+  } catch (error) {
+    if (error instanceof Error && error.message === 'too many frames') {
+      throw new TeamImageError(`That GIF has more than ${MAX_GIF_FRAMES} frames. Try a shorter one.`)
+    }
+    return null
+  }
+  if (picture.frames.length < 2) return null
+  const area = fitCrop(crop, picture.width, picture.height, TEAM_IMAGE_ASPECT[kind])
+  const target = GIF_SIZE[kind]
+  const fullWidth = Math.min(target.width, area.width)
+  const budgetWidth = Math.sqrt((GIF_PIXEL_BUDGET * TEAM_IMAGE_ASPECT[kind]) / picture.frames.length)
+  for (const step of [1, 0.75, 0.5, 0.35]) {
+    const width = Math.max(16, Math.round(Math.min(fullWidth, budgetWidth) * step))
+    const height = Math.max(1, Math.round(width / TEAM_IMAGE_ASPECT[kind]))
+    await nextPaint()
+    const bytes = await encodeGif(picture, area, width, height, nextPaint)
+    if (bytes.byteLength <= GIF_MAX_BYTES) return new Blob([bytes as BlobPart], { type: 'image/gif' })
+  }
+  throw new TeamImageError('That GIF is too big. Try a shorter or smaller one.')
+}
+
 // Redrawn on this device: cut to the chosen part (the middle if none), shrunk,
 // and left without the camera/location data a photo carries.
 export async function prepareTeamImage(file: File, kind: TeamImageKind, crop?: CropArea | null): Promise<Blob> {
   if (!file.type.startsWith('image/')) throw new TeamImageError('Pick an image file.')
   if (file.size > INPUT_MAX_BYTES) throw new TeamImageError('Pick an image under 20 MB.')
+  if (file.type === 'image/gif') {
+    const animated = await prepareAnimatedGif(file, kind, crop)
+    if (animated) return animated
+  }
   let bitmap: ImageBitmap
   try {
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
@@ -82,7 +125,7 @@ export async function prepareTeamImage(file: File, kind: TeamImageKind, crop?: C
   }
 }
 
-const EXT: Record<string, string> = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg' }
+const EXT: Record<string, string> = { 'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif' }
 
 export async function uploadTeamImage(teamId: string, kind: TeamImageKind, blob: Blob): Promise<string> {
   const supabase = createClient()
