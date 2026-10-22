@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
+  CalendarDays,
   Check,
   ChevronRight,
   Compass,
@@ -265,6 +266,10 @@ export function BuddyList({ compact }: { compact?: boolean }) {
             <Row selected={active === VIEWS.opportunities} onClick={() => open(VIEWS.opportunities)} unread={0}>
               <Radar className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <span className="truncate text-[13px]">Opportunities</span>
+            </Row>
+            <Row selected={active === VIEWS.calendar} onClick={() => open(VIEWS.calendar)} unread={0}>
+              <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate text-[13px]">Calendar</span>
             </Row>
           </div>
         )}
