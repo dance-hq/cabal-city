@@ -14,6 +14,7 @@ import { useE2ee } from './e2ee-provider'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
+import { nickColor } from '@/lib/nick-color'
 import { pathsOf, removeUploads } from '@/lib/attachments'
 import { mentions, plainText } from '@/lib/text'
 import { linkLabel } from '@/lib/channel-links'
@@ -260,10 +261,8 @@ export function MessageList({
                             type="button"
                             onClick={() => m.author_id && showProfile(m.author_id)}
                             title={author?.username ? `@${author.username}` : undefined}
-                            className={cn(
-                              'mr-2 rounded text-[13px] font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ring',
-                              mine ? 'text-mark' : 'text-foreground',
-                            )}
+                            className="mr-2 rounded text-[13px] font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                            style={{ color: nickColor(m.author_id, mine) }}
                           >
                             {name}
                           </button>
@@ -319,7 +318,9 @@ export function MessageList({
                       <div className="min-w-0 flex-1">
                         {!grouped && (
                           <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-semibold">{mine ? 'You' : name}</span>
+                            <span className="text-sm font-semibold" style={{ color: nickColor(m.author_id, mine) }}>
+                              {mine ? 'You' : name}
+                            </span>
                             <time dateTime={m.created_at} title={fullTime(m.created_at)} className="text-[11px] text-muted-foreground">
                               {clock(m.created_at)}
                             </time>
