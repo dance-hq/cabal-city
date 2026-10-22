@@ -5,7 +5,7 @@ import { onlineCount } from '@/lib/online-count'
 import { latestRelease } from '@/lib/releases'
 import { githubUrl } from '@/lib/config'
 import { GithubIcon } from '@/components/brand/github-icon'
-import { AppleIcon, WindowsIcon } from '@/components/brand/platform-icons'
+import { AppleIcon, LinuxIcon, WindowsIcon } from '@/components/brand/platform-icons'
 import { ChicagoFlag } from '@/components/marketing/chicago-flag'
 import { Downloads } from '@/components/marketing/downloads'
 import { DeletedNotice } from '@/components/marketing/deleted-notice'
@@ -20,16 +20,21 @@ export const metadata: Metadata = {
   openGraph: { type: 'website', siteName: 'cabal.city', description: SITE_DESCRIPTION, locale: 'en_US', url: '/' },
 }
 
-const HERO_PRIMARY =
-  'inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+const PLATFORM_BUTTON =
+  'inline-flex items-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-primary-foreground/10 focus-visible:bg-primary-foreground/15 focus-visible:outline-none sm:px-5'
 
 export default async function Home() {
   const community = await getCommunity()
   const [release, online] = await Promise.all([latestRelease(), community ? onlineCount(community.id) : null])
-  // Straight to the installer when the release has one (Mac = Apple Silicon first);
-  // otherwise the downloads section further down.
-  const windowsDownload = (release.state === 'ready' && release.windows[0]?.url) || '#download'
-  const macDownload = (release.state === 'ready' && release.mac[0]?.url) || '#download'
+  // Straight to the installer when the release has one (Mac = Apple Silicon, Linux = AppImage,
+  // which runs on any distro); otherwise the downloads section further down.
+  const installer = (files: 'windows' | 'mac' | 'linux') =>
+    (release.state === 'ready' && release[files][0]?.url) || '#download'
+  const platforms = [
+    { name: 'Windows', href: installer('windows'), Icon: WindowsIcon },
+    { name: 'Mac', href: installer('mac'), Icon: AppleIcon },
+    { name: 'Linux', href: installer('linux'), Icon: LinuxIcon },
+  ]
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -54,25 +59,39 @@ export default async function Home() {
             Cabal is an open-source home for Chicago&rsquo;s builders. Find people working on interesting things,
             see who&rsquo;s around, and jump into conversations or rooms to build alongside them.
           </p>
-          <div className="flex flex-wrap gap-3 pt-2">
-            {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
-            <a href={windowsDownload} className={HERO_PRIMARY}>
-              <WindowsIcon className="size-4" />
-              Download for Windows
-            </a>
-            <a href={macDownload} className={HERO_PRIMARY}>
-              <AppleIcon className="size-4" />
-              Download for Mac
-            </a>
-            {githubUrl && (
-              <a
-                href={githubUrl}
-                className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Plain anchors: next/link ignores a click when the URL already ends in #download. */}
+              <nav
+                aria-label="Download Cabal"
+                className="inline-flex h-11 divide-x divide-primary-foreground/20 overflow-hidden rounded-lg bg-primary text-primary-foreground"
               >
-                <GithubIcon className="size-4" />
-                View on GitHub
+                {platforms.map(({ name, href, Icon }) => (
+                  <a key={name} href={href} aria-label={`Download for ${name}`} className={PLATFORM_BUTTON}>
+                    <Icon className="size-4" />
+                    {name}
+                  </a>
+                ))}
+              </nav>
+              {githubUrl && (
+                <a
+                  href={githubUrl}
+                  className="inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <GithubIcon className="size-4" />
+                  View on GitHub
+                </a>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Free desktop app.{' '}
+              <a
+                href="#download"
+                className="rounded text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Intel Mac and .deb builds
               </a>
-            )}
+            </p>
           </div>
         </section>
 
