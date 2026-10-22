@@ -3,29 +3,31 @@ import { AppWindow, ArrowDownToLine, ArrowUpRight, Laptop, Monitor, Terminal } f
 import type { Download, ReleaseInfo } from '@/lib/releases'
 import { githubUrl } from '@/lib/config'
 
-type Row = { platform: string; detail: string; icon: React.ReactNode; files: Download[] }
+type Row = {
+  platform: string
+  detail: string
+  icon: React.ReactNode
+  // The first file is the main Download button; the rest are small links beside it.
+  files: Download[]
+  alternatives: { name: string; file: Download }[]
+}
+
+// What the small link next to the main button says, per release file label.
+const ALTERNATIVE_NAMES: Record<string, string> = { Intel: 'Intel Mac', '.deb': '.deb package' }
+
+const megabytes = (bytes: number) => Math.max(1, Math.round(bytes / 1_000_000))
+
+function row(platform: string, detail: string, icon: React.ReactNode, files: Download[]): Row {
+  const alternatives = files.slice(1).map((file) => ({ name: ALTERNATIVE_NAMES[file.label] ?? file.label, file }))
+  return { platform, detail, icon, files, alternatives }
+}
 
 export function Downloads({ release }: { release: ReleaseInfo }) {
   const ready = release.state === 'ready'
   const rows: Row[] = [
-    {
-      platform: 'Windows',
-      detail: 'Windows 10 or 11 · x64 and Arm',
-      icon: <Monitor className="size-5" aria-hidden />,
-      files: ready ? release.windows : [],
-    },
-    {
-      platform: 'macOS',
-      detail: 'Apple Silicon or Intel',
-      icon: <Laptop className="size-5" aria-hidden />,
-      files: ready ? release.mac : [],
-    },
-    {
-      platform: 'Linux',
-      detail: 'AppImage or Debian/Ubuntu package',
-      icon: <Terminal className="size-5" aria-hidden />,
-      files: ready ? release.linux : [],
-    },
+    row('Windows', 'Windows 10 or 11 · x64 and Arm', <Monitor className="size-5" aria-hidden />, ready ? release.windows : []),
+    row('macOS', 'Apple Silicon', <Laptop className="size-5" aria-hidden />, ready ? release.mac : []),
+    row('Linux', 'AppImage · runs on any distro', <Terminal className="size-5" aria-hidden />, ready ? release.linux : []),
   ]
 
   return (
@@ -53,19 +55,32 @@ export function Downloads({ release }: { release: ReleaseInfo }) {
                 <span className="text-xs text-muted-foreground">{row.detail}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               {row.files.length > 0 ? (
-                row.files.map((f) => (
+                <>
+                  {row.alternatives.length > 0 && (
+                    <span className="order-2 flex items-center gap-3 text-xs text-muted-foreground sm:order-1">
+                      {row.alternatives.map((alt) => (
+                        <a
+                          key={alt.file.url}
+                          href={alt.file.url}
+                          className="rounded underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                          {alt.name}
+                        </a>
+                      ))}
+                    </span>
+                  )}
                   <a
-                    key={f.url}
-                    href={f.url}
-                    className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    href={row.files[0].url}
+                    aria-label={`Download for ${row.platform}`}
+                    className="order-1 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:order-2"
                   >
                     <ArrowDownToLine className="size-4" aria-hidden />
-                    {row.platform === 'Windows' ? 'Download' : f.label}
-                    <span className="font-mono text-xs opacity-75">{Math.max(1, Math.round(f.size / 1_000_000))} MB</span>
+                    Download
+                    <span className="font-mono text-xs opacity-75">{megabytes(row.files[0].size)} MB</span>
                   </a>
-                ))
+                </>
               ) : (
                 <span className="inline-flex h-9 items-center rounded-md border border-dashed px-3 font-mono text-xs text-muted-foreground">
                   Coming with the first release
