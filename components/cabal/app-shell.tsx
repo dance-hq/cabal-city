@@ -10,6 +10,8 @@ import { BuddyList } from './buddy-list'
 import { Conversation } from './conversation'
 import { ProfileDialog } from './profile-dialog'
 import { SettingsDialog } from './settings-dialog'
+import { Welcome } from './welcome'
+import { PlaybookDialog } from './playbook'
 import { UpdateBar } from './update-bar'
 import { WorkSessionProvider } from './work-session'
 import { Home } from './home'
@@ -31,6 +33,8 @@ export function AppShell({ boot }: { boot: Boot }) {
             <Layout />
             <ProfileDialog />
             <SettingsDialog />
+            <Welcome />
+            <PlaybookDialog />
             <DesktopBuddies />
             <PinPrompt />
             <UnlockDialog />

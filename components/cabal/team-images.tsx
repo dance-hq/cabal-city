@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import {
+  TEAM_IMAGE_ASPECT,
   TeamImageError,
+  type CropArea,
   isOwnTeamImageUrl,
   prepareTeamImage,
   removeTeamImage,
@@ -79,9 +81,13 @@ export function TeamMark({
   )
 }
 
+// Always the same 6:1 shape the owner cropped to, so nothing is cut off differently per screen.
 export function TeamBanner({ url, className }: { url: string; className?: string }) {
   return (
-    <div className={cn('w-full shrink-0 overflow-hidden bg-muted', className)}>
+    <div
+      className={cn('w-full shrink-0 overflow-hidden bg-muted', className)}
+      style={{ aspectRatio: TEAM_IMAGE_ASPECT.banner }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt="" className="size-full object-cover" />
     </div>
@@ -89,18 +95,27 @@ export function TeamBanner({ url, className }: { url: string; className?: string
 }
 
 // Owners only: pick, preview and remove the team's logo and banner.
-export function TeamImagesEditor({ teamId, onChanged }: { teamId: string; onChanged?: () => void }) {
+export function TeamImagesEditor({
+  teamId,
+  teamName,
+  onChanged,
+}: {
+  teamId: string
+  teamName?: string | null
+  onChanged?: () => void
+}) {
   const { data, mutate } = useTeamImages(teamId)
   const [busy, setBusy] = useState<TeamImageKind | null>(null)
+  const [picked, setPicked] = useState<{ kind: TeamImageKind; file: File } | null>(null)
   const logoInput = useRef<HTMLInputElement>(null)
   const bannerInput = useRef<HTMLInputElement>(null)
 
-  async function save(kind: TeamImageKind, file: File | null) {
+  async function save(kind: TeamImageKind, file: File | null, crop?: CropArea) {
     const current = kind === 'logo' ? data?.logo_url : data?.banner_url
     setBusy(kind)
     let uploaded: string | null = null
     try {
-      if (file) uploaded = await uploadTeamImage(teamId, kind, await prepareTeamImage(file, kind))
+      if (file) uploaded = await uploadTeamImage(teamId, kind, await prepareTeamImage(file, kind, crop))
       const { error } = await createClient().rpc('set_team_image', { p_team: teamId, p_kind: kind, p_url: uploaded })
       if (error) throw error
       if (current && current !== uploaded) removeTeamImage(current)
@@ -109,6 +124,7 @@ export function TeamImagesEditor({ teamId, onChanged }: { teamId: string; onChan
       toast.success(
         file ? (kind === 'logo' ? 'Logo updated' : 'Banner updated') : kind === 'logo' ? 'Logo removed' : 'Banner removed',
       )
+      setPicked(null)
     } catch (error) {
       if (uploaded) removeTeamImage(uploaded)
       toast.error(error instanceof TeamImageError ? error.message : friendlyError(error))
@@ -129,7 +145,9 @@ export function TeamImagesEditor({ teamId, onChanged }: { teamId: string; onChan
         onChange={(e) => {
           const file = e.target.files?.[0] ?? null
           e.target.value = ''
-          if (file) void save(kind, file)
+          if (!file) return
+          if (!file.type.startsWith('image/')) return void toast.error('Pick an image file.')
+          setPicked({ kind, file })
         }}
       />
     )
@@ -143,7 +161,8 @@ export function TeamImagesEditor({ teamId, onChanged }: { teamId: string; onChan
       <div className="flex flex-col gap-0.5">
         <span className="text-sm font-medium">Logo and banner</span>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Shown at the top of the team, in the sidebar and in the Teams list. Wide banners work best (4:1).
+          Shown at the top of the team, in the sidebar and in the Teams list. Banners are wide and short; after you
+          pick a picture you can drag and zoom to choose the part that shows.
         </p>
       </div>
 
@@ -152,7 +171,8 @@ export function TeamImagesEditor({ teamId, onChanged }: { teamId: string; onChan
           type="button"
           onClick={() => bannerInput.current?.click()}
           disabled={busy !== null}
-          className="group relative block aspect-[4/1] w-full overflow-hidden rounded-md bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          style={{ aspectRatio: TEAM_IMAGE_ASPECT.banner }}
+          className="group relative block w-full overflow-hidden rounded-md bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           aria-label={banner ? 'Change banner' : 'Add a banner'}
         >
           {banner && (

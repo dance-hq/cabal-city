@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes'
 import { useSWRConfig } from 'swr'
 import { lockInsKey } from '@/hooks/use-lock-ins'
 import { refreshLockInHours } from '@/hooks/use-lock-in-hours'
-import { Camera, Link2, Loader2 } from 'lucide-react'
+import { BookOpen, Camera, Link2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -467,7 +467,7 @@ function AppSettings() {
 }
 
 function CommunitySettings() {
-  const { community } = useCabal()
+  const { community, setSettingsOpen, setPlaybookOpen } = useCabal()
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -481,6 +481,18 @@ function CommunitySettings() {
         <Button variant="secondary" size="sm" onClick={() => copyInviteLink(community.id)}>
           <Link2 aria-hidden />
           Copy invite link
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-2"
+          onClick={() => {
+            setSettingsOpen(false)
+            setPlaybookOpen(true)
+          }}
+        >
+          <BookOpen aria-hidden />
+          The Cabal Playbook
         </Button>
       </div>
       <LockInSettings />

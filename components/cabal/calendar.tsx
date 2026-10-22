@@ -205,9 +205,13 @@ function EventRow({
             e.title
           )}
         </h3>
+        {e.host && (
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
+            Hosted by <span className="font-medium text-foreground">{e.host}</span>
+          </p>
+        )}
         <p className="text-[13px] leading-relaxed text-muted-foreground">
           {e.venue}
-          {e.host && <> · {e.host}</>}
           {now && e.ends_at && <> · until {clock(e.ends_at, e.time_zone)}</>}
         </p>
         {e.summary && <p className="text-sm leading-relaxed text-pretty">{e.summary}</p>}

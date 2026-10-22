@@ -23,7 +23,6 @@ import { Avatar } from './avatar'
 import { MeCard } from './me-card'
 import { SessionBar } from './session-bar'
 import { ConnectionBanner } from './connection-banner'
-import { WelcomeCard } from './welcome-card'
 import { BrowseTeamsDialog, CreateTeamDialog, TeamIcon, useTeamRooms } from './team-dialogs'
 import { VIEWS, useCabal } from './store'
 import { compareByPresence } from '@/lib/presence'
@@ -257,7 +256,6 @@ export function BuddyList({ compact }: { compact?: boolean }) {
       {compact && <SessionBar />}
 
       <nav className="quiet-scroll min-h-0 flex-1 overflow-y-auto pb-4" aria-label="Conversations">
-        <WelcomeCard />
 
         {waiting.length > 0 && (
           <Section label={`New messages · ${waiting.length}`}>{waiting.map(personRow)}</Section>
