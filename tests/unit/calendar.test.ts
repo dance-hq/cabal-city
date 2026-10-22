@@ -7,12 +7,34 @@ import {
   happeningNow,
   place,
   timeRange,
+  trackedUrl,
   toIcs,
   toLocalRange,
   type CalendarEvent,
 } from '@/lib/calendar'
 
 const TZ = 'America/Chicago'
+
+describe('trackedUrl', () => {
+  it('tags where the visitor came from', () => {
+    expect(trackedUrl('https://luma.com/2b1wjs4c', 'calendar')).toBe(
+      'https://luma.com/2b1wjs4c?utm_source=cabal&utm_medium=calendar',
+    )
+  })
+  it('keeps the link’s own query and anchor', () => {
+    expect(trackedUrl('https://partiful.com/e/abc?ref=x#top', 'share')).toBe(
+      'https://partiful.com/e/abc?ref=x&utm_source=cabal&utm_medium=share#top',
+    )
+  })
+  it('never overrides the organizer’s own tags', () => {
+    const own = 'https://lu.ma/x?utm_source=newsletter&utm_medium=email'
+    expect(trackedUrl(own, 'calendar')).toBe(own)
+  })
+  it('leaves anything that is not a web link alone', () => {
+    expect(trackedUrl('mailto:hi@cabal.city', 'calendar')).toBe('mailto:hi@cabal.city')
+    expect(trackedUrl('not a link', 'calendar')).toBe('not a link')
+  })
+})
 
 describe('place', () => {
   it('hides a venue that only names the city', () => {

@@ -14,6 +14,7 @@ import {
   timeRange,
   place,
   toIcs,
+  trackedUrl,
   zoneCity,
   type CalendarEvent,
 } from '@/lib/calendar'
@@ -186,6 +187,7 @@ function EventRow({
   onEdit?: () => void
 }) {
   const now = happeningNow(e)
+  const link = e.url ? trackedUrl(e.url, 'calendar') : null
   return (
     <li className="flex flex-col gap-1.5 py-4 sm:flex-row sm:gap-5">
       <p
@@ -198,8 +200,8 @@ function EventRow({
       </p>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h3 className="text-[15px] leading-snug font-semibold text-balance">
-          {e.url ? (
-            <a href={e.url} target="_blank" rel="noopener noreferrer nofollow" className="hover:underline hover:underline-offset-2">
+          {link ? (
+            <a href={link} target="_blank" rel="noopener noreferrer nofollow" className="hover:underline hover:underline-offset-2">
               {e.title}
             </a>
           ) : (
@@ -223,9 +225,9 @@ function EventRow({
         )}
         {e.summary && <p className="text-sm leading-relaxed text-pretty">{e.summary}</p>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-          {e.url && (
+          {link && (
             <a
-              href={e.url}
+              href={link}
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
