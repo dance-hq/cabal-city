@@ -9,16 +9,16 @@ export function Downloads({ release }: { release: ReleaseInfo }) {
   const ready = release.state === 'ready'
   const rows: Row[] = [
     {
-      platform: 'macOS',
-      detail: 'Apple Silicon or Intel',
-      icon: <Laptop className="size-5" aria-hidden />,
-      files: ready ? release.mac : [],
-    },
-    {
       platform: 'Windows',
       detail: 'Windows 10 or 11 · x64 and Arm',
       icon: <Monitor className="size-5" aria-hidden />,
       files: ready ? release.windows : [],
+    },
+    {
+      platform: 'macOS',
+      detail: 'Apple Silicon or Intel',
+      icon: <Laptop className="size-5" aria-hidden />,
+      files: ready ? release.mac : [],
     },
     {
       platform: 'Linux',
@@ -98,7 +98,7 @@ export function Downloads({ release }: { release: ReleaseInfo }) {
         {ready ? (
           <>
             {release.version}
-            {release.prerelease ? ' (early release)' : ''} · The installers aren&apos;t signed yet, so macOS and Windows
+            {release.prerelease ? ' (early release)' : ''} · The installers aren&apos;t signed yet, so Windows and macOS
             ask once before opening.{' '}
             <a href={release.url} className="underline underline-offset-2 hover:text-foreground">
               Install steps and release notes
