@@ -680,6 +680,8 @@ export const ENCRYPTION_SCOPE: string[] = [
   'Photos and videos in direct messages are encrypted on your device before they upload, each under its own key, with their name and type sealed alongside. Their size isn’t hidden.',
   'Metadata isn’t hidden: who talks to whom, when, and the padded size of each message all pass through the server so delivery and unread counts work.',
   'Keys live only on your devices and in your recovery-key backup. Lose every device and the recovery key, and nobody can recover those messages. Clearing a browser’s site data deletes its keys.',
+  'The encrypting code is served by the Cabal server (the desktop app loads the same web app), so the protection assumes that server serves the published code. A compromised deployment could ship code that reads messages before they are sealed, as with any web-delivered encryption.',
+  'Public keys come from the server. A swapped key shows a “security code changed” notice only if you already had their old key; comparing security codes in person is what rules out a swap on first contact.',
 ]
 
 // --- Tests and CI ------------------------------------------------------------------

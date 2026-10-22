@@ -41,6 +41,14 @@ let teamMessage = ''
 let dmMessage = ''
 let aliceSession = ''
 let aliceDeviceRequest = ''
+let opportunity = ''
+let submission = ''
+let event = ''
+let idea = ''
+let ideaComment = ''
+let ship = ''
+let report = ''
+let teamInvite = ''
 
 function claims(who: Person | null) {
   return JSON.stringify(who ? { sub: who.id, role: 'authenticated' } : { role: 'anon' })
@@ -71,6 +79,30 @@ async function keep(who: Person, sql: string, params: unknown[] = []) {
   await db.query('reset role')
   await db.query(`select set_config('request.jwt.claims', '', true)`)
   return r.rows
+}
+
+// Runs a call as someone, then reads the database as the owner to see what it
+// actually changed, then undoes both. For functions that refuse by doing nothing.
+async function attempt(who: Person, sql: string, params: unknown[], check: string, checkParams: unknown[] = []) {
+  await db.query('savepoint attempt')
+  try {
+    await db.query('savepoint call')
+    let error: (Error & { code?: string }) | null = null
+    try {
+      await db.query('set local role authenticated')
+      await db.query(`select set_config('request.jwt.claims', $1, true)`, [claims(who)])
+      await db.query(sql, params)
+      await db.query('release savepoint call')
+    } catch (e) {
+      error = e as Error & { code?: string }
+      await db.query('rollback to savepoint call')
+    }
+    await db.query('reset role')
+    await db.query(`select set_config('request.jwt.claims', '', true)`)
+    return { error, after: (await db.query(check, checkParams)).rows }
+  } finally {
+    await db.query('rollback to savepoint attempt')
+  }
 }
 
 const denied = (r: Result) => r.error !== null || r.count === 0
@@ -157,11 +189,57 @@ describe.skipIf(!url)('authorization (rolled back, never committed)', () => {
       community,
       alice.id,
     ])
-    await db.query(`insert into public.reports (community_id, reporter_id, reported_user_id, reason) values ($1, $2, $3, 'r')`, [
-      community,
-      alice.id,
-      mallory.id,
-    ])
+    report = (
+      await db.query(
+        `insert into public.reports (community_id, reporter_id, reported_user_id, reason) values ($1, $2, $3, 'r') returning id`,
+        [community, alice.id, mallory.id],
+      )
+    ).rows[0].id
+
+    // One of each board item, so admin-only functions have something real to refuse.
+    opportunity = (
+      await db.query(
+        `insert into public.opportunities (community_id, kind, title, summary, place, url, verified_at, status)
+         values ($1, 'credits', 'Authz credits', 'Credits for the authorization check.', 'Chicago', 'https://example.invalid/o', current_date, 'published')
+         returning id`,
+        [community],
+      )
+    ).rows[0].id
+    submission = (
+      await db.query(
+        `insert into public.opportunity_submissions (community_id, url, submitted_by) values ($1, 'https://example.invalid/s', $2) returning id`,
+        [community, alice.id],
+      )
+    ).rows[0].id
+    event = (
+      await db.query(
+        `insert into public.calendar_events (community_id, title, starts_at, venue, status, submitted_by)
+         values ($1, 'Authz meetup', now() + interval '3 days', 'Somewhere', 'pending', $2) returning id`,
+        [community, alice.id],
+      )
+    ).rows[0].id
+    idea = (
+      await db.query(
+        `insert into public.feedback (community_id, author_id, kind, title, body, on_board) values ($1, $2, 'idea', 'Authz idea', 'An idea.', true) returning id`,
+        [community, alice.id],
+      )
+    ).rows[0].id
+    ideaComment = (
+      await db.query(`insert into public.idea_comments (idea_id, author_id, body) values ($1, $2, 'A comment.') returning id`, [
+        idea,
+        alice.id,
+      ])
+    ).rows[0].id
+    ship = (await db.query(`insert into public.ships (title) values ('Authz ship') returning id`)).rows[0].id
+    // ada is invited (not joined), so the admin checks above also prove an
+    // invitation alone never opens a private team's messages.
+    teamInvite = (
+      await db.query(`insert into public.team_invites (team_id, user_id, invited_by) values ($1, $2, $3) returning id`, [
+        team,
+        ada.id,
+        alice.id,
+      ])
+    ).rows[0].id
     const key = 'A'.repeat(87) + '='
     aliceDeviceRequest = (
       await db.query(
@@ -330,7 +408,7 @@ describe.skipIf(!url)('authorization (rolled back, never committed)', () => {
     })
 
     it('feedback and reports are visible to their author and admins only', async () => {
-      expect(denied(await as(bob, `select id from public.feedback where author_id = $1`, [alice.id]))).toBe(true)
+      expect(denied(await as(bob, `select id from public.feedback where author_id = $1 and not on_board`, [alice.id]))).toBe(true)
       expect(denied(await as(bob, `select id from public.reports where reporter_id = $1`, [alice.id]))).toBe(true)
       expect(denied(await as(ada, `select id from public.reports where reporter_id = $1`, [alice.id]))).toBe(false)
     })
@@ -374,6 +452,117 @@ describe.skipIf(!url)('authorization (rolled back, never committed)', () => {
     it('cannot answer someone else’s device-unlock request', async () => {
       const r = await as(bob, `select public.e2ee_claim_device($1, $2, $3)`, [aliceDeviceRequest, 'C'.repeat(87) + '=', 'D'.repeat(22) + '=='])
       expect(r.error).not.toBeNull()
+    })
+  })
+
+  describe('boards, calendar and teams', () => {
+    it('admin-only board, calendar and report functions refuse members', async () => {
+      for (const [fn, args] of [
+        ['archive_opportunity($1)', [opportunity]],
+        ['opportunity_detail($1)', [opportunity]],
+        ['dismiss_opportunity_submission($1)', [submission]],
+        ['event_detail($1)', [event]],
+        ['remove_event($1)', [event]],
+        ['save_event($1, $2, $3, null, $4, null, $5, null, null)', [event, community, 'Hijacked', '2030-01-01 18:00', 'Elsewhere']],
+        ['resolve_report($1)', [report]],
+        ['set_idea_hidden($1, true)', [idea]],
+        ['set_idea_status($1, $2, null, null)', [idea, 'shipped']],
+        ['delete_idea_comment($1)', [ideaComment]],
+      ] as const) {
+        // The exact code matters: any other error could just be a wrong call.
+        expect((await as(bob, `select * from public.${fn}`, [...args])).error?.code, fn).toBe('42501')
+        expect((await as(ada, `select * from public.${fn}`, [...args])).error?.code, `${fn} as admin`).not.toBe('42501')
+      }
+    })
+
+    // Maintainer = admin of any community (one community per deployment today).
+    // Admin only comes from the server's admin list, so joining must never grant it.
+    it('maintainer-only functions refuse members, and joining never makes you one', async () => {
+      for (const [fn, args] of [
+        ['post_ship($1, null, null)', ['Fake ship']],
+        ['delete_ship($1)', [ship]],
+        ['set_idea_link($1, $2)', [idea, 'https://github.com/evil/repo']],
+      ] as const) {
+        expect((await as(bob, `select public.${fn}`, [...args])).error?.code, fn).toBe('42501')
+      }
+      const joined = await attempt(
+        olivia,
+        `select public.join_community($1)`,
+        [`authz-${tag}`],
+        `select role from public.community_members where community_id = $1 and user_id = $2`,
+        [community, olivia.id],
+      )
+      expect(joined.error).toBeNull()
+      expect(joined.after[0]?.role).toBe('member')
+    })
+
+    it('a pending event stays out of other members’ calendars', async () => {
+      const r = await as(mallory, `select * from public.calendar_for($1)`, [community])
+      expect(r.error).toBeNull()
+      expect(JSON.stringify(r.rows)).not.toContain(event)
+    })
+
+    it('people outside the community get nothing from its boards, channels or invite code', async () => {
+      for (const sql of [
+        'select * from public.calendar_for($1)',
+        'select * from public.opportunities_for($1)',
+        'select * from public.linkable_channels($1)',
+        'select public.community_invite_code($1) code',
+      ]) {
+        const r = await as(olivia, sql, [community])
+        const leaked = JSON.stringify(r.rows).match(new RegExp(`${event}|${opportunity}|${room}|"code":"[^"]`))
+        expect(r.error !== null || leaked === null, sql).toBe(true)
+      }
+      const places = await as(olivia, `select * from public.member_places($1, $2)`, [community, alice.id])
+      expect(denied(places)).toBe(true)
+    })
+
+    it('a member’s places never reveal a private team to someone not on it', async () => {
+      const r = await as(mallory, `select * from public.member_places($1, $2)`, [community, alice.id])
+      expect(JSON.stringify(r.rows)).not.toContain(team)
+    })
+
+    it('only team owners rename a team, change its welcome or cancel its invites', async () => {
+      for (const who of [bob, mallory, ada]) {
+        expect((await as(who, `select public.rename_team($1, 'Taken over')`, [team])).error?.code).toBe('42501')
+        expect((await as(who, `select public.set_team_welcome($1, 'Gotcha')`, [team])).error?.code).toBe('42501')
+        expect((await as(who, `select public.cancel_team_invite($1)`, [teamInvite])).error?.code).toBe('42501')
+      }
+    })
+
+    it('only team owners can put images in a team’s folder', async () => {
+      const r = await as(bob, `select public.can_edit_team_image($1) ok`, [`${team}/logo.webp`])
+      expect(r.rows[0]?.ok).toBe(false)
+    })
+
+    it('cannot approve or decline someone else’s device request', async () => {
+      const approve = await attempt(
+        bob,
+        `select public.e2ee_approve_device($1, 'aXY=', 'a2V5cmluZw==')`,
+        [aliceDeviceRequest],
+        `select status, sealed_keyring from public.e2ee_device_requests where id = $1`,
+        [aliceDeviceRequest],
+      )
+      expect(approve.after[0]?.sealed_keyring ?? null).toBeNull()
+      const decline = await attempt(
+        bob,
+        `select public.e2ee_decline_device($1)`,
+        [aliceDeviceRequest],
+        `select status from public.e2ee_device_requests where id = $1`,
+        [aliceDeviceRequest],
+      )
+      expect(decline.after[0]?.status).not.toBe('declined')
+    })
+
+    it('cannot overwrite someone else’s key backup', async () => {
+      const r = await attempt(
+        bob,
+        `select public.e2ee_save_backup($1, 'aXY=', 'YmFja3Vw')`,
+        [randomUUID()],
+        `select count(*)::int n from public.e2ee_backups where user_id = $1`,
+        [alice.id],
+      )
+      expect(r.after[0]?.n).toBe(0)
     })
   })
 
