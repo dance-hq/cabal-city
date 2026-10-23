@@ -6,6 +6,7 @@ import {
   deviceCode,
   exportPublicKey,
   formatRecoveryKey,
+  lockWithPhrase,
   lockWithRecoveryKey,
   messageKey,
   newDeviceOffer,
@@ -14,9 +15,12 @@ import {
   openFromDevice,
   openMessage,
   openWithMessageKey,
+  openWithPhrase,
   openWithRecoveryKey,
   packKeyring,
   parseRecoveryKey,
+  PHRASE_ITERATIONS,
+  phraseProblem,
   publicKeyOf,
   sealForDevice,
   sealMessage,
@@ -115,6 +119,44 @@ describe('Recovery keys', () => {
     expect(back.map((k) => [k.id, k.publicKey])).toEqual([['k1', ring[0].publicKey]])
     await expect(openWithRecoveryKey(backup, newRecoveryKey(), ALICE)).rejects.toThrow()
     await expect(openWithRecoveryKey(backup, recovery, BOB)).rejects.toThrow()
+  })
+})
+
+describe('Unlock phrases', () => {
+  const PHRASE = 'harbor tulip seventy bicycle'
+
+  it('opens with the same phrase, however it was spaced, for the right person only', async () => {
+    const pair = await newKeyPair()
+    const ring = [{ id: 'k1', privateKey: pair.privateKey, publicKey: await exportPublicKey(pair.publicKey) }]
+    const backup = await lockWithPhrase(await packKeyring(ring), PHRASE, ALICE)
+    expect(backup.iterations).toBe(PHRASE_ITERATIONS)
+    const back = await unpackKeyring(await openWithPhrase(backup, `  harbor  tulip seventy\tbicycle `, ALICE))
+    expect(back.map((k) => k.publicKey)).toEqual([ring[0].publicKey])
+    await expect(openWithPhrase(backup, 'harbor tulip seventy bicycles', ALICE)).rejects.toThrow()
+    await expect(openWithPhrase(backup, PHRASE, BOB)).rejects.toThrow()
+  })
+
+  it('refuses a backup that asks for fewer iterations', async () => {
+    const pair = await newKeyPair()
+    const ring = [{ id: 'k1', privateKey: pair.privateKey, publicKey: await exportPublicKey(pair.publicKey) }]
+    const backup = await lockWithPhrase(await packKeyring(ring), PHRASE, ALICE)
+    await expect(openWithPhrase({ ...backup, iterations: 1000 }, PHRASE, ALICE)).rejects.toThrow()
+  })
+
+  it('asks for something hard to guess', () => {
+    expect(phraseProblem('short')).not.toBeNull()
+    expect(phraseProblem('aaaaaaaaaaaaaaaa')).not.toBeNull()
+    expect(phraseProblem(PHRASE)).toBeNull()
+  })
+
+  it('stores what the database accepts', async () => {
+    const sql = readFileSync('supabase/migrations/0034_e2ee_unlock_phrase.sql', 'utf8')
+    const check = (col: string) => new RegExp(sql.match(new RegExp(`${col} text not null check \\(${col} ~ '([^']+)'\\)`))![1])
+    const pair = await newKeyPair()
+    const ring = [{ id: 'k1', privateKey: pair.privateKey, publicKey: await exportPublicKey(pair.publicKey) }]
+    const backup = await lockWithPhrase(await packKeyring(ring), PHRASE, ALICE)
+    expect(backup.salt).toMatch(check('salt'))
+    expect(backup.iv).toMatch(check('iv'))
   })
 })
 

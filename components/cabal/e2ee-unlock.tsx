@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import useSWR from "swr";
-import { KeyRound, Laptop, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import useSWR, { useSWRConfig } from "swr";
+import { KeyRound, Laptop, Loader2, TextCursorInput } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,20 +19,31 @@ import { deviceLabel } from "@/lib/e2ee/device-label";
 import type { OutgoingRequest } from "@/lib/e2ee/session";
 import { friendlyError } from "@/lib/errors";
 import { useE2ee } from "./e2ee-provider";
+import {
+  AccountField,
+  PhraseInput,
+  phraseKey,
+  SetPhraseForm,
+  usePhrase,
+} from "./e2ee-phrase";
 
-type View = "choose" | "device" | "recovery" | "reset";
+type View = "choose" | "device" | "phrase" | "recovery" | "reset" | "after";
 
-// For a device that doesn't have your keys yet: get them from a device you
-// already use, from your recovery key, or start over.
+// For a device that doesn't have your keys yet: type your unlock phrase, get
+// them from a device you already use, use your recovery key, or start over.
 export function UnlockDialog() {
   const { unlockOpen, setUnlockOpen, session } = useE2ee();
+  const { data: hasPhrase, error: phraseError } = usePhrase();
+  const phraseKnown = hasPhrase !== undefined || !!phraseError;
   const [view, setView] = useState<View>("choose");
   const [req, setReq] = useState<OutgoingRequest | null>(null);
   const [starting, setStarting] = useState(false);
+  const [routed, setRouted] = useState(false);
 
   function finish() {
     setReq(null);
     setView("choose");
+    setRouted(false);
     setUnlockOpen(false);
   }
 
@@ -54,36 +65,44 @@ export function UnlockDialog() {
     }
   }
 
-  // Asking your other device is what almost everyone wants, so tapping Unlock
-  // starts it straight away. Recovery key and starting over are one tap back.
-  const autoAsked = useRef(false);
+  // With an unlock phrase, typing it is quickest and needs nothing else on.
+  // Without one, asking your other device is what almost everyone wants, so
+  // tapping Unlock starts it straight away. Everything else is one tap back.
   useEffect(() => {
-    if (!unlockOpen) {
-      autoAsked.current = false;
+    if (!unlockOpen || routed || !phraseKnown || req || view !== "choose")
+      return;
+    setRouted(true);
+    if (hasPhrase) setView("phrase");
+    else void askDevice();
+    // askDevice only reads stable values; route once per opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlockOpen, routed, phraseKnown, hasPhrase]);
+
+  function unlocked(how: "phrase" | "other") {
+    setReq(null);
+    if (how === "other" && hasPhrase === false) {
+      setView("after");
       return;
     }
-    if (autoAsked.current || req || view !== "choose") return;
-    autoAsked.current = true;
-    void askDevice();
-    // askDevice only reads stable values; run once per opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unlockOpen]);
-
-  function unlocked() {
     toast.success(
       "Unlocked. Your direct messages are readable on this device.",
     );
     finish();
   }
 
+  const preparing =
+    view === "choose" && (!routed || (starting && !req));
+
   return (
     <Dialog open={unlockOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        {view === "choose" && starting && !req && (
+        {preparing && (
           <>
             <DialogHeader>
               <DialogTitle>Unlock direct messages</DialogTitle>
-              <DialogDescription>Asking your other devices…</DialogDescription>
+              <DialogDescription>
+                {routed ? "Asking your other devices…" : "Checking your account…"}
+              </DialogDescription>
             </DialogHeader>
             <p
               className="inline-flex items-center gap-2 text-sm text-muted-foreground"
@@ -94,7 +113,7 @@ export function UnlockDialog() {
             </p>
           </>
         )}
-        {view === "choose" && !(starting && !req) && (
+        {view === "choose" && !preparing && (
           <>
             <DialogHeader>
               <DialogTitle>Unlock direct messages</DialogTitle>
@@ -105,6 +124,14 @@ export function UnlockDialog() {
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-2">
+              {hasPhrase && (
+                <Choice
+                  icon={<TextCursorInput className="size-4" aria-hidden />}
+                  title="Type my unlock phrase"
+                  hint="Works on any device, even when your others are off."
+                  onClick={() => setView("phrase")}
+                />
+              )}
               <Choice
                 icon={
                   starting ? (
@@ -125,8 +152,14 @@ export function UnlockDialog() {
                 onClick={() => setView("recovery")}
               />
             </div>
+            {hasPhrase === false && (
+              <p className="text-xs leading-relaxed text-muted-foreground text-pretty">
+                Once you’re in, you can set an unlock phrase, so next time any
+                device unlocks by typing it.
+              </p>
+            )}
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Lost both?{" "}
+              Lost all of these?{" "}
               <button
                 type="button"
                 onClick={() => setView("reset")}
@@ -140,7 +173,7 @@ export function UnlockDialog() {
         {view === "device" && req && (
           <DeviceView
             req={req}
-            onDone={unlocked}
+            onDone={() => unlocked("other")}
             onRetry={async () => {
               void session.cancelUnlock(req);
               setReq(null);
@@ -149,16 +182,26 @@ export function UnlockDialog() {
             onBack={() => {
               void session.cancelUnlock(req);
               setReq(null);
-              setView("recovery");
+              setView("choose");
             }}
           />
         )}
+        {view === "phrase" && (
+          <PhraseView
+            onDone={() => unlocked("phrase")}
+            onBack={() => setView("choose")}
+          />
+        )}
         {view === "recovery" && (
-          <RecoveryView onDone={unlocked} onBack={() => setView("choose")} />
+          <RecoveryView
+            onDone={() => unlocked("other")}
+            onBack={() => setView("choose")}
+          />
         )}
         {view === "reset" && (
           <ResetView onDone={finish} onBack={() => setView("choose")} />
         )}
+        {view === "after" && <AfterView onDone={finish} />}
       </DialogContent>
     </Dialog>
   );
@@ -271,13 +314,82 @@ function DeviceView({
 
       <DialogFooter>
         <Button variant="ghost" onClick={onBack}>
-          Use recovery key instead
+          Other ways to unlock
         </Button>
         {(state === "declined" ||
           state === "expired" ||
           state === "failed") && <Button onClick={onRetry}>Try again</Button>}
       </DialogFooter>
     </>
+  );
+}
+
+function PhraseView({
+  onDone,
+  onBack,
+}: {
+  onDone: () => void;
+  onBack: () => void;
+}) {
+  const { session } = useE2ee();
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setProblem(null);
+    try {
+      await session.unlockWithPhrase(value);
+      onDone();
+    } catch (err) {
+      setProblem(friendlyError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <DialogHeader>
+        <DialogTitle>Unlock direct messages</DialogTitle>
+        <DialogDescription className="leading-relaxed text-pretty">
+          Type your unlock phrase, or let your password manager fill it in.
+        </DialogDescription>
+      </DialogHeader>
+      <AccountField />
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="unlock-phrase">Unlock phrase</Label>
+        <PhraseInput
+          id="unlock-phrase"
+          value={value}
+          onChange={setValue}
+          autoComplete="current-password"
+          invalid={!!problem}
+          describedBy={problem ? "unlock-phrase-problem" : undefined}
+          autoFocus
+        />
+        {problem && (
+          <p
+            id="unlock-phrase-problem"
+            className="text-xs text-destructive"
+            role="alert"
+          >
+            {problem}
+          </p>
+        )}
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onBack} disabled={busy}>
+          Other ways to unlock
+        </Button>
+        <Button type="submit" disabled={busy || !value.trim()}>
+          {busy && <Loader2 className="animate-spin" aria-hidden />}
+          {busy ? "Unlocking…" : "Unlock"}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -356,6 +468,27 @@ function RecoveryView({
   );
 }
 
+// Unlocked the slow way: offer the phrase so next time needs nothing else on.
+function AfterView({ onDone }: { onDone: () => void }) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>You’re in</DialogTitle>
+        <DialogDescription className="leading-relaxed text-pretty">
+          Your direct messages are readable on this device. Want to skip
+          waiting on another device next time? Set an unlock phrase and any
+          device you sign in on can unlock by typing it.
+        </DialogDescription>
+      </DialogHeader>
+      <SetPhraseForm
+        onDone={onDone}
+        onCancel={onDone}
+        cancelLabel="Not now"
+      />
+    </>
+  );
+}
+
 function ResetView({
   onDone,
   onBack,
@@ -364,12 +497,14 @@ function ResetView({
   onBack: () => void;
 }) {
   const { session } = useE2ee();
+  const { mutate } = useSWRConfig();
   const [busy, setBusy] = useState(false);
 
   async function reset() {
     setBusy(true);
     try {
       await session.reset();
+      void mutate(phraseKey(session.userId), false, { revalidate: false });
       onDone();
     } catch (err) {
       toast.error(friendlyError(err));
@@ -383,8 +518,8 @@ function ResetView({
       <DialogHeader>
         <DialogTitle>Start over with new keys?</DialogTitle>
         <DialogDescription className="leading-relaxed text-pretty">
-          Only for when you’ve lost every device you were signed in on and your
-          recovery key.
+          Only for when you’ve lost every device you were signed in on, your
+          unlock phrase and your recovery key.
         </DialogDescription>
       </DialogHeader>
       <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm leading-relaxed text-muted-foreground">
@@ -395,7 +530,7 @@ function ResetView({
         <li>
           The people you message will see that your security code changed.
         </li>
-        <li>You’ll get a new recovery key to save.</li>
+        <li>You’ll get a new recovery key to save, and your unlock phrase stops working.</li>
       </ul>
       <DialogFooter>
         <Button variant="ghost" onClick={onBack}>

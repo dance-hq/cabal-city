@@ -56,9 +56,9 @@ export default function TermsPage() {
             message with admins.
           </li>
           <li>
-            Your keys live on your devices, backed up under a recovery key only you have. Keep it somewhere safe. If
-            you lose every device and the recovery key, those messages are gone for good, and we can&apos;t get them
-            back for you.
+            Your keys live on your devices, backed up under a recovery key only you have (and, if you choose one, an
+            unlock phrase). Keep them somewhere safe. If you lose every device, the recovery key and the phrase,
+            those messages are gone for good, and we can&apos;t get them back for you.
           </li>
           <li>
             Don&apos;t try to read other people&apos;s keys or messages, or tamper with how encryption works for

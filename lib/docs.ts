@@ -363,7 +363,7 @@ export const DATA_MODEL: Fact[] = [
   {
     label: 'Encryption',
     value: 'e2ee_keys · e2ee_backups · e2ee_device_requests · messages.sealed · message_files.sealed',
-    body: 'Public keys, recovery-key-locked backups and in-flight device approvals. See End-to-end encryption below.',
+    body: 'Public keys, recovery-key and unlock-phrase backups, and in-flight device approvals. See End-to-end encryption below.',
     sources: [{ path: E2EE_SCHEMA }],
   },
 ]
@@ -653,6 +653,15 @@ export const KEY_CARE: Fact[] = [
     sources: [{ path: E2EE, proves: ['cabal-recovery-v1'] }, { path: E2EE_SCHEMA, proves: ['create function public.e2ee_publish_key'] }],
   },
   {
+    label: 'Unlock phrase',
+    value: 'AES-GCM under PBKDF2-SHA256(phrase)',
+    body: 'Optional. A second backup of your keyring, locked with a phrase you choose, so a new device can unlock without another one being on. 600,000 iterations and a random 16-byte salt; associated data `cabal-phrase-backup-v1` plus your user id. Stored in `e2ee_phrase_backups`, readable only by its owner, saved only against your current key and dropped when that key is retired. Its strength is the phrase’s: anyone holding the backup can try guesses offline, so it asks for a long phrase.',
+    sources: [
+      { path: E2EE, proves: ['PHRASE_ITERATIONS = 600_000', 'cabal-phrase-backup-v1'] },
+      { path: 'supabase/migrations/0034_e2ee_unlock_phrase.sql', proves: ['create function public.e2ee_save_phrase', 'e2ee_keys_drop_stale_phrase'] },
+    ],
+  },
+  {
     label: 'Security code',
     value: '12 × 5 digits · SHA-512',
     body: 'Over both user ids and public keys, in a fixed order, so both people see the same code. Clients remember each peer’s key and flag a change; a code you’ve checked is remembered for that key only.',
@@ -679,7 +688,7 @@ export const ENCRYPTION_SCOPE: string[] = [
   'Rooms and team channels aren’t end-to-end encrypted. They’re protected by TLS and RLS, and the people who run a Cabal server can read them.',
   'Photos and videos in direct messages are encrypted on your device before they upload, each under its own key, with their name and type sealed alongside. Their size isn’t hidden.',
   'Metadata isn’t hidden: who talks to whom, when, and the padded size of each message all pass through the server so delivery and unread counts work.',
-  'Keys live only on your devices and in your recovery-key backup. Lose every device and the recovery key, and nobody can recover those messages. Clearing a browser’s site data deletes its keys.',
+  'Keys live only on your devices, in your recovery-key backup and, if you set one, your unlock-phrase backup. Lose every device, the recovery key and the phrase, and nobody can recover those messages. Clearing a browser’s site data deletes its keys.',
   'The encrypting code is served by the Cabal server (the desktop app loads the same web app), so the protection assumes that server serves the published code. A compromised deployment could ship code that reads messages before they are sealed, as with any web-delivered encryption.',
   'Public keys come from the server. A swapped key shows a “security code changed” notice only if you already had their old key; comparing security codes in person is what rules out a swap on first contact.',
 ]
