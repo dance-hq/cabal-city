@@ -42,9 +42,10 @@ export function Finale() {
   const note = p(f, c.place + 20, 18)
 
   const taglineY = top + LH + (fmt.portrait ? 70 : 54)
-  const tagSize = fmt.portrait ? 76 : 64
+  const tagSize = fmt.portrait ? 92 : 64
   const placeY = taglineY + tagSize * 1.1 + 34
-  const stripeH = fmt.portrait ? 12 : 10
+  // The same flag stripes as the opening, so the film opens and closes on Chicago.
+  const stripeH = fmt.portrait ? 36 : 10
   const stripeTop = top - (fmt.portrait ? 150 : 96)
   const stripeBottom = placeY + (fmt.portrait ? 130 : 84)
 
@@ -62,7 +63,6 @@ export function Finale() {
             top: y,
             height: stripeH,
             background: C.flag,
-            opacity: 0.9,
           }}
         />
       ))}
@@ -84,7 +84,7 @@ export function Finale() {
       </svg>
 
       <div style={{ position: 'absolute', left: 0, right: 0, top: taglineY, display: 'flex', justifyContent: 'center' }}>
-        <Words text="Lock in. Build together." frame={f} at={c.tagline} size={tagSize} stagger={4} align="center" />
+        <Words text="Cabal is here." frame={f} at={c.tagline} size={tagSize} stagger={5} align="center" />
       </div>
       <div
         style={{
@@ -92,24 +92,28 @@ export function Finale() {
           left: 0,
           right: 0,
           top: placeY,
-          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 14,
           fontFamily: MONO,
           fontSize: fmt.portrait ? 26 : 22,
           letterSpacing: '0.16em',
           textTransform: 'uppercase',
-          color: C.muted,
+          color: C.flag,
           opacity: place,
           transform: `translateY(${(1 - place) * 10}px)`,
         }}
       >
-        Chicago is the first community
+        <span style={{ width: 10, height: 10, borderRadius: 999, background: C.online }} />
+        Now open for Chicago builders
       </div>
       <div
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: fmt.portrait ? 80 : 40,
+          bottom: fmt.portrait ? 150 : 40,
           textAlign: 'center',
           fontFamily: MONO,
           fontSize: 15,

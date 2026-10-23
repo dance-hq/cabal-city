@@ -338,6 +338,55 @@ export async function openWithRecoveryKey(backup: { iv: string; keyring: string 
   return decrypt(await recoveryLock(recoveryKey, userId), backup.iv, backup.keyring, backupAad(userId))
 }
 
+// --- Unlock phrases ---------------------------------------------------------------
+
+// A second backup of your keys, locked with a phrase you choose, so any device
+// can unlock by typing it (or a password manager filling it) without another
+// device being on. PBKDF2 makes each guess slow; the phrase never leaves the
+// device. A long phrase is what keeps this backup as safe as the other one.
+
+export const PHRASE_ITERATIONS = 600_000
+const MIN_ITERATIONS = 600_000
+const MAX_ITERATIONS = 5_000_000
+export const MIN_PHRASE_CHARS = 12
+
+/** Spacing and look-alike Unicode forms don't matter; case does. */
+export function normalizePhrase(input: string): string {
+  return input.normalize('NFKC').trim().replace(/\s+/g, ' ')
+}
+
+/** Why a phrase is too easy to guess, or null when it's fine. */
+export function phraseProblem(input: string): string | null {
+  const p = normalizePhrase(input)
+  if (p.length < MIN_PHRASE_CHARS) return `Use at least ${MIN_PHRASE_CHARS} characters. A few unrelated words works well.`
+  if (new Set(p.toLowerCase()).size < 6) return 'That’s too repetitive to be safe. Try a few unrelated words.'
+  return null
+}
+
+async function phraseLock(phrase: string, salt: Bytes, iterations: number): Promise<Bytes> {
+  const base = await subtle().importKey('raw', encode(normalizePhrase(phrase)), 'PBKDF2', false, ['deriveBits'])
+  return new Uint8Array(await subtle().deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, base, 256))
+}
+
+const phraseAad = (userId: string) => encode(`cabal-phrase-backup-v1|${userId}`)
+
+export type PhraseBackup = { salt: string; iterations: number; iv: string; keyring: string }
+
+export async function lockWithPhrase(keyring: Bytes, phrase: string, userId: string): Promise<PhraseBackup> {
+  const salt = randomBytes(16)
+  const { iv, ct } = await encrypt(await phraseLock(phrase, salt, PHRASE_ITERATIONS), keyring, phraseAad(userId))
+  return { salt: toBase64(salt), iterations: PHRASE_ITERATIONS, iv, keyring: ct }
+}
+
+/** Throws when the phrase is wrong. */
+export async function openWithPhrase(backup: PhraseBackup, phrase: string, userId: string) {
+  if (!Number.isInteger(backup.iterations) || backup.iterations < MIN_ITERATIONS || backup.iterations > MAX_ITERATIONS) {
+    throw new Error('Unexpected iteration count')
+  }
+  const key = await phraseLock(phrase, fromBase64(backup.salt), backup.iterations)
+  return decrypt(key, backup.iv, backup.keyring, phraseAad(userId))
+}
+
 // --- Unlocking another device -----------------------------------------------------
 
 export type DeviceOffer = { privateKey: CryptoKey; publicKey: string; nonce: string }

@@ -9,9 +9,7 @@ import { OpenSource } from './scenes/open-source'
 import { Opportunities } from './scenes/opportunities'
 import { Together } from './scenes/together'
 import { C } from './theme'
-import { SCENES, TEASER_CUTS, type SceneName } from './timeline'
-
-export { TEASER_LENGTH } from './timeline'
+import { SCENES, type SceneName } from './timeline'
 
 const PARTS: Record<SceneName, () => React.JSX.Element> = {
   noise: Noise,
@@ -49,25 +47,5 @@ export function Film({ audio }: { audio: string | null }) {
       <FilmPicture />
       {audio ? <Audio src={staticFile(audio)} /> : null}
     </>
-  )
-}
-
-export function Teaser({ audio }: { audio: string | null }) {
-  let at = 0
-  return (
-    <AbsoluteFill style={{ background: C.ink }}>
-      {TEASER_CUTS.map(([a, b]) => {
-        const from = at
-        at += b - a
-        return (
-          <Sequence key={a} from={from} durationInFrames={b - a}>
-            <Sequence from={-a}>
-              <FilmPicture />
-            </Sequence>
-          </Sequence>
-        )
-      })}
-      {audio ? <Audio src={staticFile(audio)} /> : null}
-    </AbsoluteFill>
   )
 }

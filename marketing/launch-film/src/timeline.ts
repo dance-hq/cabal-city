@@ -25,7 +25,7 @@ export const TOTAL = SCENES.finale[1]
 export const CUE = {
   intent: { line: 14, buttonIn: 60, press: PRESS - SCENES.intent[0], morph: 96, focusIn: 110, typeFrom: 118 },
   together: { rowsFrom: 0, rowEvery: BEAT, pull: 108, pullLen: 52, captionA: 150, captionB: 186 },
-  help: { header: 6, ask: 18, intro: 45, switchRoom: 92, launch: 104, reply1: 126, reply2: 146, sub: 150 },
+  help: { launch: 16, reply1: 50, reply2: 72, reply3: 94, sub: 116 },
   opps: { header: 6, rows: [16, 30, 44], pick: 82, toast: 92, headline: 14, sub: 108 },
   cal: { header: 6, rows: [16, 34], add: 66, headline: 12, sub: 50 },
   open: { headline: 8, typeFrom: 24, license: 66, sub: 76 },
@@ -34,17 +34,6 @@ export const CUE = {
 } as const
 
 export const FOCUS_TEXT = 'Pricing page for the beta'
-
-// The teaser is a cut of the master: [source start, source end] pairs played
-// back to back. Picture and sound both read this list.
-export const TEASER_CUTS: [number, number][] = [
-  [84, 150],
-  [196, 300],
-  // 465 keeps the music on the beat across the next join (540 → 1260 is 48 beats).
-  [465, 540],
-  [1260, 1440],
-]
-export const TEASER_LENGTH = TEASER_CUTS.reduce((n, [a, b]) => n + b - a, 0)
 
 // Noise: when each notification lands (scene-local), denser toward the cut.
 export const NOISE_COUNT = 46

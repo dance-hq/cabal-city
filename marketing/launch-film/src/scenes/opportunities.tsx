@@ -122,14 +122,14 @@ export function Opportunities() {
   const words = (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: fmt.portrait ? 'center' : 'flex-start' }}>
       <Words
-        text={'Find what moves\nyour work forward.'}
+        text={'Find your\nnext break.'}
         frame={frame}
         at={c.headline}
-        size={size}
+        size={fmt.portrait ? 116 : 104}
         align={fmt.portrait ? 'center' : 'left'}
       />
       <Words
-        text={'Credits, programs and events,\ncurated by the community.'}
+        text={'Residencies, credits and hackathons,\npicked for Chicago builders.'}
         frame={frame}
         at={c.sub}
         size={fmt.portrait ? 44 : 40}

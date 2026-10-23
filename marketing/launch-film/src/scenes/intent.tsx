@@ -8,7 +8,7 @@ import { CUE, FOCUS_TEXT, SCENES } from '../timeline'
 
 const LEN = SCENES.intent[1] - SCENES.intent[0]
 
-// Silence, one sentence, one button. The press starts the music.
+// Silence, two words, one button. The press starts the music.
 export function Intent() {
   const frame = useCurrentFrame()
   const fmt = useFormat()
@@ -35,14 +35,8 @@ export function Intent() {
     <AbsoluteFill style={{ background: C.ink, opacity: 1 - exit, transform: `scale(${1 - 0.04 * exit})` }}>
       <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ transform: `translateY(${lineY}px) scale(${lineScale})` }}>
-          <Words
-            text={fmt.portrait ? 'Cabal is for when\nyou’re ready to build.' : 'Cabal is for when you’re ready to build.'}
-            frame={frame}
-            at={c.line}
-            stagger={4}
-            size={fmt.portrait ? 92 : 88}
-            align="center"
-          />
+          {/* Reads into the button below it: "Open Cabal. Lock in." */}
+          <Words text="Open Cabal." frame={frame} at={c.line} stagger={6} size={fmt.portrait ? 128 : 112} align="center" />
         </div>
       </AbsoluteFill>
 

@@ -39,8 +39,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Your public encryption key</strong>, so people can send you encrypted direct messages, and a
-            backup of your private keys that only your recovery key can open. Your private keys stay on your own
-            devices. We never have them or your recovery key.
+            backup of your private keys that only your recovery key can open. If you set an unlock phrase, a second
+            backup that only that phrase can open. Your private keys stay on your own devices. We never have them,
+            your recovery key or your phrase.
           </li>
           <li>
             <strong>How you use conversations</strong>: which ones you&apos;ve read up to where, which you&apos;ve

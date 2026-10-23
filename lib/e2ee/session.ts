@@ -10,6 +10,7 @@ import {
   exportPublicKey,
   importPublicKey,
   isEnvelope,
+  lockWithPhrase,
   lockWithRecoveryKey,
   messageKey,
   newDeviceOffer,
@@ -20,9 +21,11 @@ import {
   openFromDevice,
   openLongText,
   openMessage,
+  openWithPhrase,
   openWithRecoveryKey,
   packKeyring,
   parseRecoveryKey,
+  phraseProblem,
   sealFile,
   sealForDevice,
   sealLongText,
@@ -43,7 +46,7 @@ import { loadPeer, loadVault, removeVault, savePeer, saveVault, type Vault } fro
 //   loading      checking this device and the server
 //   ready        this device has your current key
 //   locked       you have a key, but not on this device yet: unlock it from
-//                another device or with your recovery key
+//                another device, your unlock phrase or your recovery key
 //   unsupported  this browser can't do the cryptography
 //   error        couldn't reach the server to check
 
@@ -256,6 +259,52 @@ export class E2eeSession {
     const { recovery: _, ...rest } = this.vault
     await this.save(rest)
     this.emit()
+  }
+
+  // --- unlock phrases -----------------------------------------------------------------
+
+  /** Whether you've set an unlock phrase. A reset drops it, since it would hold old keys. */
+  async hasPhrase(): Promise<boolean> {
+    const { data, error } = await this.db.from('e2ee_phrase_backups').select('key_id').eq('user_id', this.userId).maybeSingle()
+    if (error) throw error
+    return !!data
+  }
+
+  async unlockWithPhrase(input: string) {
+    const { data, error } = await this.db
+      .from('e2ee_phrase_backups')
+      .select('salt, iterations, iv, keyring')
+      .eq('user_id', this.userId)
+      .maybeSingle()
+    if (error) throw error
+    if (!data) throw new E2eeError('There’s no unlock phrase yet. Approve from another device or use your recovery key.')
+    let keys: KeyringEntry[]
+    try {
+      keys = await unpackKeyring(await openWithPhrase(data, input, this.userId))
+    } catch {
+      throw new E2eeError('That phrase doesn’t match. Check it and try again.')
+    }
+    await this.adopt(keys)
+  }
+
+  async setPhrase(phrase: string) {
+    if (this.status !== 'ready' || !this.vault.activeId) throw new E2eeError('Unlock this device first.')
+    const problem = phraseProblem(phrase)
+    if (problem) throw new E2eeError(problem)
+    const backup = await lockWithPhrase(await packKeyring(this.vault.keys), phrase, this.userId)
+    const { error } = await this.db.rpc('e2ee_save_phrase', {
+      p_key: this.vault.activeId,
+      p_salt: backup.salt,
+      p_iterations: backup.iterations,
+      p_iv: backup.iv,
+      p_backup: backup.keyring,
+    })
+    if (error) throw error
+  }
+
+  async removePhrase() {
+    const { error } = await this.db.rpc('e2ee_remove_phrase')
+    if (error) throw error
   }
 
   /** Starting over: a new key pair. Anything only the old keys could open stays locked. */

@@ -1,11 +1,12 @@
 import { AbsoluteFill, useCurrentFrame } from 'remotion'
 import { Words } from '../components/words'
-import { out, p, rng, useFormat } from '../motion'
+import { inOut, out, p, rng, useFormat } from '../motion'
 import { C, SANS } from '../theme'
 import { noiseTimes } from '../timeline'
 
-// Cold open: the always-on internet. Generic, unbranded pings that pile up
-// faster and faster until a hard cut to silence.
+// Cold open: Chicago is named in the first second, inside the flag's stripes,
+// while the always-on internet (generic, unbranded pings) piles up faster and
+// faster around it until a hard cut to silence.
 const LINES = [
   'Are you around?',
   'Got a sec?',
@@ -44,7 +45,7 @@ function pings(portrait: boolean): Ping[] {
     for (let tries = 0; tries < 20; tries++) {
       x = 0.04 + random() * 0.84
       y = 0.05 + random() * 0.88
-      const band = portrait ? y > 0.4 && y < 0.6 : y > 0.36 && y < 0.62 && x > 0.12 && x < 0.7
+      const band = portrait ? y > 0.33 && y < 0.64 : y > 0.36 && y < 0.62 && x > 0.12 && x < 0.7
       if (!band || i > 30) break
     }
     const n = random()
@@ -119,12 +120,49 @@ export function Noise() {
         style={{
           alignItems: 'center',
           justifyContent: 'center',
-          background: `radial-gradient(ellipse ${fmt.portrait ? '85% 26%' : '48% 30%'} at 50% 50%, ${C.ink}f2 30%, ${C.ink}00 100%)`,
+          background: `radial-gradient(ellipse ${fmt.portrait ? '95% 30%' : '48% 30%'} at 50% 50%, ${C.ink}f5 34%, ${C.ink}00 100%)`,
         }}
       >
-        <Words text={fmt.portrait ? 'Most apps want\nyou online.' : 'Most apps want you online.'} frame={frame} at={16} size={size} align="center" />
-        <Words text="All the time." frame={frame} at={74} size={size} align="center" color={C.dim} style={{ marginTop: 8 }} />
+        <Words text="Chicago builders," frame={frame} at={14} size={fmt.portrait ? 76 : 72} align="center" />
+        <Words
+          text={fmt.portrait ? 'it’s time\nto lock in.' : 'it’s time to lock in.'}
+          frame={frame}
+          at={52}
+          stagger={5}
+          size={fmt.portrait ? 132 : size * 1.25}
+          lineHeight={0.98}
+          align="center"
+          style={{ marginTop: 18 }}
+        />
       </AbsoluteFill>
+      <FlagStripes frame={frame} />
     </AbsoluteFill>
+  )
+}
+
+// The Chicago flag's two light-blue stripes, the same band the homepage
+// uses. They sweep out from the middle and hold still while the noise
+// piles up around them; the finale draws them again.
+function FlagStripes({ frame }: { frame: number }) {
+  const fmt = useFormat()
+  const t = p(frame, 4, 34, inOut)
+  const h = fmt.portrait ? 40 : 30
+  const gap = fmt.portrait ? 300 : 230
+  return (
+    <>
+      {[-1, 1].map((side) => (
+        <div
+          key={side}
+          style={{
+            position: 'absolute',
+            left: fmt.w / 2 - (fmt.w / 2) * t,
+            width: fmt.w * t,
+            top: fmt.h / 2 + side * gap - h / 2,
+            height: h,
+            background: C.flag,
+          }}
+        />
+      ))}
+    </>
   )
 }
